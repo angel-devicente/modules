@@ -2246,6 +2246,12 @@ proc modulepath-label {modpath label} {
    reportDebug "modpath=$modpath, label='$label'"
 }
 
+proc modulepath-indent {modpath indent} {
+   set modpath [getAbsolutePath $modpath]
+   set ::g_modulepathIndent($modpath) $indent
+   reportDebug "modpath=$modpath, indent='$indent'"
+}
+
 proc unique-name-conflict {} {
    # skip if unique_name_loaded configuration is disabled
    if {![getConf unique_name_loaded]} {

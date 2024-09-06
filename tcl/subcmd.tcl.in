@@ -1906,9 +1906,10 @@ proc cmdModuleAvail {show_oneperline show_mtime show_filter search_filter\
             # err is raised from a modulerc)
             array set mod_list [getModules $dir $mod $show_mtime\
                $search_filter $show_filter]
-            set modpath_label [getModulepathLabel $dir]
+             set modpath_label [getModulepathLabel $dir]
+             set modpath_indent [getModulepathIndent $dir]             
             reportModules $search_queries $modpath_label mp $hstyle\
-               $show_mtime 0 $one_per_line $theader_cols hidden-loaded
+                $show_mtime 0 $one_per_line $theader_cols hidden-loaded {} $modpath_indent
          } else {
             # add result if not already added from an upper priority modpath
             foreach {elt props} [getModules $dir $mod $show_mtime\

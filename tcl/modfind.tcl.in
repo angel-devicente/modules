@@ -506,6 +506,16 @@ proc getModulepathLabel {modpath} {
    return $label
 }
 
+proc getModulepathIndent {modpath} {
+   if {[info exists ::g_modulepathIndent($modpath)]} {
+      set indent $::g_modulepathIndent($modpath)
+   } else {
+      set indent 0
+   }
+   return $indent
+}
+
+
 # return list of the configured and existing global RC files
 proc getGlobalRcFileList {} {
    set rclist {}
