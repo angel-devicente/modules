@@ -1555,8 +1555,13 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
    }
 
    # output formatted elements
-   displayElementList $header $hsgrkey $hstyle $one_per_line $show_idx 1\
-      $display_list $len_list $max_len $indent
+   if {$search_queries == "*"} {
+       displayElementList $header $hsgrkey $hstyle $one_per_line $show_idx 1\
+           $display_list $len_list $max_len $indent
+   } else {
+       displayElementList $header $hsgrkey $hstyle $one_per_line $show_idx 1\
+           $display_list $len_list $max_len $indent 1
+   }
 }
 
 proc showModulePath {} {
@@ -1594,7 +1599,7 @@ proc displaySeparatorLine {{title {}} {sgrkey {}} {indent 0}} {
       set lrep [tcl::mathfunc::max [expr {($tty_cols - $len - 2)/2}] 1]
        set rrep [tcl::mathfunc::max [expr {$tty_cols - $len - 2 - $lrep}] 1]
        if {$indent > 0} {
-           report "[string repeat " " $indent][string repeat "." $lrep] [sgr $sgrkey $title] [string repeat "."\
+           report "[string repeat " " $indent][string repeat "." $lrep] [sgr er $title] [string repeat "."\
          $rrep]"
        } else {
            report "[string repeat " " $indent][string repeat = $lrep] [sgr $sgrkey $title] [string repeat =\
@@ -1606,7 +1611,7 @@ proc displaySeparatorLine {{title {}} {sgrkey {}} {indent 0}} {
 # get a list of elements and print them in a column or in a
 # one-per-line fashion
 proc displayElementList {header sgrkey hstyle one_per_line display_idx\
-                             start_idx display_list {len_list {}} {max_len 0} {indent 0}} {
+                             start_idx display_list {len_list {}} {max_len 0} {indent 0} {terse 0}} {
    set elt_cnt [llength $display_list]
    reportDebug "header=$header, sgrkey=$sgrkey, hstyle=$hstyle,\
       elt_cnt=$elt_cnt, max_len=$max_len, one_per_line=$one_per_line,\
@@ -1615,8 +1620,10 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
    # end proc if no element are to print
     if {$elt_cnt == 0} {
         if {$indent != 0} {
-            displaySeparatorLine $header $sgrkey $indent
-            reportSeparateNextContent
+            if {$terse != 1} {
+             displaySeparatorLine $header $sgrkey $indent
+             reportSeparateNextContent
+            }
         }
         return
    }
