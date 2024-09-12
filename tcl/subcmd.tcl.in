@@ -410,7 +410,8 @@ proc cmdModuleSearch {{mod {}} {search {}}} {
             }
          }
 
-         displayElementList $dir mp sepline 1 0 0 $display_list
+         set modpath_label [getModulepathLabel $dir] 
+         displayElementList $modpath_label mp sepline 1 0 0 $display_list
       }
    }
    lpopState mode
