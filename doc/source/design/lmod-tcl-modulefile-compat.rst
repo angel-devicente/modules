@@ -9,8 +9,9 @@ Lmod Tcl modulefile compatibility
   - No evaluation error
   - Be as close as possible to the behavior of Lmod
 
-- As of Modules v5.0, the following Tcl modulefile command of Lmod are not
-  supported:
+- Starting with Modules v5.1, the following Tcl modulefile commands from Lmod
+  are now supported. This document describes their implementation and behavior
+  in Modules v5.1 and later.
 
   - ``add-property``
   - ``remove-property``
@@ -25,6 +26,9 @@ Lmod Tcl modulefile compatibility
   - ``hide-version``
   - ``hide-modulefile``
 
+- See :ref:`Compatibility with Lmod Tcl modulefile` section in
+  :ref:`modulefile(5)` man page for the current state of support.
+
 
 ``add-property``/``remove-property``
 ------------------------------------
@@ -37,7 +41,8 @@ Lmod Tcl modulefile compatibility
   - Could be unset with ``remove-property``
   - Defined as a key-value
 
-- These commands will be first implemented as a no-operation command (``nop``)
+- As of Modules version 5.1, these commands are implemented as a no-operation
+  command (``nop``)
 
   - No error raised if used
   - And no warning message to avoid polluting output
@@ -45,8 +50,18 @@ Lmod Tcl modulefile compatibility
 - These commands are intended for use only within modulefile evaluation
   context (not within modulerc)
 
-- *FUTURE*: it could be interesting to map some properties on tags like the
-  ``lmod:sticky`` property which corresponds to the ``sticky`` tag
+- An update is made on Modules version 5.6: argument *value* of
+  mfcmd:`add-property` is converted to :mfcmd:`module-tag` onto loading
+  modulefile
+
+  - Argument *name* is ignored as it seems *value* is the deterministic
+    information (can be understood just by itself)
+  - Argument *value* is split as sometimes multiple values are aggregated with
+    ``:`` separator
+  - ``remove-property`` stays as a no-op operation as Modules does not have
+    a tag-withdrawn mechanism (and it does not seem useful)
+  - ``add-property`` is no-op during scan evaluation mode as module tags
+    search does not currently trigger an extra match search
 
 
 ``extensions``
@@ -59,7 +74,8 @@ Lmod Tcl modulefile compatibility
   - Not used to load the modulefile declaring them when an extension name is
     passed to ``load`` sub-command or ``depends-on`` modulefile command
 
-- This command will be first implemented as a no-operation command (``nop``)
+- This command was first implemented as a no-operation command (``nop``) in
+  Modules 5.1
 
   - No error raised if used
   - And no warning message to avoid polluting output
@@ -67,12 +83,8 @@ Lmod Tcl modulefile compatibility
 - This command is intended for use only within modulefile evaluation context
   (not within modulerc)
 
-- *FUTURE*: may be interesting to improve the concept by making the extension
-  names an alias on the modulefile declaring them
-
-  - Will automatically achieve dependency consistency this way
-  - Could resolve dependencies based on extension names if modulefile is
-    evaluated during an ``avail``
+- Starting Modules 5.6, this command is made an alias onto :mfcmd:`provide`
+  modulefile command. See :ref:`provide` for details.
 
 
 ``prereq-any``
@@ -366,5 +378,47 @@ Lmod Tcl modulefile compatibility
 
 - These commands are intended for use only within modulerc evaluation context
   (not within modulefile)
+
+
+``--mode`` option
+-----------------
+
+Lmod introduced on version ``8.7.60`` the ``--mode`` option (short name
+``-m`` or ``-mode``) for the following modulefile commands:
+
+* ``setenv``
+* ``unsetenv``
+* ``prepend-path``
+* ``append-path``
+* ``remove-path``
+* ``pushenv``
+* ``module load``
+* ``module load-any``
+* ``module try-load``
+* ``module unload``
+
+See :ref:`mode-select` design documentation to learn about this option.
+
+This ``--mode`` option is not supported currently on Modules and an error is
+raised when it is used in modulefiles.
+
+
+``--respect`` option
+--------------------
+
+Lmod has the ``--respect`` option (short name ``-r`` or ``-respect``) for the
+following modulefile commands:
+
+* ``setenv``
+* ``unsetenv``
+
+This option on ``setenv`` does not change the environment variable value, if
+this variable is already defined. On ``unsetenv``, environment variable is not
+unset if its current value does not equal the one specified on ``unsetenv``
+command.
+
+This ``--respect`` option is not supported currently on Modules and an error
+is raised when it is used in modulefiles.
+
 
 .. vim:set tabstop=2 shiftwidth=2 expandtab autoindent:

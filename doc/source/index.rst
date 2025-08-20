@@ -3,6 +3,21 @@
 Environment Modules
 ===================
 
+.. image:: https://img.shields.io/github/stars/envmodules/modules
+    :target: https://github.com/envmodules/modules
+    :alt: GitHub Repository
+
+.. image:: https://img.shields.io/github/license/envmodules/modules?color=lightsteelblue
+    :alt: GitHub License
+
+.. image:: https://img.shields.io/github/v/release/envmodules/modules
+    :target: https://github.com/envmodules/modules/releases/latest
+    :alt: GitHub Release
+
+.. image:: https://img.shields.io/twitter/url/https/twitter.com/EnvModules.svg?style=social&label=@EnvModules
+    :target: https://twitter.com/EnvModules
+    :alt: Twitter/X
+
 **Welcome to the Environment Modules documentation portal. The Environment
 Modules package provides for the dynamic modification of a user's environment
 via modulefiles.**
@@ -22,7 +37,7 @@ replace the shared modulefiles.
 
 Modules can be **loaded** and **unloaded** dynamically and atomically,
 in an clean fashion. All popular shells are supported, including *bash*,
-*ksh*, *zsh*, *sh*, *csh*, *tcsh*, *fish*, *cmd*, as well as some scripting
+*ksh*, *zsh*, *sh*, *csh*, *tcsh*, *fish*, *cmd*, *pwsh*, as well as some
 languages such as *tcl*, *perl*, *python*, *ruby*, *cmake* and *r*.
 
 Modules are useful in managing different versions of applications. Modules
@@ -40,16 +55,16 @@ Quick examples
 Here is an example of loading a module on a Linux machine under bash.
 ::
 
-    $ module load gcc/9.4.0
+    $ module load gcc/12.4.0
     $ which gcc
-    $ /usr/local/gcc/9.4.0/linux-x86_64/bin/gcc
+    $ /usr/local/gcc/12.4.0/linux-x86_64/bin/gcc
 
 Now we'll switch to a different version of the module
 ::
 
-    $ module switch gcc gcc/10
+    $ module switch gcc/14
     $ which gcc
-    /usr/local/gcc/10.3.0/linux-x86_64/bin/gcc
+    /usr/local/gcc/14.2.0/linux-x86_64/bin/gcc
 
 And now we'll unload the module altogether
 ::
@@ -61,9 +76,9 @@ And now we'll unload the module altogether
 Now we'll log into a different machine, using a different shell (tcsh).
 ::
 
-    % module load gcc/10.3
+    % module load gcc/14.2
     % which gcc
-    /usr/local/gcc/10.3.0/linux-aarch64/bin/gcc
+    /usr/local/gcc/14.2.0/linux-aarch64/bin/gcc
 
 Note that the command line is exactly the same, but the path has
 automatically configured to the correct architecture.
@@ -79,6 +94,7 @@ automatically configured to the correct architecture.
    NEWS
    FAQ
    changes
+   other-implementations
 
 .. toctree::
    :hidden:
@@ -95,6 +111,7 @@ automatically configured to the correct architecture.
    ml
    module
    modulefile
+   envml
 
 .. toctree::
    :hidden:
@@ -102,7 +119,11 @@ automatically configured to the correct architecture.
    :caption: Development
 
    CONTRIBUTING
+   devel
    design
+   CHARTER
+   GOVERNANCE
+   acknowledgments
 
 
 Get started with Modules
@@ -115,18 +136,66 @@ introduced by each version is available in the :ref:`MIGRATING` guide.
 :ref:`changes` document gives an in-depth view of the modified behaviors and
 new features between major versions.
 
-Reference manual page for the :ref:`module(1)` and :ref:`ml(1)` commands and
-for :ref:`modulefile(5)` script provide details on all supported options.
+Reference manual page for the :ref:`module(1)`, :ref:`ml(1)` and
+:ref:`envml(1)` commands and for :ref:`modulefile(5)` script provide details
+on all supported options.
 
 A :ref:`cookbook` of recipes describes how to use the various features of
 Modules and how to extend the :command:`module` command to achieve specific
 needs.
 
-If you have questions, comments or development suggestions for the Modules
-community, please read the :ref:`CONTRIBUTING` guide.
+Links
+-----
+
+* Web site: http://modules.sourceforge.net
+* Documentation: https://modules.readthedocs.io
+* Source repository: https://github.com/envmodules/modules
+* Issue tracking system: https://github.com/envmodules/modules/issues
+* Download releases: https://github.com/envmodules/modules/releases
+
+.. _Community:
+
+Community
+---------
+
+Modules is an open source project. Questions, discussion, and contributions
+are welcome. You can get in contact with the Modules community via:
+
+* the `modules-interest mailing list`_
+  (``modules-interest@lists.sourceforge.net``)
+* the `Modules chat room`_ (``#modules:matrix.org``)
+
+The project is also present on several social media platforms:
+
+* X/Twitter: `@EnvModules`_
+* Mastodon: `@EnvModules@mast.hpc.social`_
+* Bluesky: `@EnvModules.bsky.social`_
+
+.. _modules-interest mailing list: https://sourceforge.net/projects/modules/lists/modules-interest
+.. _Modules chat room: https://matrix.to/#/#modules:matrix.org
+.. _@EnvModules: https://x.com/EnvModules
+.. _@EnvModules@mast.hpc.social: https://mast.hpc.social/@EnvModules
+.. _@EnvModules.bsky.social: https://bsky.app/profile/envmodules.bsky.social
+
+Contributing
+------------
+
+Modules project welcomes contributions of all kinds! Before submitting an
+issue or pull request, please take a moment to review our :ref:`Contributing
+guide<CONTRIBUTING>`. It includes important information about issue reporting,
+coding standards, etc.
+
+Please note that Modules project has a `Code of conduct`_. It ensures a
+respectful and inclusive environment for all contributors. By participating in
+the Modules community, you agree to abide by its rules.
+
+This project also adheres to a :ref:`Technical charter<CHARTER>`, which
+defines its governance model, decision-making process, and long-term vision.
+
+.. _Code of conduct: https://github.com/envmodules/modules?tab=coc-ov-file#readme
 
 License
 -------
 
 Modules is distributed under the GNU General Public License, either version 2
-or (at your option) any later version (GPL v2+).
+or (at your option) any later version (`GPL-2.0-or-later`).

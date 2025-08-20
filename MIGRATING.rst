@@ -8,6 +8,396 @@ Modules. It provides an overview of the new features and changed behaviors
 that will be encountered when upgrading.
 
 
+v5.6
+====
+
+This new version is backward-compatible with previous version 5 release. It
+fixes bugs but also introduces new functionalities that are described in this
+section. See the :ref:`5.6 release notes<5.6 release notes>` for a complete
+list of the changes between Modules v5.5 and v5.6.
+
+spider sub-command
+------------------
+
+Support has been added for the :subcmd:`spider` sub-command introduced by the
+`Lmod`_ project. This sub-command lists available modules found in enabled
+modulepaths and recursively found in modulepaths enabled by available modules.
+
+.. parsed-literal::
+
+    :ps:`$` module avail
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    foo/1  foo/2
+    :ps:`$` module show foo/1
+    -------------------------------------------------------------------
+    :sgrhi:`/path/to/modulefiles/foo/1`:
+
+    :sgrcm:`conflict`        foo
+    :sgrcm:`module`          use /path/to/modulefiles.2
+    -------------------------------------------------------------------
+    :ps:`$` module show foo/2
+    -------------------------------------------------------------------
+    :sgrhi:`/path/to/modulefiles/foo/2`:
+
+    :sgrcm:`conflict`        foo
+    :sgrcm:`append-path`     MODULEPATH /path/to/modulefiles.3
+    -------------------------------------------------------------------
+    :ps:`$` module spider
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    foo/1  foo/2
+
+    -------------- :sgrdi:`/path/to/modulefiles.2` (via foo/1) --------------
+    bar/1  bar/2  bar/3
+
+    -------------- :sgrdi:`/path/to/modulefiles.3` (via foo/2) --------------
+    bar/3  bar/4
+
+    -------------- :sgrdi:`/path/to/modulefiles.3` (via bar/1) --------------
+    qux/1  qux/2
+
+The :subcmd:`spider` sub-command relies on the :ref:Extra match search
+mechanism to scan modulefiles and identify the modulepaths they enable. Since
+all modulefiles are evaluated during this scan, it is recommended to build
+and use a :ref:`Module cache` to improve search performance.
+
+The output of :subcmd:`spider` is similar to that of the :subcmd:`avail`
+sub-command and supports the same set of options and queries.
+
+.. parsed-literal::
+
+    :ps:`$` module spider -t bar@2:
+    :sgrdi:`/path/to/modulefiles.2`:
+    :sgrhi:`bar/2`
+    bar/3
+
+    :sgrdi:`/path/to/modulefiles.3`:
+    bar/3
+    bar/4
+
+The :subcmd:`spider` sub-command has its own configuration options to control
+the content of its output: :mconfig:`spider_indepth`,
+:mconfig:`spider_output`, and :mconfig:`spider_terse_output`.
+
+These settings make it possible to define output for :subcmd:`spider` that
+differs from the :subcmd:`avail` sub-command.
+
+.. parsed-literal::
+
+    :ps:`$` module config spider_output -modulepath
+    :ps:`$` module config spider_indepth 0
+    :ps:`$` module spider
+    :sgrdi:`bar`/  :sgrdi:`foo`/  :sgrdi:`qux`/
+
+When a modulepath is enabled by a specific module, that modulepath is
+considered available *via* that module. When the module is loaded, this *via*
+information is stored in the :envvar:`__MODULES_LMUSE` environment variable to
+track which modules enable which modulepaths.
+
+By default, the *via* information is included in the standard output of the
+:subcmd:`spider` sub-command. Additionally, the JSON output for both the
+:subcmd:`avail` and :subcmd:`spider` sub-commands has been updated to include
+*via* details for each modulefile.
+
+.. parsed-literal::
+
+    :ps:`$` module spider -j bar@2:
+    {"/path/to/modulefiles.2": {
+    "bar/2": { "name": "bar/2", "type": "modulefile", "symbols": [], "tags": [], "pathname": "/path/to/modulefiles.2/bar/2", "via": "foo/1"}
+    "bar/2": { "name": "bar/3", "type": "modulefile", "symbols": [], "tags": [], "pathname": "/path/to/modulefiles.2/bar/3", "via": "foo/1"}
+    },
+    "/path/to/modulefiles.3": {
+    "bar/3": { "name": "bar/3", "type": "modulefile", "symbols": [], "tags": [], "pathname": "/path/to/modulefiles.3/bar/3", "via": "foo/2"},
+    "bar/4": { "name": "bar/4", "type": "modulefile", "symbols": [], "tags": [], "pathname": "/path/to/modulefiles.3/bar/4", "via": "foo/2"}
+    }}
+
+.. _Requiring via module:
+
+Requiring *via* module
+----------------------
+
+A loaded module that enables a modulepath is considered the *via* module of
+other loaded modules whose modulefiles are stored in this modulepath. The
+:mconfig:`require_via` configuration option is introduced to consider a *via*
+module a requirement for the loaded module stored in the modulepath it
+enables.
+
+A *module hierarchy* mechanism, as introduced by the Lmod_ project, is now
+supported with this feature. It allows organizing modulefiles through a
+primary modulepath, where loading certain modules enables additional
+modulepaths. :mconfig:`require_via` maintains a link between modulefiles in
+these additional paths and the *via* module that activated them.
+
+The :mconfig:`require_via` setting is disabled by default to maintain
+compatibility with previous Modules 5 releases. However, users are encouraged
+to enable this feature if they want to use the *module hierarchy* mechanism.
+
+.. parsed-literal::
+
+    :ps:`$` module config require_via 1
+
+When unloading a *via* module, all the modules stored in its enabled
+modulepath are automatically unloaded thanks to the *Dependent Unload*
+mechanism of the :ref:`Automated module handling mode<MODULES_AUTO_HANDLING>`.
+
+.. parsed-literal::
+
+    :ps:`$` module load foo/1 bar/2
+    :ps:`$` module avail
+    -------------- :sgrdi:`/path/to/modulefiles.2` (via foo/1) --------------
+    bar/1  :sgrl:`bar/2`  bar/3
+
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    :sgrl:`foo/1`  foo/2
+
+    Key:
+    :sgrl:`loaded`  :sgrdi:`modulepath`
+    :ps:`$` module unload foo
+    Unloading :sgrhi:`foo/1`
+      :sgrin:`Unloading dependent`: bar/2
+
+When a *via* module is replaced by another, any modulepaths it enabled are
+updated accordingly. If the newly enabled modulepath provides alternatives to
+modules previously loaded from the original path, those modules are reloaded
+from the new location. If no alternatives are found, the dependent modules are
+unloaded.
+
+.. parsed-literal::
+
+    :ps:`$` module config conflict_unload 1
+    :ps:`$` module load foo/1 bar/3
+    :ps:`$` module load foo/2
+    Loading :sgrhi:`foo/2`
+      :sgrin:`Unloading dependent`: bar/3
+      :sgrin:`Unloading conflict`: foo/1
+      :sgrin:`Reloading dependent`: bar/3
+    :ps:`$` module avail
+    -------------- :sgrdi:`/path/to/modulefiles.3` (via foo/2) --------------
+    :sgrl:`bar/3`  bar/4
+
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    foo/1  :sgrl:`foo/2`
+
+    Key:
+    :sgrl:`loaded`  :sgrdi:`modulepath`
+
+Always see hidden modules
+-------------------------
+
+The ``hidden`` element is a new allowed value for the :mconfig:`avail_output`,
+:mconfig:`avail_terse_output`, :mconfig:`list_output`,
+:mconfig:`list_terse_output`, :mconfig:`spider_output` and
+:mconfig:`spider_terse_output` configuration options. When set into the value
+list of these options hidden modules are shown on the output of corresponding
+commands (:subcmd:`avail`, :subcmd:`list` and :subcmd:`spider`).
+
+.. parsed-literal::
+
+    --------------- :sgrdi:`/path/to/modulefiles` ---------------
+    bar/1.0
+    :ps:`$` module config avail_output +hidden
+    :ps:`$` ml av
+    --------------- :sgrdi:`/path/to/modulefiles` ---------------
+    bar/1.0  foo/1.0 <H>
+
+When set, this is equivalent to always adding the :option:`--all` command-line
+option.
+
+Issue warning upon module evaluation
+------------------------------------
+
+The mfcmd:`module-warn` modulefile Tcl command is introduced to define warning
+message to print when loading specified modulefiles.
+
+.. parsed-literal::
+
+    :ps:`$` cat /path/to/modulefiles/foo/1.0
+    #%Module
+    module-warn --message {Please consider using "bar" module instead} foo
+    :ps:`$` module load foo
+    Loading :sgrhi:`foo/1.0`
+      :sgrwa:`WARNING`: Please consider using "bar" module instead
+
+The warning message is printed when targeted modulefile is evaluated in
+*load*, *display*, *help* or *test* mode.
+
+:mfcmd:`module-warn` supports the same kind of options than
+:mfcmd:`module-tag` or :mfcmd:`module-hide`: it is possible to specify a list
+of affected or unaffected users or groups. Warning may also be only effective
+before or after a particular date.
+
+The ``warning`` tag is set on modules targeted by a mfcmd:`module-warn`
+command.
+
+Simplified way to define module help message
+--------------------------------------------
+
+Until now module help message was defined through a specific Tcl procedure
+that outputs text to *stderr* channel:
+
+.. code-block:: tcl
+
+   #%Module
+   proc ModulesHelp {} {
+       puts stderr {Module Name: foo, Version: 1.0}
+       puts stderr {This modulefile does this and that}
+   }
+
+A new modulefile Tcl command is introduced, :mfcmd:`module-help`, to simplify
+a bit the definition of help message:
+
+.. code-block:: tcl
+
+   #%Module
+   module-help {Module Name: foo, Version: 1.0}
+   module-help {This modulefile does this and that}
+
+With this modulefile command there is no need to define the ``ModulesHelp``
+procedure anymore. As :mfcmd:`module-help` is reported on module *display*
+evaluation, help message will also be visible there.
+
+Support for newline character in environment variable value
+-----------------------------------------------------------
+
+It is now possible on *sh*, *bash*, *ksh*, *zsh* and *fish* shells to set
+value for environment variable that contains newline character:
+
+.. parsed-literal::
+
+    :ps:`$` cat /path/to/modulefiles/bar/1.0
+    #%Module
+    setenv BAR "multi\nline\nvalue"
+    :ps:`$` module load bar
+    :ps:`$` echo "$BAR"
+    multi
+    line
+    value
+
+Generated shell code on these shells has been changed to enclose value within
+single quotes rather escaping each special characters:
+
+.. parsed-literal::
+
+    :ps:`$` module mod-to-sh bash bar/1.0
+    BAR='multi
+    line
+    value'; export BAR;
+
+Declare additional elements provided by a module
+------------------------------------------------
+
+New :mfcmd:`provide` modulefile command is added to declare additional
+elements included in a modulefile. When the modulefile is loaded, each
+argument specified in the :mfcmd:`provide` command is registered as an alias
+for the module.
+
+
+.. parsed-literal::
+
+    :ps:`$` module show foo
+    -------------------------------------------------------------------
+    :sgrhi:`/path/to/modulefiles/mp4/foo/1`:
+
+    :sgrcm:`provide`         liba/1.2 libb/2.1
+    :sgrcm:`conflict`        foo
+    :sgrcm:`conflict`        liba libb
+    -------------------------------------------------------------------
+    :ps:`$` module load foo
+
+It is advised to define :mfcmd:`conflict` over the name of these additional
+elements to ensure only one provider is found loaded in user environment.
+
+.. parsed-literal::
+
+    :ps:`$` module show bar/1
+    -------------------------------------------------------------------
+    :sgrhi:`/path/to/modulefiles/bar/1`:
+
+    :sgrcm:`provide`         liba/1.2 libb/2.1
+    :sgrcm:`conflict`        bar
+    :sgrcm:`conflict`        liba libb
+    -------------------------------------------------------------------
+    :ps:`$` module load bar
+    Loading :sgrhi:`bar/1`
+      :sgrer:`ERROR`: Module cannot be loaded due to a conflict.
+        HINT: Might try "module unload foo/1" first.
+
+Once a module with a provided alias is loaded, it fulfills any requirements
+declared by other modules for that name and version, just like any other type
+of module alias.
+
+.. parsed-literal::
+
+    :ps:`$` module show qux
+    -------------------------------------------------------------------
+    :sgrhi:`/path/to/modulefiles/qux/1`:
+
+    :sgrcm:`prereq`          liba/1.2
+    -------------------------------------------------------------------
+    :ps:`$` module load qux
+    :ps:`$` module list
+    Currently Loaded Modulefiles:
+     1) foo/1   2) qux/1
+
+Module aliases defined via the :mfcmd:`provide` command are not available
+during module resolution, as modulefiles are not evaluated in that context.
+Therefore, it is recommended to define a global module alias in a ``modulerc``
+file using the :mfcmd:`module-alias` command to specify a default target for
+the alias.
+
+.. parsed-literal::
+
+    :ps:`$` cat /path/to/modulefiles/.modulerc
+    #%Module
+    module-alias liba/1.2 bar/1
+    :ps:`$` module purge
+    :ps:`$` module load qux
+    Loading :sgrhi:`qux/1`
+      :sgrin:`Loading requirement`: bar/1
+
+The :mfcmd:`provide` modulefile command also serves as an alias for the
+:mfcmd:`extensions` command, ensuring compatibility with modulefiles written
+for `Lmod`_.
+
+By default an :subcmd:`avail` command includes module aliases defined in
+``modulerc`` files. To also get aliases defined within modulefiles with
+:mfcmd:`provide` or :mfcmd:`family`, output element ``provided-alias`` has to
+be included. It is supported on :mconfig:`avail_output`,
+:mconfig:`avail_terse_output`, :mconfig:`spider_output` and
+:mconfig:`spider_terse_output` configuration options.
+
+Having ``provided-alias`` included in output triggers :ref:`Extra match
+search` mechanism that scans all modulefiles to find these aliases. It is thus
+advised to have :ref:`Module cache` built and used to improve search speed.
+
+.. parsed-literal::
+
+    :ps:`$` module avail
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    bar/1  foo/1  :sgrali:`liba/1.2`  qux/1
+
+    Key:
+    :sgrdi:`modulepath`  :sgrali:`module-alias`
+    :ps:`$`  module avail -o +provided-alias
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    bar/1  foo/1  :sgrali:`liba/1.2`  :sgrali:`libb/2.1`  qux/1
+
+    Key:
+    :sgrdi:`modulepath`  :sgrali:`module-alias`
+
+The ``provided-alias`` :ref:`Extra specifier` is also introduced to find
+modules that define such alias with :mfcmd:`provide` or :mfcmd:`family`
+modulefile commands.
+
+.. parsed-literal::
+
+    :ps:`$` module avail provided-alias:liba/1.2
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    bar/1  foo/1
+
+    Key:
+    :sgrdi:`modulepath`
+
+
 v5.5
 ====
 
@@ -15,6 +405,8 @@ This new version is backward-compatible with previous version 5 release. It
 fixes bugs but also introduces new functionalities that are described in this
 section. See the :ref:`5.5 release notes<5.5 release notes>` for a complete
 list of the changes between Modules v5.4 and v5.5.
+
+.. _Logging activity:
 
 Logging activity
 ----------------
@@ -111,6 +503,234 @@ without ``arm64`` among the possible values.
 
 This prefix is recognized on module search context (i.e., :subcmd:`avail`,
 :subcmd:`whatis` and :subcmd:`paths` sub-commands).
+
+PowerShell support
+------------------
+
+Support for PowerShell (``pwsh``) is added. This shell may be used with
+Modules on either Unix or Windows platforms. All main :ref:`kind of
+environment changes are supported<Shell support>`.
+
+A ``envmodule`` shell function is configured on PowerShell, as ``module`` is a
+reserved keyword on this shell.
+
+The Windows-specific distribution zipball of Modules has been updated to also
+contain the required files to setup PowerShell support.
+
+.. _Conflict unload MIGRATING:
+
+Conflict unload
+---------------
+
+Automated module handling is enhanced with the addition of a new mechanism:
+*Conflict Unload*. When loading a module, this new mechanism automatically
+unloads conflicting modules and their dependent.
+
+.. parsed-literal::
+
+    :ps:`$` module load foo/1
+    Loading :sgrhi:`foo/1`:sgrse:`{`:sgrvahi:`-debug`:sgrse:`}`
+      :sgrin:`Loading requirement`: qux/1 bar/1
+    :ps:`$` module load foo/2
+    Loading :sgrhi:`foo/2`
+      :sgrer:`ERROR`: Module cannot be loaded due to a conflict.
+        HINT: Might try "module unload foo/1" first.
+    :ps:`$` module config conflict_unload 1
+    :ps:`$` module load foo/2
+    Loading :sgrhi:`foo/2`:sgrse:`{`:sgrvahi:`-debug`:sgrse:`}`
+      :sgrin:`Unloading conflict`: foo/1\ :sgrse:`{`:sgrva:`-debug`:sgrse:`}`
+
+As seen in the above example, *Conflict Unload* is controlled by the
+:mconfig:`conflict_unload` configuration option. It is disabled by default
+as it changes behaviors of the :envvar:`automated module handling
+mode<MODULES_AUTO_HANDLING>`. But everyone is encouraged to enable this new
+option to benefit from an highly automated experience. This option can be
+changed at installation time with :instopt:`--enable-conflict-unload`
+configure script option.
+
+*Conflict Unload* handles all kind of conflicts: conflicts defined by already
+loaded modules, conflict declared by loading module through :mfcmd:`conflict`,
+:mfcmd:`family` or :mfcmd:`module unload<module>` commands. It also supports
+the unload of a module that is loaded again but with different variant values.
+
+.. parsed-literal::
+
+    :ps:`$` module load foo/2 +debug
+    Loading :sgrhi:`foo/2`:sgrse:`{`:sgrvahi:`+debug`:sgrse:`}`
+      :sgrin:`Unloading conflict`: foo/2\ :sgrse:`{`:sgrva:`-debug`:sgrse:`}`
+
+Along with *Conflict Unload*, the *Useless Requirement Unload* mechanism is
+added to load evaluation. With it, auto loaded requirements of modules
+unloaded by *Conflict Unload* mechanism are automatically unloaded.
+
+.. parsed-literal::
+
+    :ps:`$` module load foo/3
+    Loading :sgrhi:`foo/3`:sgrse:`{`:sgrvahi:`-debug`:sgrse:`}`
+      :sgrin:`Unloading conflict`: foo/2\ :sgrse:`{`:sgrva:`+debug`:sgrse:`}` bar/1
+      :sgrin:`Loading requirement`: bar/2
+      :sgrin:`Unloading useless requirement`: qux/1
+
+Dependent modules of *Conflict Unload* modules are considered *Dependent
+Reload* modules. They are unloaded prior unloading the *Conflict Unload*
+module that depend on them. Reload occurs after loading main module and only
+if the loaded environment satisfies the dependencies of the module to reload.
+
+.. parsed-literal::
+
+    :ps:`$` module load bar/3
+    Loading :sgrhi:`bar/3`
+      :sgrin:`Loading requirement`: qux/2
+    :ps:`$` module load qux/1
+    Loading :sgrhi:`qux/1`
+      :sgrin:`Unloading dependent`: bar/3
+      :sgrin:`Unloading conflict`: qux/2
+      :sgrin:`Reloading dependent`: bar/3
+
+Improved automated module handling mechanisms
+---------------------------------------------
+
+Along with the introduction of *Conflict Unload* mechanism, some of the
+existing automated module handling mechanisms have been adapted and enhanced.
+
+*Useless Requirement Unload* (UReqUn) mechanism is moved during a
+:subcmd:`switch` sub-command from the end of the unload phase to the end of
+the load phase. Both *UReqUn* modules coming from unload and load phases are
+this way treated jointly. If *UReqUn* modules resulting from the switch unload
+phase are detected as conflict to the switched-on module, it is advised to
+enable the :mconfig:`conflict_unload` mechanism to automatically handle them.
+
+.. parsed-literal::
+
+    :ps:`$` module switch foo/3 foo/4
+    Loading :sgrhi:`foo/4`
+      :sgrer:`ERROR`: Module cannot be loaded due to a conflict.
+        HINT: Might try "module unload bar/2" first.
+
+    Switching from :sgrhi:`foo/3`:sgrse:`{`:sgrvahi:`-debug`:sgrse:`}` to :sgrhi:`foo/4`
+      :sgrer:`ERROR`: Load of switched-on foo/4 failed
+    :ps:`$` module config conflict_unload 1
+    :ps:`$` module switch foo/3 foo/4
+    Switching from :sgrhi:`foo/3`:sgrse:`{`:sgrvahi:`-debug`:sgrse:`}` to :sgrhi:`foo/4`
+      :sgrin:`Unloading conflict`: bar/2
+
+*Dependent Reload* (DepRe) modules that also are *UReqUn* modules are now
+unloaded during the *DepRe* unload phase instead of during the *UReqUn*
+process. As a consequence these modules are now unloaded prior main module
+action, as they are a dependent of this main module. This kind of *UReqUn*
+modules may not be a dependency of a module unloaded in the current
+processing.
+
+Modules from *Dependent Unload* (DepUn) and *Dependent Reload* (DepRe)
+mechanisms are now mixed together to proceed to their unload. They are this
+way unloaded in their reverse loading order. So if a module is part of the
+*DepUn* process and one of its requirement is part of the *DepRe* process, the
+requirement is now unloaded after its dependent.
+
+Reload of *Dependent Reload* (DepRe) module is now skipped if this module is
+not found loadable in environment. Either because its requirements are not
+loaded or a conflict is spotted. Such module is considered *Dependent Unload*
+rather *Dependent Reload*. If *DepRe* module is sticky, reload is attempted
+anyway.
+
+Reload of all *Dependent Reload* (DepRe) modules now occurs after main module
+evaluation rather after each sub module evaluation that triggered the
+*Dependent Reload* unload phase.
+
+When a loading module requires a *Dependent Unload* (DepUn) module, the unload
+of this module was forced when it was triggered by a Conflict Unload or a
+switched-off module. The unload of such *DepUn* module is not forced anymore
+by default and an error is raised if a loading module requiring the *DepUn*
+module is detected.
+
+When unloading *Dependent Reload* modules, do not force by default this unload
+unless asked with :option:`--force` option. As a result an error is obtained
+when trying to reload Dependent Reload modules that conflict with other loaded
+modules. This error may be by-passed with :option:`--force` command-line
+option.
+
+.. _Specific modulepath for requirements:
+
+Specific modulepath for requirements
+------------------------------------
+
+A ``--modulepath`` option is introduced on the :mfcmd:`always-load`,
+:mfcmd:`depends-on`, :mfcmd:`prereq`, :mfcmd:`prereq-all` and
+:mfcmd:`prereq-any` modulefile commands. This option indicates that
+requirement should be specifically searched in the provided list of
+modulepaths. Such mechanism helps to ensure loaded requirements are those
+expected and they are not coming from an unexpected module tree.
+
+In the following example, ``foo`` module requires ``bar``. It expects the
+``bar`` module from the same modulepath than ``foo``. User's environment has
+enabled another modulepath that also provides a ``bar`` module. Use of
+``--modulepath`` option guides the requirement load mechanism to the expected
+module.
+
+.. parsed-literal::
+
+    :ps:`$` module avail
+    --------------------- :sgrdi:`/path/to/othermfiles` ---------------------
+    bar/1
+
+    --------------------- :sgrdi:`/path/to/modulefiles` ---------------------
+    bar/1  foo/1  foo/2
+    :ps:`$` module show foo/1
+    -------------------------------------------------------------------
+    :sgrhi:`/path/to/modulefiles/foo/1`:
+
+    :sgrcm:`prereq`          --modulepath .. bar/1
+    -------------------------------------------------------------------
+    :ps:`$` module load foo/1
+    Loading :sgrhi:`foo/1`
+      :sgrin:`Loading requirement`: bar/1
+    :ps:`$` echo $_LMFILES_
+    /path/to/modulefiles/bar/1:/path/to/modulefiles/foo/1
+
+Specific modulepath set may guide to a directory not necessarily enabled
+(i.e., not defined in :envvar:`MODULEPATH` environment variable):
+
+.. parsed-literal::
+
+    :ps:`$` module show foo/2
+    -------------------------------------------------------------------
+    :sgrhi:`/path/to/modulefiles/foo/2`:
+
+    :sgrcm:`prereq`          --modulepath /path/to/alternatefiles bar/2
+    -------------------------------------------------------------------
+    :ps:`$` module load foo/2
+    Loading :sgrhi:`foo/2`
+      :sgrin:`Loading requirement`: bar/2
+    :ps:`$` module list
+    Currently Loaded Modulefiles:
+     1) bar/2   2) foo/2
+    :ps:`$` echo $_LMFILES_
+    /path/to/alternatefiles/bar/2:/path/to/modulefiles/foo/2
+
+If a required module is already loaded from a modulepath that does not
+correspond to the requirement definition, an error is obtained. However if
+the *Conflict Unload* mechanism described above is enabled, the conflicting
+module will automatically be unloaded.
+
+.. parsed-literal::
+
+    :ps:`$` module purge
+    :ps:`$` module load bar/1
+    :ps:`$` echo $_LMFILES_
+    /path/to/othermfiles/mp2/bar/1
+    :ps:`$` module load foo/1
+    Loading :sgrhi:`bar/1`
+      :sgrer:`ERROR`: Module already loaded from a different modulepath
+
+    Loading :sgrhi:`foo/1`
+      :sgrer:`ERROR`: Load of requirement bar/1 (specific path) failed
+    :ps:`$` module config conflict_unload 1
+    :ps:`$` module load foo/1
+    Loading :sgrhi:`foo/1`
+      :sgrin:`Unloading conflict`: bar/1
+      :sgrin:`Loading requirement`: bar/1
+    :ps:`$` echo $_LMFILES_
+    /path/to/modulefiles/bar/1:/path/to/modulefiles/foo/1
 
 
 v5.4
@@ -285,6 +905,8 @@ amount of I/O operations:
       1.78    0.000027           0        40           fcntl
     ------ ----------- ----------- --------- --------- ----------------
     100.00    0.001520           1       946       137 total
+
+.. _Abort on error:
 
 Abort on error
 --------------
@@ -938,6 +1560,8 @@ All shells supported by :file:`modulecmd.tcl` script are supported by
     os.environ['FOO'] = 'value'
     os.environ['BAR'] = 'othervalue'
 
+.. _Initial environment:
+
 Initial environment
 -------------------
 
@@ -1000,6 +1624,8 @@ other value corresponds to the name of a collection to restore.
     :ps:`$` module reset
     Unloading bar/1.0
     Unloading foo/1.0
+
+.. _Stashing environment:
 
 Stashing environment
 --------------------
@@ -1193,6 +1819,8 @@ also added to change the output redirection behavior for a single command:
     :ps:`$` module load unknown --no-redirect >/dev/null
     :sgrer:`ERROR`: Unable to locate a modulefile for 'unknown'
 
+.. _Change modulefile command behavior:
+
 Change modulefile command behavior
 ----------------------------------
 
@@ -1373,6 +2001,8 @@ two implementations.
 Note that when processing a :mfcmd:`family` command, the
 :envvar:`LMOD_FAMILY_\<NAME\>` environment variable is defined by Modules to
 be compatible with existing modulefiles or scripts relying on such variable.
+
+.. _More tagging capabilities:
 
 More tagging capabilities
 -------------------------
@@ -1696,6 +2326,8 @@ This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
 section. See the :ref:`4.8 release notes<4.8 release notes>` for a complete
 list of the changes between Modules v4.7 and v4.8.
+
+.. _Editing modulefiles:
 
 Editing modulefiles
 -------------------
@@ -2852,7 +3484,9 @@ A stack trace is also returned when an unknown error occurs in
           ("eval" body line 1)
           invoked from within
       "eval $execcmdlist"
-      Please report this issue at :noparse:`https://github.com/cea-hpc/modules/issues`
+      Please report this issue at :noparse:`https://github.com/envmodules/modules/issues`
+
+.. _Automatic default and latest syms:
 
 Automatic default and latest symbolic versions
 ----------------------------------------------
@@ -3006,7 +3640,7 @@ selection of module versions. It copes very well with command-line typing, by
 avoiding characters having a special meaning on shells. Moreover the users of
 Spack that also are users of Modules may already be familiar with this syntax.
 
-.. _version specifier syntax: https://spack.readthedocs.io/en/stable/basic_usage.html#version-specifier
+.. _version specifier syntax: https://spack.readthedocs.io/en/latest/basic_usage.html#version-specifier
 .. _Spack: https://github.com/spack/spack
 
 The mechanism introduced here is called *advanced module version specifier*
@@ -3169,7 +3803,7 @@ options take as value a colon-separated list in the same fashion ``LS_COLORS``
 does. In this list, output item that should be highlighted is designated by
 a key which is associated to a `Select Graphic Rendition (SGR) code`_.
 
-.. _Select Graphic Rendition (SGR) code: https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters
+.. _Select Graphic Rendition (SGR) code: https://en.wikipedia.org/wiki/ANSI_escape_code#Select_Graphic_Rendition_parameters
 
 The ``MODULES_TERM_BACKGROUND`` environment variable and the
 ``--with-terminal-background`` configure option help Modules to determine if
@@ -3793,6 +4427,8 @@ fixes bugs but also introduces new functionalities that are described in this
 section. See the :ref:`4.1 release notes<4.1 release notes>` for a complete
 list of the changes between Modules v4.0 and v4.1.
 
+.. _Virtual modules:
+
 Virtual modules
 ---------------
 
@@ -3822,6 +4458,8 @@ beginning of the main procedure code.
 definitions made in ``modulecmd.tcl`` with site-specific code. A module
 sub-command can for instance be redefined to make it fit local needs
 without having to touch the main ``modulecmd.tcl``.
+
+.. _Quarantine mechanism:
 
 Quarantine mechanism to protect module execution
 ------------------------------------------------
@@ -4102,6 +4740,8 @@ required Tcl interpreters. Which means a configured Tcl interpreter is
 reused as much as possible between each modulefile interpretation or
 between each modulerc interpretation.
 
+.. _Sourcing modulefiles:
+
 Sourcing modulefiles
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -4237,4 +4877,4 @@ please read the :ref:`changes` document.
 A significant number of issues reported for v3.2 have been closed on v4.
 List of these closed issues can be found at:
 
-https://github.com/cea-hpc/modules/milestone/1?closed=1
+https://github.com/envmodules/modules/milestone/1?closed=1

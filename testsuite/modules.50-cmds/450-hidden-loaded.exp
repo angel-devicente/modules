@@ -149,13 +149,27 @@ testouterr_cmd_re sh {-v unload -v --auto h2} $ans [msg_unload {h4 <aL:H>}]\n[ms
 
 # depre (on load)
 # depun module is hidden and was automatically loaded (should not be reported)
+# depre h4 is also seen as urequn (as it is automatically loaded and unloadable, even if not a dependency of an unloaded module)
 set ans [list]
-lappend ans [list set __MODULES_LMPREREQ h2&h1:h4&h1&h2|h3]
-lappend ans [list set _LMFILES_ $mp/h1:$mp/h2:$mp/h3:$mp/h4]
-lappend ans [list set LOADEDMODULES h1:h2:h3:h4]
-lappend ans [list set __MODULES_LMTAG h1&hidden-loaded&auto-loaded:h2&auto-loaded:h3&hidden-loaded:h4&hidden-loaded&auto-loaded]
-testouterr_cmd_re sh {load -v --auto h3} $ans [msg_load {h3 <H>}]
+lappend ans [list unset __MODULES_LMPREREQ]
+lappend ans [list set _LMFILES_ $mp/h3]
+lappend ans [list set LOADEDMODULES h3]
+lappend ans [list set __MODULES_LMTAG h3&hidden-loaded]
+set tserr [msg_unload {h2 <aL>}]\n\n[msg_top_load_conun {h3 <H>} {} {} {h2} {} {}]
+testouterr_cmd_re sh {load -v --auto h3} $ans $tserr
+set tserr [msg_unload {h4 <aL:H>}]\n[msg_unload {h2 <aL>}]\n[msg_unload {h1 <aL:H>}]\n\n[msg_top_load_conun {h3 <H>} {} {} {h4 h2 h1} {} {}]
+testouterr_cmd_re sh {load -vv --auto h3} $ans $tserr
+
+# test multiple DepRe that become UReqUn, one hidden, not the other
+setenv_loaded_module [list h1 h2 h4 h5] [list $mp/h1 $mp/h2 $mp/h4 $mp/h4] [list h1 h2]
+setenv_var __MODULES_LMPREREQ h2&h1:h4&h1&h2|h3:h5&h1&h2|h3
+setenv_var __MODULES_LMTAG h1&hidden-loaded&auto-loaded:h2&auto-loaded:h4&hidden-loaded&auto-loaded:h5&auto-loaded
+set tserr [msg_unload {h5 <aL>}]\n[msg_unload {h4 <aL:H>}]\n[msg_unload {h2 <aL>}]\n[msg_unload {h1 <aL:H>}]\n\n[msg_top_load_conun {h3 <H>} {} {} {h5 h4 h2 h1} {} {}]
+testouterr_cmd_re sh {load -vv --auto h3} $ans $tserr
+
 # depun module is hidden and was not automatically loaded (should be reported)
+setenv_loaded_module [list h1 h2 h4] [list $mp/h1 $mp/h2 $mp/h4] [list h1 h2]
+setenv_var __MODULES_LMPREREQ h2&h1:h4&h1&h2|h3
 setenv_var __MODULES_LMTAG h1&hidden-loaded&auto-loaded:h2&auto-loaded:h4&hidden-loaded
 set ans [list]
 lappend ans [list set __MODULES_LMPREREQ h2&h1:h4&h1&h2|h3]
@@ -167,14 +181,18 @@ testouterr_cmd_re sh {load -v --auto -v h3} $ans [msg_unload {h4 <H>}]\n[msg_loa
 
 # depre (on unload)
 # depun module is hidden and was automatically loaded (should not be reported)
+# depre h4 is also seen as urequn (as it is automatically loaded and unloadable, even if not a dependency of an unloaded module)
 setenv_loaded_module [list h1 h2 h3 h4] [list $mp/h1 $mp/h2 $mp/h3 $mp/h4] [list h1 h2 h4]
 setenv_var __MODULES_LMTAG h1&hidden-loaded&auto-loaded:h2&auto-loaded:h3&hidden-loaded:h4&hidden-loaded&auto-loaded
 set ans [list]
-lappend ans [list set __MODULES_LMPREREQ h2&h1:h4&h1&h2|h3]
-lappend ans [list set _LMFILES_ $mp/h1:$mp/h2:$mp/h4]
-lappend ans [list set LOADEDMODULES h1:h2:h4]
-lappend ans [list set __MODULES_LMTAG h1&hidden-loaded&auto-loaded:h2&auto-loaded:h4&hidden-loaded&auto-loaded]
-testouterr_cmd_re sh {unload -v --auto h3} $ans [msg_unload {h3 <H>}]
+lappend ans [list unset __MODULES_LMPREREQ]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+lappend ans [list unset __MODULES_LMTAG]
+set tserr [msg_unload {h2 <aL>}]\n\n[msg_top_unload {h3 <H>} {} {h2} {}]
+testouterr_cmd_re sh {unload -v --auto h3} $ans $tserr
+set tserr [msg_unload {h4 <aL:H>}]\n[msg_unload {h2 <aL>}]\n[msg_unload {h1 <aL:H>}]\n\n[msg_top_unload {h3 <H>} {} {h4 h2 h1} {}]
+testouterr_cmd_re sh {unload -vv --auto h3} $ans $tserr
 # depun module is hidden and was not automatically loaded (should be reported)
 setenv_var __MODULES_LMTAG h1&hidden-loaded&auto-loaded:h2&auto-loaded:h3&hidden-loaded:h4&hidden-loaded
 set ans [list]
@@ -317,14 +335,32 @@ setenv_var TESTSUITE_HIDE_HIDDEN_LOADED_SET7 1
 setenv_loaded_module [list h33] [list $mp/h33]
 unsetenv_var __MODULES_LMTAG
 setenv_var __MODULES_LMCONFLICT h33&h31
-testouterr_cmd_re sh {load -v --auto h32} ERR [msg_load {h30 <aL>}]\n\n[msg_load h31 [err_conflict h33]]\n\n[msg_load h32 [err_reqlo h31]]
-set ans [list]
-lappend ans [list set __MODULES_LMPREREQ h31&h30:h32&h31]
-lappend ans [list set _LMFILES_ $mp/h33:$mp/h30:$mp/h31:$mp/h32]
-lappend ans [list set LOADEDMODULES h33:h30:h31:h32]
-lappend ans [list set __MODULES_LMTAG h30&auto-loaded:h31&auto-loaded&hidden-loaded]
-testouterr_cmd_re sh {load --force -v --auto h32} $ans [msg_load {h30 <aL>}]\n\n[msg_load {h31 <aL:H>} [err_conlof h33]]\n\n[msg_top_load h32 {} {h30 h31} {}]
-testouterr_cmd_re sh {load --force -vv --auto h32} $ans [msg_load {h30 <aL>}]\n\n[msg_load {h31 <aL:H>} [err_conlof h33]]\n\n[msg_top_load h32 {} {h30 h31} {}]
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list set __MODULES_LMPREREQ h31&h30:h32&h31]
+    lappend ans [list set _LMFILES_ $mp/h30:$mp/h31:$mp/h32]
+    lappend ans [list set LOADEDMODULES h30:h31:h32]
+    lappend ans [list set __MODULES_LMTAG h30&auto-loaded:h31&auto-loaded&hidden-loaded]
+    set tserr [msg_unload h33]\n[msg_load {h30 <aL>}]\n\n[msg_top_load h32 h33 h30 {}]
+} else {
+    set ans ERR
+    set tserr [msg_load {h30 <aL>}]\n\n[msg_load h31 [err_conflict h33]]\n\n[msg_load h32 [err_reqlo h31]]
+}
+testouterr_cmd_re sh {load -v --auto h32} $ans $tserr
+if {![is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMPREREQ h31&h30:h32&h31]
+    lappend ans [list set _LMFILES_ $mp/h33:$mp/h30:$mp/h31:$mp/h32]
+    lappend ans [list set LOADEDMODULES h33:h30:h31:h32]
+    lappend ans [list set __MODULES_LMTAG h30&auto-loaded:h31&auto-loaded&hidden-loaded]
+    set tserr [msg_load {h30 <aL>}]\n\n[msg_load {h31 <aL:H>} [err_conlof h33]]\n\n[msg_top_load h32 {} {h30 h31} {}]
+}
+testouterr_cmd_re sh {load --force -v --auto h32} $ans $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload h33]\n[msg_load {h30 <aL>}]\n[msg_load {h31 <aL:H>}]\n\n[msg_top_load h32 h33 {h30 h31} {}]
+}
+testouterr_cmd_re sh {load --force -vv --auto h32} $ans $tserr
 unsetenv_var __MODULES_LMCONFLICT
 unsetenv_loaded_module
 unsetenv_var TESTSUITE_HIDE_HIDDEN_LOADED_SET7

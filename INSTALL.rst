@@ -79,7 +79,7 @@ under the name of ``modules`` or ``environment-modules``.
 If you want to install Modules from sources, tarballs from all Modules'
 releases can be retrieved from one of the following link:
 
-* https://github.com/cea-hpc/modules/releases/
+* https://github.com/envmodules/modules/releases/
 * https://sourceforge.net/projects/modules/files/Modules/
 
 For instance to download then unpack the last release of Modules:
@@ -114,7 +114,8 @@ Some explanation, step by step:
 3. Type ``make`` to adapt scripts to the configuration, build Tcl extension
    library if enabled and build documentation if working from git repository.
 
-4. Optionally, type ``make test`` to run the test suite.
+4. Optionally, type ``make test QUICKTEST=1`` to run the lightweight version
+   of the non-regression test suite.
 
 5. Type ``make install`` to install modulecmd.tcl, initialization scripts and
    documentation.
@@ -143,6 +144,93 @@ option available.
    process. On non-Linux systems, the ``gmake`` should be called instead of
    ``make``.
 
+.. _enable-modules-in-shells:
+
+Enable Modules in shells
+------------------------
+
+Shell initialization scripts should be adapted to enable Modules during their
+startup. Enabling Modules means defining the ``module`` shell function and
+applying its configuration.
+
+An easy way to achieve that is to make Modules initialization scripts part of
+the system-wide environment setup in ``/etc/profile.d``.To do so, make a link
+in this directory to the profile scripts that can be found in your Modules
+installation init directory. For instance, if Modules has been installed in
+``/usr/share/modules``:
+
+.. parsed-literal::
+
+    :ps:`$` ln -s /usr/share/modules/init/profile.sh /etc/profile.d/modules.sh
+    :ps:`$` ln -s /usr/share/modules/init/profile.csh /etc/profile.d/modules.csh
+
+These profile scripts will automatically adapt to the kind of ``sh`` or
+``csh`` shell you are running.
+
+Another approach is to get the Modules initialization script sourced from the
+shell configuration startup file. For instance following line could be added
+to the end of the ``~/.bashrc`` file if running Bash shell::
+
+    . /usr/share/modules/init/bash
+
+Beware that shells have multiple ways to initialize depending if they are a
+login shell or not and if they are launched in interactive mode or not.
+
+Depending on your OS distribution system-wide profile scripts may be ignored
+when initializing non-interactive shells. This is for instance the case on
+Debian distribution and its derivatives like Ubuntu. On such system, Modules
+initialization script should be sourced by shell initialization files to get
+``module`` function defined when executing a command through ``ssh`` or
+running a script. Add the following code snippets to the initialization files
+of the shell you use.
+
+* For **Bash**, update either system-wide (``/etc/bash.bashrc`` on Debian-like
+  systems) or personal (``~/.bashrc``) initialization file:
+
+  .. code-block:: sh
+
+      # enable module command in non-login shells
+      if ! shopt -q login_shell; then
+          . /usr/share/modules/init/bash
+      fi
+
+* For **Csh**/**Tcsh**, add Modules initialization file into Csh rc directory
+  (``/etc/csh/cshrc.d`` on Debian-like systems)::
+
+      ln -s /usr/share/modules/init/csh /etc/csh/cshrc.d/modules
+
+  Or update personal (``~/.cshrc``) initialization file:
+
+  .. code-block:: csh
+
+      # enable module command in non-login shells
+      if (! $?loginsh) then
+          source /usr/share/modules/init/csh
+      endif
+
+* For **Zsh**, update either system-wide (``/etc/zsh/zshenv`` on Debian-like
+  systems) or personal (``~/.zshenv``) initialization file:
+
+  .. code-block:: sh
+
+      # enable module command
+      . /usr/share/modules/init/zsh
+
+* For **Ksh**, update personal (``~/.kshrc``) initialization file:
+
+  .. code-block:: sh
+
+      # enable module command
+      . /usr/share/modules/init/ksh
+
+* For **Fish**, add Modules initialization file into Fish system-wide config
+  directory (``/etc/fish/conf.d``)::
+
+      ln -s /usr/share/modules/init/fish /etc/fish/conf.d/modules.fish
+
+  Or into Fish personal config directory (``~/.config/fish/conf.d``)::
+
+      ln -s /usr/share/modules/init/fish ~/.config/fish/conf.d/modules.fish
 
 Configuration
 -------------
@@ -151,31 +239,7 @@ Once installed you should review and adapt the configuration to make it fit
 your needs. The following steps are provided for example. They are not
 necessarily mandatory as it depends of the kind of setup you want to achieve.
 
-1. Enable Modules initialization at shell startup. An easy way to get module
-   function defined and its associated configuration setup at shell startup
-   is to make the initialization scripts part of the system-wide environment
-   setup in ``/etc/profile.d``. To do so, make a link in this directory to the
-   profile scripts that can be found in your Modules installation init
-   directory:
-
-   .. parsed-literal::
-
-       :ps:`$` ln -s PREFIX/init/profile.sh /etc/profile.d/modules.sh
-       :ps:`$` ln -s PREFIX/init/profile.csh /etc/profile.d/modules.csh
-
-   These profile scripts will automatically adapt to the kind of ``sh`` or
-   ``csh`` shell you are running.
-
-   Another approach may be to get the Modules initialization script sourced
-   from the shell configuration startup file. For instance following line
-   could be added to the end of the ``~/.bashrc`` file if running Bash shell::
-
-       source PREFIX/init/bash
-
-   Beware that shells have multiple ways to initialize depending if they are
-   a login shell or not and if they are launched in interactive mode or not.
-
-2. Define module paths to enable by default. Edit :file:`initrc` configuration
+1. Define module paths to enable by default. Edit :file:`initrc` configuration
    file in the directory designated by the :instopt:`--etcdir` option or edit
    :file:`modulespath` in the same directory.
 
@@ -208,7 +272,7 @@ necessarily mandatory as it depends of the kind of setup you want to achieve.
       files :file:`initrc` and :file:`modulespath` are respectively named
       ``modulerc`` and ``.modulespath``.
 
-3. Define modulefiles to load by default. Edit :file:`initrc` configuration
+2. Define modulefiles to load by default. Edit :file:`initrc` configuration
    file. Modulefiles to load cannot be specified in :file:`modulespath` file.
    Add there all the modulefiles you want to load by default at Modules
    initialization time.
@@ -251,14 +315,14 @@ needs. After that you still have to write modulefiles to get something to
 load and unload in your newly configured Modules setup. In case you want to
 achieve a specific setup, some additional steps may be required:
 
-4. In case the configuration you expect cannot be achieved through the
+3. In case the configuration you expect cannot be achieved through the
    :file:`initrc` configuration file, you may review and tune the
    initialization scripts. These files are located in the directory designated
    by the :instopt:`--initdir` option. Beware that these scripts could be
    overwritten when upgrading to a newer version of Modules, so configuration
    should be done through the :file:`initrc` file as far as possible.
 
-5. If you want to alter the way the :file:`modulecmd.tcl` script operates, the
+4. If you want to alter the way the :file:`modulecmd.tcl` script operates, the
    :file:`siteconfig.tcl` script may be used. This Tcl file is located in the
    directory designated by the :instopt:`--etcdir` option. Every time the
    :command:`module` command is called, it executes the :file:`modulecmd.tcl`
@@ -267,7 +331,7 @@ achieve a specific setup, some additional steps may be required:
    default configuration values and more largely could supersede all
    procedures defined in :file:`modulecmd.tcl` to obtain specific behaviors.
 
-6. Prior running the module sub-command specified as argument, the
+5. Prior running the module sub-command specified as argument, the
    :file:`modulecmd.tcl` script evaluates the global run-command files. These
    files are either the :file:`rc` file in the directory designated by the
    :instopt:`--etcdir` option, the file(s) designated in the
@@ -286,6 +350,31 @@ To learn more about siteconfig and run-command files, see the
 also look at the available :ref:`setup recipes<cookbook>` to get concrete
 deployment examples of these files.
 
+Upgrading
+---------
+
+In case you want to upgrade a pre-existing Modules installation, it is
+suggested to:
+
+1. Backup configuration files stored in *etcdir* (like :file:`siteconfig.tcl`
+   or :file:`initrc`);
+2. Remove previous Modules installation;
+3. Install new Modules version;
+4. Review specific configuration of previous installation and adapt
+   configuration files of new version.
+
+It is advised to look at the different documents describing changes and new
+features appearing between versions. By reading these documents you will be
+able to determine the specific configuration options to apply to satisfy your
+use cases.
+
+* :ref:`changes`
+* :ref:`NEWS`
+* :ref:`MIGRATING`
+
+In case you install Modules with the :instopt:`--enable-versioning` option
+set, you may be able to install a new version of Modules alongside existing
+ones (if they also have been installed with this option set).
 
 Build and installation options
 ------------------------------
@@ -310,6 +399,14 @@ is displayed within brackets):
 
  Directory to host documentation other than man pages like README, license
  file, etc [``DATAROOTDIR/doc``]
+
+.. instopt:: --emacsdatadir=DIR
+
+ Directory to host Emacs addon files [``DATAROOTDIR/emacs/lisp``]
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. instopt:: --etcdir=DIR
 
@@ -457,6 +554,19 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
     .. versionchanged:: 5.0
        Configuration option default set to ``yes``
 
+.. instopt:: --enable-conflict-unload
+
+ Apply automated unload of conflicting modulefiles when loading a module.
+ (default=no)
+
+ This installation option defines the default value of the
+ :mconfig:`conflict_unload` configuration option which could be changed after
+ installation with the :subcmd:`config` sub-command.
+
+ .. only:: html
+
+    .. versionadded:: 5.5
+
 .. instopt:: --enable-doc-install
 
  Install the documentation files in the documentation directory defined with
@@ -468,6 +578,15 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  .. only:: html
 
     .. versionadded:: 4.0
+
+.. instopt:: --enable-emacs-addons
+
+ Install the Emacs addon files in the Emacs addons directory defined with the
+ :instopt:`--emacsdatadir` option. (default=yes)
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. instopt:: --enable-example-modulefiles
 
@@ -605,7 +724,8 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Enable all new features that are disabled by default due to the substantial
  behavior changes they imply on Modules 5. This option is equivalent to the
  cumulative use of
- :instopt:`--with-abort-on-error=load:ml:reload:switch<--with-abort-on-error>`.
+ :instopt:`--with-abort-on-error=load:ml:reload:switch<--with-abort-on-error>`,
+ :instopt:`--enable-conflict-unload` and :instopt:`--enable-require-via`.
  (default=no)
 
  .. only:: html
@@ -624,6 +744,12 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
        Enables *abort on error* behavior on :subcmd:`load` and
        :subcmd:`switch` sub-commands.
 
+    .. versionchanged:: 5.5
+       Enables automated *conflict unload* mechanism
+
+    .. versionchanged:: 5.6
+       Enables automated *require via* mechanism
+
 
 .. instopt:: --enable-quarantine-support
 
@@ -640,6 +766,19 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
 
     .. versionchanged:: 5.0
        Configuration option default set to ``no``
+
+.. instopt:: --enable-require-via
+
+ Consider loaded module that enables a modulepath, a requirement of loaded
+ modules stored in this modulepath. (default=no)
+
+ This installation option defines the default value of the
+ :mconfig:`require_via` configuration option which could be changed after
+ installation with the :subcmd:`config` sub-command.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. instopt:: --enable-set-binpath
 
@@ -705,6 +844,22 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  .. only:: html
 
     .. versionadded:: 5.4
+
+.. instopt:: --enable-spider-indepth
+
+ When performing an :subcmd:`spider` sub-command, include in search results
+ the matching modulefiles and directories and recursively the modulefiles and
+ directories contained in these matching directories when enabled or limit
+ search results to the matching modulefiles and directories found at the depth
+ level expressed by the search query if disabled. (default=yes)
+
+ This installation option defines the default value of the
+ :mconfig:`spider_indepth` configuration option which could be changed after
+ installation with the :subcmd:`config` sub-command.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. instopt:: --enable-versioning
 
@@ -788,10 +943,10 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
 
  Specify the content to report on avail sub-command regular output in addition
  to the available module names. Elements accepted in LIST are: ``modulepath``,
- ``alias``, ``dirwsym``, ``indesym``, ``sym``, ``tag``, ``key``, ``variant``
- and ``variantifspec`` (elements in LIST are separated by ``:``). The order of
- the elements in LIST does not matter.
- (default=\ ``modulepath:alias:dirwsym:sym:tag:variantifspec:key``)
+ ``alias``, ``provided-alias``, ``dirwsym``, ``indesym``, ``sym``, ``tag``,
+ ``key``, ``hidden``, ``variant``, ``variantifspec`` and ``via`` (elements in
+ LIST are separated by ``:``). The order of the elements in LIST does not
+ matter. (default=\ ``modulepath:alias:dirwsym:sym:tag:variantifspec:key``)
 
  This installation option defines the default value of the
  :mconfig:`avail_output` configuration option which could be changed after
@@ -810,13 +965,17 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
     .. versionchanged:: 5.3.1
        Element ``indesym`` added
 
+    .. versionchanged:: 5.6
+       Elements ``hidden``, ``provided-alias`` and ``via`` added
+
 .. instopt:: --with-avail-terse-output=LIST
 
  Specify the content to report on avail sub-command terse output in addition
  addition to the available module names. Elements accepted in LIST are:
- ``modulepath``, ``alias``, ``dirwsym``, ``indesym``, ``sym``, ``tag``,
- ``key``, ``variant`` and ``variantifspec`` (elements in LIST are separated by
- ``:``). The order of the elements in LIST does not matter.
+ ``modulepath``, ``alias``, ``provided-alias``, ``dirwsym``, ``indesym``,
+ ``sym``, ``tag``, ``key``, ``hidden``, ``variant`` and ``variantifspec``
+ (elements in LIST are separated by ``:``). The order of the elements in LIST
+ does not matter.
  (default=\ ``modulepath:alias:dirwsym:sym:tag:variantifspec``)
 
  This installation option defines the default value of the
@@ -835,6 +994,9 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
 
     .. versionchanged:: 5.3.1
        Element ``indesym`` added
+
+    .. versionchanged:: 5.6
+       Elements ``hidden`` and ``provided-alias`` added
 
 .. instopt:: --with-bashcompletiondir=DIR
 
@@ -877,12 +1039,12 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  this abbreviation to get a graphical rendering. Each basic tag has by default
  a key set in the color palette, based on its abbreviated string: auto-loaded
  (``aL``), forbidden (``F``), hidden and hidden-loaded (``H``), loaded
- (``L``), nearly-forbidden (``nF``), sticky (``S``), super-sticky (``sS``) and
- keep-loaded (``kL``).
+ (``L``), nearly-forbidden (``nF``), sticky (``S``), super-sticky (``sS``),
+ keep-loaded (``kL``) and warning (``W``).
 
  For a complete SGR code reference, see
- https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters.
- (default=\ ``hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=43:S=46:sS=44:kL=30;48;5;109``)
+ https://en.wikipedia.org/wiki/ANSI_escape_code#Select_Graphic_Rendition_parameters.
+ (default=\ ``hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=31;43:S=46:sS=44:kL=30;48;5;109:W=30;43``)
 
  This installation option defines the default value of the :mconfig:`colors`
  configuration option when :mconfig:`term_background` configuration option
@@ -906,6 +1068,12 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
 
     .. versionchanged:: 5.1
        Output item for keep-loaded module tag (``kL``) added
+
+    .. versionchanged:: 5.6
+       Output item for warning module tag (``W``) added
+
+    .. versionchanged:: 5.6
+       Default ``nearly-forbidden`` tag color changed
 
 .. instopt:: --with-editor=BIN
 
@@ -967,7 +1135,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  Default color set to apply if terminal background color is defined to
  ``light``. Expect the same syntax than described for
  :instopt:`--with-dark-background-colors`.
- (default=\ ``hi=1:db=2:tr=2:se=2:er=31:wa=33:me=35:in=34:mp=1;34:di=34:al=36:va=33:sy=35:de=4:cm=32:aL=107:L=47:H=2:F=101:nF=103:S=106:sS=104:kL=48;5;109``)
+ (default=\ ``hi=1:db=2:tr=2:se=2:er=31:wa=33:me=35:in=34:mp=1;34:di=34:al=36:va=33:sy=35:de=4:cm=32:aL=107:L=47:H=2:F=101:nF=91;103:S=106:sS=104:kL=48;5;109:W=103``)
 
  This installation option defines the default value of the :mconfig:`colors`
  configuration option when :mconfig:`term_background` configuration option
@@ -992,13 +1160,19 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
     .. versionchanged:: 5.1
        Output item for keep-loaded module tag (``kL``) added
 
+    .. versionchanged:: 5.6
+       Output item for warning module tag (``W``) added
+
+    .. versionchanged:: 5.6
+       Default ``nearly-forbidden`` tag color changed
+
 .. instopt:: --with-list-output=LIST
 
  Specify the content to report on list sub-command regular output in addition
  to the loaded module names. Elements accepted in LIST are: ``header``,
- ``idx``, ``variant``, ``alias``, ``indesym``, ``sym``, ``tag`` and ``key``
- (elements in LIST are separated by ``:``). The order of the elements in LIST
- does not matter. (default=\ ``header:idx:variant:sym:tag:key``)
+ ``idx``, ``variant``, ``alias``, ``indesym``, ``sym``, ``tag``, ``hidden``
+ and ``key`` (elements in LIST are separated by ``:``). The order of the
+ elements in LIST does not matter. (default=\ ``header:idx:variant:sym:tag:key``)
 
  This installation option defines the default value of the
  :mconfig:`list_output` configuration option which could be changed after
@@ -1014,13 +1188,16 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
     .. versionchanged:: 5.4
        Elements ``alias`` and ``indesym`` added
 
+    .. versionchanged:: 5.6
+       Element ``hidden`` added
+
 .. instopt:: --with-list-terse-output=LIST
 
  Specify the content to report on list sub-command terse output in addition
  to the loaded module names. Elements accepted in LIST are: ``header``,
- ``idx``, ``variant``, ``alias``, ``indesym``, ``sym``, ``tag`` and ``key``
- (elements in LIST are separated by ``:``). The order of the elements in LIST
- does not matter. (default=\ ``header``)
+ ``idx``, ``variant``, ``alias``, ``indesym``, ``sym``, ``tag``, ``hidden``
+ and ``key`` (elements in LIST are separated by ``:``). The order of the
+ elements in LIST does not matter. (default=\ ``header``)
 
  This installation option defines the default value of the
  :mconfig:`list_terse_output` configuration option which could be changed
@@ -1035,6 +1212,9 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
 
     .. versionchanged:: 5.4
        Elements ``alias`` and ``indesym`` added
+
+    .. versionchanged:: 5.6
+       Element ``hidden`` added
 
 .. instopt:: --with-loadedmodules=MODLIST
 
@@ -1215,6 +1395,42 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
 
     .. versionadded:: 4.3
 
+.. instopt:: --with-spider-output=LIST
+
+ Specify the content to report on spider sub-command regular output in
+ addition to the available module names. Elements accepted in LIST are:
+ ``modulepath``, ``alias``, ``provided-alias``, ``dirwsym``, ``indesym``,
+ ``sym``, ``tag``, ``key``, ``hidden``, ``variant``, ``variantifspec`` and
+ ``via`` (elements in LIST are separated by ``:``). The order of the elements
+ in LIST does not matter.
+ (default=\ ``modulepath:alias:dirwsym:sym:tag:variantifspec:via:key``)
+
+ This installation option defines the default value of the
+ :mconfig:`spider_output` configuration option which could be changed after
+ installation with the :subcmd:`config` sub-command.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
+.. instopt:: --with-spider-terse-output=LIST
+
+ Specify the content to report on spider sub-command terse output in addition
+ addition to the available module names. Elements accepted in LIST are:
+ ``modulepath``, ``alias``, ``provided-alias``, ``dirwsym``, ``indesym``,
+ ``sym``, ``tag``, ``key``, ``hidden``, ``variant`` and ``variantifspec``
+ (elements in LIST are separated by ``:``). The order of the elements in LIST
+ does not matter.
+ (default=\ ``modulepath:alias:dirwsym:sym:tag:variantifspec``)
+
+ This installation option defines the default value of the
+ :mconfig:`spider_terse_output` configuration option which could be changed
+ after installation with the :subcmd:`config` sub-command.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
 .. instopt:: --with-sticky-purge=VALUE
 
  When unloading a sticky or super-sticky module during a module purge, raise
@@ -1234,7 +1450,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  Define the abbreviation to use when reporting each module tag. Each element
  in ABBRVLIST is a tag name associated to an abbreviation string (elements in
  ABBRVLIST are separated by ``:``).
- (default=\ ``auto-loaded=aL:loaded=L:hidden=H:hidden-loaded=H:forbidden=F:nearly-forbidden=nF:sticky=S:super-sticky=sS:keep-loaded=kL``)
+ (default=\ ``auto-loaded=aL:loaded=L:hidden=H:hidden-loaded=H:forbidden=F:nearly-forbidden=nF:sticky=S:super-sticky=sS:keep-loaded=kL:warning=W``)
 
  This installation option defines the default value of the
  :mconfig:`tag_abbrev` configuration option which could be changed after
@@ -1246,6 +1462,9 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
 
     .. versionchanged:: 5.1
        Abbreviation for ``keep-loaded`` tag added
+
+    .. versionchanged:: 5.6
+       Abbreviation for ``warning`` tag added
 
 .. instopt:: --with-tag-color-name=TAGLIST
 
@@ -1431,8 +1650,11 @@ installation.
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`colors`                 | hi=1:db=2:tr=2:se=2:er=91:wa=93:\            | :instopt:`--with-dark-background-colors`,    |              |           |
 |                                   | me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95\ | :instopt:`--with-light-background-colors`,   |              |           |
-|                                   | :de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=43:\  | :envvar:`MODULES_COLORS`                     |              |           |
-|                                   | S=46:sS=44:kL=30;48;5;109                    |                                              |              |           |
+|                                   | :de=4:cm=92:aL=100:L=90;47:H=2:F=41:\        | :envvar:`MODULES_COLORS`                     |              |           |
+|                                   | nF=31;43:S=46:sS=44:kL=30;48;5;109:W=30;43   |                                              |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`conflict_unload`        | ``0``                                        | :instopt:`--enable-conflict-unload`,         |              |           |
+|                                   |                                              | :envvar:`MODULES_CONFLICT_UNLOAD`            |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`contact`                | ``root@localhost``                           | :envvar:`MODULECONTACT`                      |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
@@ -1512,6 +1734,9 @@ installation.
 |                                   |                                              | :option:`--redirect`,                        |              |           |
 |                                   |                                              | :option:`--no-redirect`                      |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`require_via`            | ``0``                                        | :instopt:`--enable-require-via`,             |              |           |
+|                                   |                                              | :envvar:`MODULES_REQUIRE_VIA`                |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`reset_target_state`     | ``__init__``                                 | :envvar:`MODULES_RESET_TARGET_STATE`,        |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`run_quarantine`         | *Empty by default*                           | :instopt:`--with-quarantine-vars`,           |              |           |
@@ -1536,13 +1761,25 @@ installation.
 | :mconfig:`source_cache`           | ``0``                                        | :instopt:`--enable-source-cache`,            |              |           |
 |                                   |                                              | :envvar:`MODULES_SOURCE_CACHE`               |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`spider_indepth`         | ``1``                                        | :instopt:`--enable-spider-indepth`,          |              |           |
+|                                   |                                              | :envvar:`MODULES_SPIDER_INDEPTH`,            |              |           |
+|                                   |                                              | :option:`--indepth`, :option:`--no-indepth`  |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`spider_output`          | modulepath:alias:dirwsym:sym:tag:\           | :instopt:`--with-spider-output`,             |              |           |
+|                                   | variantifspec:via:key                        | :envvar:`MODULES_SPIDER_OUTPUT`,             |              |           |
+|                                   |                                              | :option:`--output`                           |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`spider_terse_output`    | modulepath:alias:dirwsym:sym:tag:\           | :instopt:`--with-spider-terse-output`,       |              |           |
+|                                   | variantifspec                                | :envvar:`MODULES_SPIDER_TERSE_OUTPUT`,       |              |           |
+|                                   |                                              | :option:`--output`                           |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`sticky_purge`           | ``error``                                    | :instopt:`--with-sticky-purge`,              |              |           |
 |                                   |                                              | :envvar:`MODULES_STICKY_PURGE`               |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`tag_abbrev`             | auto-loaded=aL:loaded=L:hidden=H:\           | :instopt:`--with-tag-abbrev`,                |              |           |
 |                                   | hidden-loaded=H:forbidden=F:nearly-\         | :envvar:`MODULES_TAG_ABBREV`                 |              |           |
 |                                   | forbidden=nF:sticky=S:super-sticky=sS:\      |                                              |              |           |
-|                                   | keep-loaded=kL                               |                                              |              |           |
+|                                   | keep-loaded=kL:warning=W                     |                                              |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`tag_color_name`         | *Empty by default*                           | :instopt:`--with-tag-color-name`,            |              |           |
 |                                   |                                              | :envvar:`MODULES_TAG_COLOR_NAME`             |              |           |

@@ -46,7 +46,7 @@ Installation instructions
    from the source tarball by the ``-win`` suffix in their name.
 
 .. _SourceForge: https://sourceforge.net/projects/modules/files/Modules/
-.. _GitHub: https://github.com/cea-hpc/modules/releases
+.. _GitHub: https://github.com/envmodules/modules/releases
 
 4. Unpack downloaded zip file then enter deflated directory and execute the
    ``INSTALL.bat`` script file found in it. This script installs files by
@@ -54,22 +54,47 @@ Installation instructions
    ``bin`` directory in this installation location to the system-wide ``PATH``
    environment variable.
 
-.. note:: ``INSTALL.bat`` script may require to be run with administrator
-   rights to perform installation correctly.
+   If you use Powershell Core on Windows, please use the ``INSTALL_PWSH.bat``
+   instead. It won't add the ``bin`` directory to the system-wide ``PATH``
+   environment variable because the ``module`` command will interfere with
+   Powershell's ``module`` keyword.
 
-5. Once installed, verify that the ``module`` command is correctly found in
-   defined ``PATH`` by typing the following command from a Windows ``cmd``
+.. note:: ``INSTALL.bat`` and ``INSTALL_PWSH.bat`` scripts may require to be
+   run with administrator rights to perform installation correctly.
+
+5. Once installed, verify that the ``module`` command is correctly found. If
+   you used the ``INSTALL.bat`` script, the commands should be in the defined
+   ``PATH``. Verify by typing the following command from a Windows ``cmd``
    shell::
 
         > module -V
-        Modules Release 4.4.1 (2020-01-03)
+        Modules Release 5.5.0 (2024-11-11)
 
-Installation location can be adapted by running the ``INSTALL.bat`` script
-from a ``cmd`` console shell and passing desired installation target as
-argument. For instance to install Modules in ``C:\EnvironmentModules``
-directory::
+   If your used the ``INSTALL_PWSH.bat`` script, the environment has to be
+   initialized first. Verify by typing the following commands from a Windows
+   ``cmd`` shell::
+
+        > call "C:\Program Files\Environment Modules\init\cmd.cmd"
+        > module -V
+        Modules Release 5.5.0 (2024-11-11)
+
+   And the following commands from a Windows ``pwsh`` shell::
+
+        > . "C:\Program Files\Environment Modules\init\pwsh.ps1"
+        > envmodule --version
+        Modules Release 5.5.0 (2024-11-11)
+
+Installation location can be adapted by running the ``INSTALL.bat`` and
+``INSTALL_PWSH.bat`` scripts from a ``cmd`` console shell and passing desired
+installation target as argument. For instance to install Modules in
+``C:\EnvironmentModules`` directory::
 
         > INSTALL.bat C:\EnvironmentModules
+
+
+For PowerShell, you may adapt profile script to make ``envmodule`` command
+initialized when ``pwsh`` shell starts. See the PowerShell documentation on
+how to `customize your shell environment <https://learn.microsoft.com/en-us/powershell/scripting/learn/shell/creating-profiles>`_.
 
 Modules installation is now operational and you can setup your modulefiles. By
 default, the ``modulefiles`` directory in installation directory is defined as
@@ -79,6 +104,6 @@ a modulepath and contains few modulefile examples::
         ------- C:/Program Files/Environment Modules/modulefiles --------
         module-git  module-info  null
 
-Documentation of the :ref:`module(1)` and :ref:`ml(1)` commands and
-:ref:`modulefile(5)` syntax can be found in the ``doc`` directory in
-installation directory.
+Documentation of the :ref:`module(1)`, :ref:`ml(1)` and :ref:`envml(1)`
+commands and :ref:`modulefile(5)` syntax can be found in the ``doc`` directory
+in installation directory.

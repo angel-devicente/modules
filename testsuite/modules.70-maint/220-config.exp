@@ -39,6 +39,8 @@ unsetenv_var MODULES_AVAIL_OUTPUT
 unsetenv_var MODULES_AVAIL_TERSE_OUTPUT
 unsetenv_var MODULES_LIST_OUTPUT
 unsetenv_var MODULES_LIST_TERSE_OUTPUT
+unsetenv_var MODULES_SPIDER_OUTPUT
+unsetenv_var MODULES_SPIDER_TERSE_OUTPUT
 unsetenv_var MODULES_VARIANT_SHORTCUT
 if {[info exists env(MODULES_ICASE)]} {
     set saved_icase $env(MODULES_ICASE)
@@ -68,6 +70,7 @@ array set configdfl [list\
     collection_target         <undef>\
     color                     "never \\\(env-var\\\)"\
     colors                    [expr {$install_termbg eq {dark} ? $valid_darkbgcolors : $valid_lightbgcolors}]\
+    conflict_unload           [expr {$install_conflictunload eq {y}}]\
     contact                   root@localhost\
     editor                    "$install_editor"\
     extended_default          [expr {$install_extendeddefault eq {y}}]\
@@ -94,6 +97,7 @@ array set configdfl [list\
     quarantine_support        [expr {$install_quarantinesupport eq {y}}]\
     rcfile                    <undef>\
     redirect_output           1\
+    require_via               [expr {$install_requirevia eq {y}}]\
     reset_target_state        __init__\
     run_quarantine            <undef>\
     search_match              $install_searchmatch\
@@ -102,6 +106,9 @@ array set configdfl [list\
     silent_shell_debug        [expr {$install_silentshdbgsupport eq {y}}]\
     siteconfig                $siteconfig_filere\
     source_cache              [expr {$install_sourcecache eq {y}}]\
+    spider_indepth            [expr {$install_spiderindepth eq {y}}]\
+    spider_output             $install_spideroutput\
+    spider_terse_output       $install_spiderterseoutput\
     sticky_purge              $install_stickypurge\
     tcl_ext_lib               lib/libtclenvmodules$install_shlib_suffix\
     tcl_linter                $install_tcllintercmd\
@@ -130,6 +137,7 @@ array set configvar [list\
     collection_target         MODULES_COLLECTION_TARGET\
     color                     MODULES_COLOR\
     colors                    MODULES_COLORS\
+    conflict_unload           MODULES_CONFLICT_UNLOAD\
     contact                   MODULECONTACT\
     editor                    MODULES_EDITOR\
     extended_default          MODULES_EXTENDED_DEFAULT\
@@ -154,6 +162,7 @@ array set configvar [list\
     quarantine_support        MODULES_QUARANTINE_SUPPORT\
     rcfile                    MODULERCFILE\
     redirect_output           MODULES_REDIRECT_OUTPUT\
+    require_via               MODULES_REQUIRE_VIA\
     reset_target_state        MODULES_RESET_TARGET_STATE\
     run_quarantine            MODULES_RUN_QUARANTINE\
     search_match              MODULES_SEARCH_MATCH\
@@ -161,6 +170,9 @@ array set configvar [list\
     shells_with_ksh_fpath     MODULES_SHELLS_WITH_KSH_FPATH\
     silent_shell_debug        MODULES_SILENT_SHELL_DEBUG\
     source_cache              MODULES_SOURCE_CACHE\
+    spider_indepth            MODULES_SPIDER_INDEPTH\
+    spider_output             MODULES_SPIDER_OUTPUT\
+    spider_terse_output       MODULES_SPIDER_TERSE_OUTPUT\
     sticky_purge              MODULES_STICKY_PURGE\
     tag_abbrev                MODULES_TAG_ABBREV\
     tag_color_name            MODULES_TAG_COLOR_NAME\
@@ -179,22 +191,23 @@ array set configvalid [list\
     advanced_version_spec     {0 1}\
     auto_handling             {0 1}\
     avail_indepth             {0 1}\
-    avail_output              {modulepath alias dirwsym indesym sym tag key variant variantifspec}\
-    avail_terse_output        {modulepath alias dirwsym indesym sym tag key variant variantifspec}\
+    avail_output              {modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec via}\
+    avail_terse_output        {modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec}\
     cache_buffer_bytes        {4096 1000000}\
     cache_expiry_secs         {0 31536000}\
     collection_pin_version    {0 1}\
     collection_pin_tag        {0 1}\
     color                     {never auto always}\
+    conflict_unload           {0 1}\
     extended_default          {0 1}\
     hide_auto_loaded          {0 1}\
     icase                     {never search always}\
     ignore_cache              {0 1}\
-    ignore_user_rc              {0 1}\
+    ignore_user_rc            {0 1}\
     implicit_default          {0 1}\
     implicit_requirement      {0 1}\
-    list_output               {header idx variant alias indesym sym tag key}\
-    list_terse_output         {header idx variant alias indesym sym tag key}\
+    list_output               {header idx variant alias indesym sym tag hidden key}\
+    list_terse_output         {header idx variant alias indesym sym tag hidden key}\
     logged_events             {auto_eval requested_eval requested_cmd}\
     mcookie_check             {eval always}\
     mcookie_version_check     {0 1}\
@@ -202,11 +215,15 @@ array set configvalid [list\
     nearly_forbidden_days     {0 365}\
     quarantine_support        {0 1}\
     redirect_output           {0 1}\
+    require_via               {0 1}\
     search_match              {starts_with contains}\
     set_shell_startup         {0 1}\
     shells_with_ksh_fpath     {sh bash csh tcsh fish}\
     silent_shell_debug        {0 1}\
     source_cache              {0 1}\
+    spider_indepth            {0 1}\
+    spider_output             {modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec via}\
+    spider_terse_output       {modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec}\
     sticky_purge              {error warning silent}\
     term_background           {dark light}\
     term_width                {0 1000}\
@@ -227,6 +244,8 @@ array set configvalidkind [list\
     logged_events             eltlist\
     nearly_forbidden_days     intbe\
     shells_with_ksh_fpath     eltlist\
+    spider_output             eltlist\
+    spider_terse_output       eltlist\
     term_width                intbe\
 ]
 
@@ -248,6 +267,8 @@ array set configkind [list\
     protected_envvars         l\
     rcfile                    l\
     shells_with_ksh_fpath     l\
+    spider_output             l\
+    spider_terse_output       l\
     tag_abbrev                l\
     tag_color_name            l\
     variant_shortcut          l\

@@ -38,16 +38,31 @@ setenv_var MODULERCFILE $env(TESTSUITEDIR)/etc/modulerc.depsaltname
 unsetenv_var __MODULES_LMALTNAME
 unsetenv_var __MODULES_LMPREREQ
 unsetenv_loaded_module
-set tserr [msg_load faa [err_conlo fa]]
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload {fa <aL>} [err_deploi faa]]\n\n[msg_load faa [err_conun fa]]
+} else {
+    set tserr [msg_load faa [err_conlo fa]]
+}
 testouterr_cmd_re sh {load --auto faa} ERR $tserr
-set ans [list]
-lappend ans [list set __MODULES_LMCONFLICT faa&fa]
-lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
-lappend ans [list set __MODULES_LMPREREQ faa&fa]
-lappend ans [list set _LMFILES_ $mp/fa:$mp/faa]
-lappend ans [list set LOADEDMODULES fa:faa]
-lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
-set tserr [msg_top_load faa {} fa {} [err_conlof fa]]
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMCONFLICT faa&fa]
+    lappend ans [list unset __MODULES_LMALTNAME]
+    lappend ans [list set __MODULES_LMPREREQ faa&fa]
+    lappend ans [list set _LMFILES_ $mp/faa]
+    lappend ans [list set LOADEDMODULES faa]
+    lappend ans [list unset __MODULES_LMTAG]
+    set tserr [msg_unload {fa <aL>} [err_deploif faa]]\n\n[msg_top_load faa fa {} {} {Loading requirement: fa}]
+} else {
+    set ans [list]
+    lappend ans [list set __MODULES_LMCONFLICT faa&fa]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list set __MODULES_LMPREREQ faa&fa]
+    lappend ans [list set _LMFILES_ $mp/fa:$mp/faa]
+    lappend ans [list set LOADEDMODULES fa:faa]
+    lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
+    set tserr [msg_top_load faa {} fa {} [err_conlof fa]]
+}
 testouterr_cmd_re sh {load --force --auto faa} $ans $tserr
 set tserr [msg_load faa [err_prereq fa]]
 testouterr_cmd_re sh {load --no-auto faa} ERR $tserr
@@ -62,8 +77,11 @@ testouterr_cmd_re sh {load --force --no-auto faa} $ans $tserr
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
 set tserr [msg_load faa [err_conflict fa]]
-testouterr_cmd_re sh {load --auto faa} ERR $tserr
 testouterr_cmd_re sh {load --no-auto faa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload fa [err_deploi faa]]\n\n[msg_load faa [err_conun fa]]
+}
+testouterr_cmd_re sh {load --auto faa} ERR $tserr
 
 setenv_loaded_module [list faa] [list $mp/faa]
 unsetenv_var __MODULES_LMALTNAME
@@ -77,20 +95,34 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto faa} $ans {}
 testouterr_cmd_re sh {unload --no-auto faa} $ans {}
 
-set tserr [msg_load fa [err_conflict faa]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa faa {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict faa]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa faa] [list $mp/fa $mp/faa] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior faa, as it is also declared a prereq of faa
+#   depre_un of fa should be triggered after faa unload
+set tserr [msg_unload {fa <aL>} [err_deplo faa]]\n\n[msg_unload faa [err_depun fa]]
+testouterr_cmd_re sh {unload --auto faa} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload faa {} fa {}]
-testouterr_cmd_re sh {unload --auto faa} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto faa} $ans $tserr
 set ans [list]
 lappend ans [list unset __MODULES_LMCONFLICT]
@@ -105,7 +137,11 @@ unsetenv_var __MODULES_LMALTNAME
 unsetenv_var __MODULES_LMCONFLICT
 unsetenv_var __MODULES_LMPREREQ
 unsetenv_loaded_module
-set tserr [msg_load fab [err_conlo fa]]
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload {fa <aL>} [err_deploi fab]]\n\n[msg_load fab [err_conun fa]]
+} else {
+    set tserr [msg_load fab [err_conlo fa]]
+}
 testouterr_cmd_re sh {load --auto fab} ERR $tserr
 set ans [list]
 lappend ans [list set __MODULES_LMCONFLICT fab&fa]
@@ -114,10 +150,21 @@ lappend ans [list set __MODULES_LMPREREQ fab&alfa]
 lappend ans [list set _LMFILES_ $mp/fa:$mp/fab]
 lappend ans [list set LOADEDMODULES fa:fab]
 lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
-set tserr [msg_top_load fab {} fa {} [err_conlof fa]]
-testouterr_cmd_re sh {load --force --auto fab} $ans $tserr
 set tserr [msg_load fab [err_prereq alfa]]
 testouterr_cmd_re sh {load --no-auto fab} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMCONFLICT fab&fa]
+    lappend ans [list unset __MODULES_LMALTNAME]
+    lappend ans [list set __MODULES_LMPREREQ fab&alfa]
+    lappend ans [list set _LMFILES_ $mp/fab]
+    lappend ans [list set LOADEDMODULES fab]
+    lappend ans [list unset __MODULES_LMTAG]
+    set tserr [msg_unload {fa <aL>} [err_deploif fab]]\n\n[msg_top_load fab fa {} {} {Loading requirement: fa}]
+} else {
+    set tserr [msg_top_load fab {} fa {} [err_conlof fa]]
+}
+testouterr_cmd_re sh {load --force --auto fab} $ans $tserr
 set ans [list]
 lappend ans [list set __MODULES_LMCONFLICT fab&fa]
 lappend ans [list set __MODULES_LMPREREQ fab&alfa]
@@ -129,8 +176,11 @@ testouterr_cmd_re sh {load --force --no-auto fab} $ans $tserr
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
 set tserr [msg_load fab [err_conflict fa]]
-testouterr_cmd_re sh {load --auto fab} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fab} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload fa [err_deploi fab]]\n\n[msg_load fab [err_conun fa]]
+}
+testouterr_cmd_re sh {load --auto fab} ERR $tserr
 
 setenv_loaded_module [list fab] [list $mp/fab]
 unsetenv_var __MODULES_LMALTNAME
@@ -144,20 +194,34 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fab} $ans {}
 testouterr_cmd_re sh {unload --no-auto fab} $ans {}
 
-set tserr [msg_load fa [err_conflict fab]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fab {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fab]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fab] [list $mp/fa $mp/fab] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fab, as it is also declared a prereq of fab
+#   depre_un of fa should be triggered after fab unload
+set tserr [msg_unload {fa <aL>} [err_deplo fab]]\n\n[msg_unload fab [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fab} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fab {} fa {}]
-testouterr_cmd_re sh {unload --auto fab} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fab} $ans $tserr
 set ans [list]
 lappend ans [list unset __MODULES_LMCONFLICT]
@@ -181,7 +245,7 @@ lappend ans [list set __MODULES_LMPREREQ fac&fa]
 lappend ans [list set _LMFILES_ $mp/fa:$mp/fac]
 lappend ans [list set LOADEDMODULES fa:fac]
 lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
-# conflict is reported twice: by declaring module and conflict-target module as they are both evaluated here
+# conflict is reported twice: first by conflict target module when loading and by declaring module af the end of its load
 set tserr [msg_load {fa <aL>} [err_conloif fac]]\n\n[msg_top_load fac {} fa {} [err_conlof fa]]
 testouterr_cmd_re sh {load --force --auto fac} $ans $tserr
 set tserr [msg_load fac [err_prereq fa]]
@@ -197,8 +261,11 @@ testouterr_cmd_re sh {load --force --no-auto fac} $ans $tserr
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
 set tserr [msg_load fac [err_conflict fa]]
-testouterr_cmd_re sh {load --auto fac} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fac} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_load fa [err_conloi fac]]\n\n[msg_load fac [err_reqlo fa]]
+}
+testouterr_cmd_re sh {load --auto fac} ERR $tserr
 
 setenv_loaded_module [list fac] [list $mp/fac]
 unsetenv_var __MODULES_LMALTNAME
@@ -212,20 +279,34 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fac} $ans {}
 testouterr_cmd_re sh {unload --no-auto fac} $ans {}
 
-set tserr [msg_load fa [err_conflict fac]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fac {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fac]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fac] [list $mp/fa $mp/fac] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fac, as it is also declared a prereq of fac
+#   depre_un of fa should be triggered after fac unload
+set tserr [msg_unload {fa <aL>} [err_deplo fac]]\n\n[msg_unload fac [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fac} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fac {} fa {}]
-testouterr_cmd_re sh {unload --auto fac} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fac} $ans $tserr
 set ans [list]
 lappend ans [list unset __MODULES_LMCONFLICT]
@@ -265,8 +346,11 @@ testouterr_cmd_re sh {load --force --no-auto fad} $ans $tserr
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
 set tserr [msg_load fad [err_conflict fa]]
-testouterr_cmd_re sh {load --auto fad} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fad} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_load fa [err_conloi fad]]\n\n[msg_load fad [err_reqlo fa]]
+}
+testouterr_cmd_re sh {load --auto fad} ERR $tserr
 
 setenv_loaded_module [list fad] [list $mp/fad]
 unsetenv_var __MODULES_LMALTNAME
@@ -280,20 +364,34 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fad} $ans {}
 testouterr_cmd_re sh {unload --no-auto fad} $ans {}
 
-set tserr [msg_load fa [err_conflict fad]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fad {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fad]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fad] [list $mp/fa $mp/fad] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fad, as it is also declared a prereq of fad
+#   depre_un of fa should be triggered after fad unload
+set tserr [msg_unload {fa <aL>} [err_deplo fad]]\n\n[msg_unload fad [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fad} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fad {} fa {}]
-testouterr_cmd_re sh {unload --auto fad} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fad} $ans $tserr
 set ans [list]
 lappend ans [list unset __MODULES_LMCONFLICT]
@@ -309,8 +407,11 @@ unsetenv_var __MODULES_LMCONFLICT
 unsetenv_var __MODULES_LMPREREQ
 unsetenv_loaded_module
 set tserr [msg_load fae [err_conlo fa]]
-testouterr_cmd_re sh {load --auto fae} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fae} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload {fa <aL>} [err_deploi fae]]\n\n[msg_load fae [err_conun fa]]
+}
+testouterr_cmd_re sh {load --auto fae} ERR $tserr
 set ans [list]
 lappend ans [list set __MODULES_LMCONFLICT fae&fa]
 lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
@@ -319,14 +420,27 @@ lappend ans [list set _LMFILES_ $mp/fa:$mp/fae]
 lappend ans [list set LOADEDMODULES fa:fae]
 lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
 set tserr [msg_top_load fae {} fa {} [err_conlof fa]]
-testouterr_cmd_re sh {load --force --auto fae} $ans $tserr
 testouterr_cmd_re sh {load --force --no-auto fae} $ans $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMCONFLICT fae&fa]
+    lappend ans [list unset __MODULES_LMALTNAME]
+    lappend ans [list set __MODULES_LMPREREQ fae&fa]
+    lappend ans [list set _LMFILES_ $mp/fae]
+    lappend ans [list set LOADEDMODULES fae]
+    lappend ans [list unset __MODULES_LMTAG]
+    set tserr [msg_unload {fa <aL>} [err_deploif fae]]\n\n[msg_top_load fae fa {} {} {Loading requirement: fa}]
+}
+testouterr_cmd_re sh {load --force --auto fae} $ans $tserr
 
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
 set tserr [msg_load fae [err_conflict fa]]
-testouterr_cmd_re sh {load --auto fae} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fae} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload fa [err_deploi fae]]\n\n[msg_load fae [err_conun fa]]
+}
+testouterr_cmd_re sh {load --auto fae} ERR $tserr
 
 setenv_loaded_module [list fae] [list $mp/fae]
 unsetenv_var __MODULES_LMALTNAME
@@ -340,28 +454,35 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fae} $ans {}
 testouterr_cmd_re sh {unload --no-auto fae} $ans {}
 
-set tserr [msg_load fa [err_conflict fae]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fae {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fae]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fae] [list $mp/fa $mp/fae] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fae, as it is also declared a prereq of fae
+#   depre_un of fa should be triggered after fae unload
+set tserr [msg_unload {fa <aL>} [err_deplo fae]]\n\n[msg_unload fae [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fae} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fae {} fa {}]
-testouterr_cmd_re sh {unload --auto fae} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fae} $ans $tserr
-set ans [list]
-lappend ans [list unset __MODULES_LMCONFLICT]
-lappend ans [list unset __MODULES_LMALTNAME]
-lappend ans [list unset __MODULES_LMPREREQ]
-lappend ans [list unset _LMFILES_]
-lappend ans [list unset LOADEDMODULES]
-lappend ans [list unset __MODULES_LMTAG]
 testouterr_cmd_re sh {unload --no-auto fae} $ans $tserr
 testouterr_cmd_re sh {unload --force --no-auto fae} $ans $tserr
 
@@ -388,8 +509,11 @@ testouterr_cmd_re sh {load --force --no-auto faf} $ans $tserr
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
 set tserr [msg_load faf [err_conflict fa]]
-testouterr_cmd_re sh {load --auto faf} ERR $tserr
 testouterr_cmd_re sh {load --no-auto faf} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_load fa [err_conloi faf]]\n\n[msg_load faf [err_reqlo fa]]
+}
+testouterr_cmd_re sh {load --auto faf} ERR $tserr
 
 setenv_loaded_module [list faf] [list $mp/faf]
 unsetenv_var __MODULES_LMALTNAME
@@ -403,28 +527,35 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto faf} $ans {}
 testouterr_cmd_re sh {unload --no-auto faf} $ans {}
 
-set tserr [msg_load fa [err_conflict faf]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa faf {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict faf]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa faf] [list $mp/fa $mp/faf] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior faf, as it is also declared a prereq of faf
+#   depre_un of fa should be triggered after faf unload
+set tserr [msg_unload {fa <aL>} [err_deplo faf]]\n\n[msg_unload faf [err_depun fa]]
+testouterr_cmd_re sh {unload --auto faf} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload faf {} fa {}]
-testouterr_cmd_re sh {unload --auto faf} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto faf} $ans $tserr
-set ans [list]
-lappend ans [list unset __MODULES_LMCONFLICT]
-lappend ans [list unset __MODULES_LMALTNAME]
-lappend ans [list unset __MODULES_LMPREREQ]
-lappend ans [list unset _LMFILES_]
-lappend ans [list unset LOADEDMODULES]
-lappend ans [list unset __MODULES_LMTAG]
 testouterr_cmd_re sh {unload --no-auto faf} $ans $tserr
 testouterr_cmd_re sh {unload --force --no-auto faf} $ans $tserr
 
@@ -433,17 +564,16 @@ unsetenv_var __MODULES_LMALTNAME
 unsetenv_var __MODULES_LMCONFLICT
 unsetenv_var __MODULES_LMPREREQ
 unsetenv_loaded_module
-set tserr [msg_unload {fa <aL>} [err_deplo fai]]\n\n[msg_load fai [err_conun fa]]
+set tserr [msg_unload {fa <aL>} [err_deploi fai]]\n\n[msg_load fai [err_conun fa]]
 testouterr_cmd_re sh {load --auto fai} ERR $tserr
 set ans [list]
 lappend ans [list set __MODULES_LMCONFLICT fai&fa]
-lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list set __MODULES_LMPREREQ fai&fa]
-lappend ans [list set LOADEDMODULES fa:fai]
-lappend ans [list set _LMFILES_ $mp/fa:$mp/fai]
-lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
-lappend ans [list ERR]
-set tserr [msg_unload {fa <aL>} [err_deplo fai]]\n\n[msg_top_load fai {} fa {} [err_conunf fa]]
+lappend ans [list set _LMFILES_ $mp/fai]
+lappend ans [list set LOADEDMODULES fai]
+lappend ans [list unset __MODULES_LMTAG]
+set tserr [msg_unload {fa <aL>} [err_deploif fai]]\n\n[msg_load fai {Loading requirement: fa} {Unloading conflict: fa}]
 testouterr_cmd_re sh {load --force --auto fai} $ans $tserr
 set tserr [msg_load fai [err_prereq fa]]
 testouterr_cmd_re sh {load --no-auto fai} ERR $tserr
@@ -457,7 +587,7 @@ testouterr_cmd_re sh {load --force --no-auto fai} $ans $tserr
 
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
-set tserr [msg_unload fa [err_deplo fai]]\n\n[msg_load fai [err_conun fa]]
+set tserr [msg_unload fa [err_deploi fai]]\n\n[msg_load fai [err_conun fa]]
 testouterr_cmd_re sh {load --auto fai} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fai} ERR $tserr
 
@@ -473,20 +603,34 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fai} $ans {}
 testouterr_cmd_re sh {unload --no-auto fai} $ans {}
 
-set tserr [msg_load fa [err_conflict fai]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fai {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fai]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fai] [list $mp/fa $mp/fai] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fai, as it is also declared a prereq of fai
+#   depre_un of fa should be triggered after fai unload
+set tserr [msg_unload {fa <aL>} [err_deplo fai]]\n\n[msg_unload fai [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fai} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fai {} fa {}]
-testouterr_cmd_re sh {unload --auto fai} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fai} $ans $tserr
 set ans [list]
 lappend ans [list unset __MODULES_LMCONFLICT]
@@ -510,7 +654,12 @@ lappend ans [list set __MODULES_LMPREREQ faj&fa]
 lappend ans [list set _LMFILES_ $mp/fa:$mp/faj]
 lappend ans [list set LOADEDMODULES fa:faj]
 lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
-set tserr [msg_load {fa <aL>} [err_conloif faj]]\n\n[msg_top_load faj {} fa {}]
+if {[is_conf_enabled conflictunload]} {
+    # conflict is reported twice: first by conflict target module when loading and by declaring module af the end of its load
+    set tserr [msg_load {fa <aL>} [err_conloif faj]]\n\n[msg_top_load faj {} fa {} [err_conlof fa]]
+} else {
+    set tserr [msg_load {fa <aL>} [err_conloif faj]]\n\n[msg_top_load faj {} fa {}]
+}
 testouterr_cmd_re sh {load --force --auto faj} $ans $tserr
 # no load suggestion for fa as its previous unload attempt is detected
 set tserr [msg_load faj [err_reqmis fa]]
@@ -543,20 +692,34 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto faj} $ans {}
 testouterr_cmd_re sh {unload --no-auto faj} $ans {}
 
-set tserr [msg_load fa [err_conflict faj]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa faj {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict faj]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa faj] [list $mp/fa $mp/faj] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior faj, as it is also declared a prereq of faj
+#   depre_un of fa should be triggered after faj unload
+set tserr [msg_unload {fa <aL>} [err_deplo faj]]\n\n[msg_unload faj [err_depun fa]]
+testouterr_cmd_re sh {unload --auto faj} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload faj {} fa {}]
-testouterr_cmd_re sh {unload --auto faj} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto faj} $ans $tserr
 set ans [list]
 lappend ans [list unset __MODULES_LMCONFLICT]
@@ -571,24 +734,23 @@ unsetenv_var __MODULES_LMALTNAME
 unsetenv_var __MODULES_LMCONFLICT
 unsetenv_var __MODULES_LMPREREQ
 unsetenv_loaded_module
-set tserr [msg_unload {fa <aL>} [err_deplo fak]]\n\n[msg_load fak [err_conun fa]]
+set tserr [msg_unload {fa <aL>} [err_deploi fak]]\n\n[msg_load fak [err_conun fa]]
 testouterr_cmd_re sh {load --auto fak} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fak} ERR $tserr
 set ans [list]
 lappend ans [list set __MODULES_LMCONFLICT fak&fa]
-lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list set __MODULES_LMPREREQ fak&fa]
-lappend ans [list set LOADEDMODULES fa:fak]
-lappend ans [list set _LMFILES_ $mp/fa:$mp/fak]
-lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
-lappend ans [list ERR]
-set tserr [msg_unload {fa <aL>} [err_deplo fak]]\n\n[msg_top_load fak {} fa {} [err_conunf fa]]
-testouterr_cmd_re sh {load --force --auto fak} $ans $tserr
+lappend ans [list set _LMFILES_ $mp/fak]
+lappend ans [list set LOADEDMODULES fak]
+lappend ans [list unset __MODULES_LMTAG]
+set tserr [msg_unload {fa <aL>} [err_deploif fak]]\n\n[msg_load fak {Loading requirement: fa} {Unloading conflict: fa}]
 testouterr_cmd_re sh {load --force --no-auto fak} $ans $tserr
+testouterr_cmd_re sh {load --force --auto fak} $ans $tserr
 
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
-set tserr [msg_unload fa [err_deplo fak]]\n\n[msg_load fak [err_conun fa]]
+set tserr [msg_unload fa [err_deploi fak]]\n\n[msg_load fak [err_conun fa]]
 testouterr_cmd_re sh {load --auto fak} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fak} ERR $tserr
 
@@ -604,28 +766,35 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fak} $ans {}
 testouterr_cmd_re sh {unload --no-auto fak} $ans {}
 
-set tserr [msg_load fa [err_conflict fak]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fak {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fak]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fak] [list $mp/fa $mp/fak] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fak, as it is also declared a prereq of fak
+#   depre_un of fa should be triggered after fak unload
+set tserr [msg_unload {fa <aL>} [err_deplo fak]]\n\n[msg_unload fak [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fak} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fak {} fa {}]
-testouterr_cmd_re sh {unload --auto fak} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fak} $ans $tserr
-set ans [list]
-lappend ans [list unset __MODULES_LMCONFLICT]
-lappend ans [list unset __MODULES_LMALTNAME]
-lappend ans [list unset __MODULES_LMPREREQ]
-lappend ans [list unset _LMFILES_]
-lappend ans [list unset LOADEDMODULES]
-lappend ans [list unset __MODULES_LMTAG]
 testouterr_cmd_re sh {unload --no-auto fak} $ans $tserr
 testouterr_cmd_re sh {unload --force --no-auto fak} $ans $tserr
 
@@ -634,24 +803,23 @@ unsetenv_var __MODULES_LMALTNAME
 unsetenv_var __MODULES_LMCONFLICT
 unsetenv_var __MODULES_LMPREREQ
 unsetenv_loaded_module
-set tserr [msg_unload {fa <aL>} [err_deplo fal]]\n\n[msg_load fal [err_conun fa]]
+set tserr [msg_unload {fa <aL>} [err_deploi fal]]\n\n[msg_load fal [err_conun fa]]
 testouterr_cmd_re sh {load --auto fal} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fal} ERR $tserr
 set ans [list]
 lappend ans [list set __MODULES_LMCONFLICT fal&alfa]
-lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list set __MODULES_LMPREREQ fal&fa]
-lappend ans [list set LOADEDMODULES fa:fal]
-lappend ans [list set _LMFILES_ $mp/fa:$mp/fal]
-lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
-lappend ans [list ERR]
-set tserr [msg_unload {fa <aL>} [err_deplo fal]]\n\n[msg_top_load fal {} fa {} [err_conunf fa]]
-testouterr_cmd_re sh {load --force --auto fal} $ans $tserr
+lappend ans [list set _LMFILES_ $mp/fal]
+lappend ans [list set LOADEDMODULES fal]
+lappend ans [list unset __MODULES_LMTAG]
+set tserr [msg_unload {fa <aL>} [err_deploif fal]]\n\n[msg_load fal {Loading requirement: fa} {Unloading conflict: fa}]
 testouterr_cmd_re sh {load --force --no-auto fal} $ans $tserr
+testouterr_cmd_re sh {load --force --auto fal} $ans $tserr
 
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
-set tserr [msg_unload fa [err_deplo fal]]\n\n[msg_load fal [err_conun fa]]
+set tserr [msg_unload fa [err_deploi fal]]\n\n[msg_load fal [err_conun fa]]
 testouterr_cmd_re sh {load --auto fal} ERR $tserr
 testouterr_cmd_re sh {load --no-auto fal} ERR $tserr
 
@@ -667,28 +835,35 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fal} $ans {}
 testouterr_cmd_re sh {unload --no-auto fal} $ans {}
 
-set tserr [msg_load fa [err_conflict fal]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fal {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fal]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fal] [list $mp/fa $mp/fal] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fal, as it is also declared a prereq of fal
+#   depre_un of fa should be triggered after fal unload
+set tserr [msg_unload {fa <aL>} [err_deplo fal]]\n\n[msg_unload fal [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fal} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fal {} fa {}]
-testouterr_cmd_re sh {unload --auto fal} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fal} $ans $tserr
-set ans [list]
-lappend ans [list unset __MODULES_LMCONFLICT]
-lappend ans [list unset __MODULES_LMALTNAME]
-lappend ans [list unset __MODULES_LMPREREQ]
-lappend ans [list unset _LMFILES_]
-lappend ans [list unset LOADEDMODULES]
-lappend ans [list unset __MODULES_LMTAG]
 testouterr_cmd_re sh {unload --no-auto fal} $ans $tserr
 testouterr_cmd_re sh {unload --force --no-auto fal} $ans $tserr
 
@@ -708,8 +883,12 @@ lappend ans [list set _LMFILES_ $mp/fa:$mp/fam]
 lappend ans [list set LOADEDMODULES fa:fam]
 lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
 set tserr [msg_load {fa <aL>} [err_conloif fam]]\n\n[msg_top_load fam {} fa {}]
-testouterr_cmd_re sh {load --force --auto fam} $ans $tserr
 testouterr_cmd_re sh {load --force --no-auto fam} $ans $tserr
+if {[is_conf_enabled conflictunload]} {
+    # conflict is reported twice: first by conflict target module when loading and by declaring module af the end of its load
+    set tserr [msg_load {fa <aL>} [err_conloif fam]]\n\n[msg_top_load fam {} fa {} [err_conlof fa]]
+}
+testouterr_cmd_re sh {load --force --auto fam} $ans $tserr
 
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
@@ -729,28 +908,35 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fam} $ans {}
 testouterr_cmd_re sh {unload --no-auto fam} $ans {}
 
-set tserr [msg_load fa [err_conflict fam]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fam {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fam]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fam] [list $mp/fa $mp/fam] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fam, as it is also declared a prereq of fam
+#   depre_un of fa should be triggered after fam unload
+set tserr [msg_unload {fa <aL>} [err_deplo fam]]\n\n[msg_unload fam [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fam} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fam {} fa {}]
-testouterr_cmd_re sh {unload --auto fam} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fam} $ans $tserr
-set ans [list]
-lappend ans [list unset __MODULES_LMCONFLICT]
-lappend ans [list unset __MODULES_LMALTNAME]
-lappend ans [list unset __MODULES_LMPREREQ]
-lappend ans [list unset _LMFILES_]
-lappend ans [list unset LOADEDMODULES]
-lappend ans [list unset __MODULES_LMTAG]
 testouterr_cmd_re sh {unload --no-auto fam} $ans $tserr
 testouterr_cmd_re sh {unload --force --no-auto fam} $ans $tserr
 
@@ -770,8 +956,12 @@ lappend ans [list set _LMFILES_ $mp/fa:$mp/fan]
 lappend ans [list set LOADEDMODULES fa:fan]
 lappend ans [list set __MODULES_LMTAG fa&auto-loaded]
 set tserr [msg_load {fa <aL>} [err_conloif fan]]\n\n[msg_top_load fan {} fa {}]
-testouterr_cmd_re sh {load --force --auto fan} $ans $tserr
 testouterr_cmd_re sh {load --force --no-auto fan} $ans $tserr
+if {[is_conf_enabled conflictunload]} {
+    # conflict is reported twice: first by conflict target module when loading and by declaring module af the end of its load
+    set tserr [msg_load {fa <aL>} [err_conloif fan]]\n\n[msg_top_load fan {} fa {} [err_conlof fa]]
+}
+testouterr_cmd_re sh {load --force --auto fan} $ans $tserr
 
 setenv_loaded_module [list fa] [list $mp/fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
@@ -791,28 +981,35 @@ lappend ans [list unset LOADEDMODULES]
 testouterr_cmd_re sh {unload --auto fan} $ans {}
 testouterr_cmd_re sh {unload --no-auto fan} $ans {}
 
-set tserr [msg_load fa [err_conflict fan]]
-testouterr_cmd_re sh {load --auto fa} ERR $tserr
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set __MODULES_LMALTNAME fa&al|alfa]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/fa]
+    lappend ans [list set LOADEDMODULES fa]
+    set tserr [msg_top_load fa fan {} {}]
+} else {
+    set ans ERR
+    set tserr [msg_load fa [err_conflict fan]]
+}
+testouterr_cmd_re sh {load --auto fa} $ans $tserr
 
 setenv_loaded_module [list fa fan] [list $mp/fa $mp/fan] [list fa]
 setenv_var __MODULES_LMALTNAME fa&al|alfa
+#FIXME: conflicting fa should not be unloaded prior fan, as it is also declared a prereq of fan
+#   depre_un of fa should be triggered after fan unload
+set tserr [msg_unload {fa <aL>} [err_deplo fan]]\n\n[msg_unload fan [err_depun fa]]
+testouterr_cmd_re sh {unload --auto fan} ERR $tserr
 set ans [list]
-lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMCONFLICT]
+lappend ans [list unset __MODULES_LMALTNAME]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list unset _LMFILES_]
 lappend ans [list unset LOADEDMODULES]
 lappend ans [list unset __MODULES_LMTAG]
 set tserr [msg_top_unload fan {} fa {}]
-testouterr_cmd_re sh {unload --auto fan} $ans $tserr
 testouterr_cmd_re sh {unload --force --auto fan} $ans $tserr
-set ans [list]
-lappend ans [list unset __MODULES_LMCONFLICT]
-lappend ans [list unset __MODULES_LMALTNAME]
-lappend ans [list unset __MODULES_LMPREREQ]
-lappend ans [list unset _LMFILES_]
-lappend ans [list unset LOADEDMODULES]
-lappend ans [list unset __MODULES_LMTAG]
 testouterr_cmd_re sh {unload --no-auto fan} $ans $tserr
 testouterr_cmd_re sh {unload --force --no-auto fan} $ans $tserr
 

@@ -89,8 +89,10 @@ time if :command:`mogui-cmd` command is found in :envvar:`PATH`.
 changes performed in the GUI is applied onto the shell session that executed
 :command:`mogui`.
 
-.. versionchanged:: 5.5
-   Definition of :command:`mogui` alias or function added
+.. only:: html
+
+   .. versionchanged:: 5.5
+      Definition of :command:`mogui` alias or function added
 
 
 Examples of initialization
@@ -109,6 +111,13 @@ Bourne Shell (sh) (and derivatives):
 
      . \ |initdir|\ /sh
      module load modulefile modulefile ...
+
+PowerShell (pwsh):
+
+.. parsed-literal::
+
+     . \ |initdir|\ /pwsh.ps1
+     envmodule load modulefile modulefile ...
 
 Perl:
 
@@ -197,8 +206,8 @@ switches are accepted:
 
  Include hidden modules in search performed with :subcmd:`avail`,
  :subcmd:`aliases`, :subcmd:`list`, :subcmd:`lint`, :subcmd:`savelist`,
- :subcmd:`search` or :subcmd:`whatis` sub-commands. Hard-hidden modules are
- not affected by this option.
+ :subcmd:`search`, :subcmd:`spider` or :subcmd:`whatis` sub-commands.
+ Hard-hidden modules are not affected by this option.
 
  .. only:: html
 
@@ -209,6 +218,9 @@ switches are accepted:
 
     .. versionchanged:: 5.2
        Support for :subcmd:`lint` and :subcmd:`savelist` sub-commands added
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
 
 .. option:: --auto
 
@@ -230,9 +242,9 @@ switches are accepted:
 
 .. option:: --contains, -C
 
- On :subcmd:`avail`, :subcmd:`list` and :subcmd:`savelist` sub-commands,
- return modules or collections whose fully qualified name contains search
- query string.
+ On :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist` and :subcmd:`spider`
+ sub-commands, return modules or collections whose fully qualified name
+ contains search query string.
 
  .. only:: html
 
@@ -243,6 +255,9 @@ switches are accepted:
 
     .. versionchanged:: 5.2
        Support for :subcmd:`savelist` sub-command added
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
 
 .. option:: --debug, -D, -DD
 
@@ -259,26 +274,40 @@ switches are accepted:
 
 .. option:: --default, -d
 
- On :subcmd:`avail` sub-command, display only the default version of each
- module name. Default version is the explicitly set default version or also
- the implicit default version if the configuration option
- :mconfig:`implicit_default` is enabled (see :ref:`Locating Modulefiles`
- section in the :ref:`modulefile(5)` man page for further details on implicit
- default version).
+ On :subcmd:`avail` and :subcmd:`spider` sub-commands, display only the
+ default version of each module name. Default version is the explicitly set
+ default version or also the implicit default version if the configuration
+ option :mconfig:`implicit_default` is enabled (see :ref:`Locating
+ Modulefiles` section in the :ref:`modulefile(5)` man page for further details
+ on implicit default version).
 
  .. only:: html
 
     .. versionadded:: 4.0
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
+
+.. option:: --dumpname
+
+ Report the name of the current implementation of the :command:`module`
+ command. This option returns ``Modules`` for this implementation. The command
+ then terminates without further processing.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. option:: --force, -f
 
  On :subcmd:`load`, :subcmd:`unload`, :subcmd:`switch`, :subcmd:`load-any`,
  :subcmd:`try-load`, :subcmd:`mod-to-sh` and :subcmd:`source` sub-commands
  by-pass any unsatisfied modulefile constraint corresponding to the declared
- :mfcmd:`prereq` and :mfcmd:`conflict`. Which means for instance that a
- *modulefile* will be loaded even if it comes in conflict with another loaded
- *modulefile* or that a *modulefile* will be unloaded even if it is required
- as a prereq by another *modulefile*.
+ :mfcmd:`prereq`, :ref:`via requirement<MODULES_REQUIRE_VIA>` and
+ :mfcmd:`conflict`. Which means for instance that a *modulefile* will be
+ loaded even if it comes in conflict with another loaded *modulefile* or that
+ a *modulefile* will be unloaded even if it is a requirement of another
+ *modulefile*.
 
  On :subcmd:`load`, :command:`ml`, :subcmd:`mod-to-sh`, :subcmd:`purge`,
  :subcmd:`reload`, :subcmd:`switch`, :subcmd:`try-load` and :subcmd:`unload`
@@ -356,38 +385,62 @@ switches are accepted:
 
 .. option:: --indepth
 
- On :subcmd:`avail` sub-command, include in search results the matching
- modulefiles and directories and recursively the modulefiles and directories
- contained in these matching directories.
+ On :subcmd:`avail` and :subcmd:`spider` sub-commands, include in search
+ results the matching modulefiles and directories and recursively the
+ modulefiles and directories contained in these matching directories.
 
  .. only:: html
 
     .. versionadded:: 4.3
 
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
+
 .. option:: --json, -j
 
  Display :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist`,
- :subcmd:`stashlist`, :subcmd:`whatis` and :subcmd:`search` output in JSON
- format.
+ :subcmd:`search`, :subcmd:`spider`, :subcmd:`stashlist` and :subcmd:`whatis`
+ output in JSON format.
 
  .. only:: html
 
     .. versionadded:: 4.5
 
+    .. versionchanged:: 5.2
+       Support for :subcmd:`stashlist` sub-command added
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
+
+
 .. option:: --latest, -L
 
- On :subcmd:`avail` sub-command, display only the highest numerically sorted
- version of each module name (see :ref:`Locating Modulefiles` section in the
- :ref:`modulefile(5)` man page).
+ On :subcmd:`avail` and :subcmd:`spider` sub-commands, display only the
+ highest numerically sorted version of each module name (see :ref:`Locating
+ Modulefiles` section in the :ref:`modulefile(5)` man page).
 
  .. only:: html
 
     .. versionadded:: 4.0
 
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
+
 .. option:: --long, -l
 
- Display :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist` and
- :subcmd:`stashlist` output in long format.
+ Display :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist`, :subcmd:`spider`
+ and :subcmd:`stashlist` output in long format.
+
+ .. only:: html
+
+    .. versionchanged:: 4.0
+       Support for :subcmd:`savelist` sub-command added
+
+    .. versionchanged:: 5.2
+       Support for :subcmd:`stashlist` sub-command added
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
 
 .. option:: --no-auto
 
@@ -400,14 +453,17 @@ switches are accepted:
 
 .. option:: --no-indepth
 
- On :subcmd:`avail` sub-command, limit search results to the matching
- modulefiles and directories found at the depth level expressed by the search
- query. Thus modulefiles contained in directories part of the result are
- excluded.
+ On :subcmd:`avail` and :subcmd:`spider` sub-commands, limit search results to
+ the matching modulefiles and directories found at the depth level expressed
+ by the search query. Thus modulefiles contained in directories part of the
+ result are excluded.
 
  .. only:: html
 
     .. versionadded:: 4.3
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
 
 .. option:: --no-pager
 
@@ -425,20 +481,23 @@ switches are accepted:
 
     .. versionadded:: 5.1
 
+.. _--output:
+
 .. option:: --output=LIST, -o LIST
 
  Define the content to report in addition to module names. This option is
- supported by :subcmd:`avail` and :subcmd:`list` sub-commands on their regular
- or terse output modes. Accepted values are a *LIST* of elements to report
- separated by colon character (``:``). The order of the elements in *LIST*
- does not matter.
+ supported by :subcmd:`avail`, :subcmd:`list` and :subcmd:`spider`
+ sub-commands on their regular or terse output modes. Accepted values are a
+ *LIST* of elements to report separated by colon character (``:``). The order
+ of the elements in *LIST* does not matter.
 
- Accepted elements in *LIST* for :subcmd:`avail` sub-command are:
- *modulepath*, *alias*, *dirwsym*, *indesym*, *sym*, *tag*, *key*, *variant*
- and *variantifspec*.
+ Accepted elements in *LIST* for :subcmd:`avail` and :subcmd:`spider`
+ sub-command are: *modulepath*, *alias*, *provided-alias*, *dirwsym*,
+ *indesym*, *sym*, *tag*, *key*, *hidden*, *variant*, *variantifspec* and
+ *via*. *via* element is not accepted on terse output mode.
 
  Accepted elements in *LIST* for :subcmd:`list` sub-command are: *header*,
- *idx*, *variant*, *alias*, *indesym*, *sym*, *tag* and *key*.
+ *idx*, *variant*, *alias*, *indesym*, *sym*, *tag*, *hidden* and *key*.
 
  The order of the elements in *LIST* does not matter. Module names are the
  only content reported when *LIST* is set to an empty value.
@@ -446,7 +505,8 @@ switches are accepted:
  *LIST* may be prefixed by ``+`` or ``-`` character to indicate respectively
  to append it to or subtract it from current configuration option value.
 
- See also :envvar:`MODULES_AVAIL_OUTPUT` and :envvar:`MODULES_LIST_OUTPUT`.
+ See also :envvar:`MODULES_AVAIL_OUTPUT`, :envvar:`MODULES_LIST_OUTPUT` and
+ :envvar:`MODULES_SPIDER_OUTPUT`.
 
  .. only:: html
 
@@ -467,6 +527,17 @@ switches are accepted:
 
     .. versionchanged:: 5.4
        Elements *alias* and *indesym* added for :subcmd:`list` sub-command
+
+    .. versionchanged:: 5.6
+       Sub-command :subcmd:`spider` supported
+
+    .. versionchanged:: 5.6
+       Element *hidden* added for :subcmd:`avail`, :subcmd:`list` and
+       :subcmd:`spider` sub-commands
+
+    .. versionchanged:: 5.6
+       Elements *provided-alias* and *via* added for :subcmd:`avail` and
+       :subcmd:`spider` sub-commands
 
 .. option:: --paginate
 
@@ -500,8 +571,9 @@ switches are accepted:
 
 .. option:: --starts-with, -S
 
- On :subcmd:`avail`, :subcmd:`list` and :subcmd:`savelist` sub-commands,
- return modules or collections whose name starts with search query string.
+ On :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist` and :subcmd:`spider`
+ sub-commands, return modules or collections whose name starts with search
+ query string.
 
  .. only:: html
 
@@ -512,6 +584,9 @@ switches are accepted:
 
     .. versionchanged:: 5.2
        Support for :subcmd:`savelist` sub-command added
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
 
 .. option:: --tag=LIST
 
@@ -529,8 +604,19 @@ switches are accepted:
 
 .. option:: --terse, -t
 
- Display :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist` and
- :subcmd:`stashlist` output in short format.
+ Display :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist`, :subcmd:`spider`
+ and :subcmd:`stashlist` output in short format.
+
+ .. only:: html
+
+    .. versionchanged:: 4.0
+       Support for :subcmd:`savelist` sub-command added
+
+    .. versionchanged:: 5.2
+       Support for :subcmd:`stashlist` sub-command added
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
 
 .. option:: --timer
 
@@ -690,6 +776,9 @@ Module Sub-Commands
  *pattern* variant specification and extra specifier. *pattern* may be a bare
  variant specification or extra specifier without mention of a module name.
 
+ When several *patterns* are provided all modulefiles matching at least one of
+ these *patterns* are listed.
+
  .. only:: html
 
     .. versionchanged:: 4.0
@@ -721,6 +810,10 @@ Module Sub-Commands
     .. versionchanged:: 5.3
        *pattern* may include variant specification or extra specifier to
        filter results
+
+    .. versionchanged:: 5.6
+       Results from a multi *pattern* search are consolidated under a single
+       output
 
 .. subcmd:: cachebuild [modulepath...]
 
@@ -851,10 +944,10 @@ Module Sub-Commands
   Content to report in addition to module names on :subcmd:`avail` sub-command
   regular output mode.
 
-  Default value is ``modulepath:alias:dirwsym:sym:tag:key``. It can be changed
-  at installation time with :instopt:`--with-avail-output` option. The
-  :envvar:`MODULES_AVAIL_OUTPUT` environment variable is defined by
-  :subcmd:`config` sub-command when changing this configuration option from
+  Default value is ``modulepath:alias:dirwsym:sym:tag:variantifspec:key``. It
+  can be changed at installation time with :instopt:`--with-avail-output`
+  option. The :envvar:`MODULES_AVAIL_OUTPUT` environment variable is defined
+  by :subcmd:`config` sub-command when changing this configuration option from
   its default value. The :option:`--output`/:option:`-o` command line switches
   change the value of this configuration option. See
   :envvar:`MODULES_AVAIL_OUTPUT` description for details.
@@ -868,12 +961,12 @@ Module Sub-Commands
   Content to report in addition to module names on :subcmd:`avail` sub-command
   terse output mode.
 
-  Default value is ``modulepath:alias:dirwsym:sym:tag``. It can be changed at
-  installation time with :instopt:`--with-avail-terse-output` option. The
-  :envvar:`MODULES_AVAIL_TERSE_OUTPUT` environment variable is defined by
-  :subcmd:`config` sub-command when changing this configuration option from
-  its default value. The :option:`--output`/:option:`-o` command line switches
-  change the value of this configuration option. See
+  Default value is ``modulepath:alias:dirwsym:sym:tag:variantifspec``. It can
+  be changed at installation time with :instopt:`--with-avail-terse-output`
+  option. The :envvar:`MODULES_AVAIL_TERSE_OUTPUT` environment variable is
+  defined by :subcmd:`config` sub-command when changing this configuration
+  option from its default value. The :option:`--output`/:option:`-o` command
+  line switches change the value of this configuration option. See
   :envvar:`MODULES_AVAIL_TERSE_OUTPUT` description for details.
 
   .. only:: html
@@ -954,7 +1047,7 @@ Module Sub-Commands
 
   Chosen colors to highlight output items.
 
-  Default value is ``hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=43:S=46:sS=44:kL=30;48;5;109``.
+  Default value is ``hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=31;43:S=46:sS=44:kL=30;48;5;109:W=30;43``.
   It can be changed at installation time with
   :instopt:`--with-dark-background-colors` or
   :instopt:`--with-light-background-colors` options in conjunction with
@@ -962,6 +1055,24 @@ Module Sub-Commands
   environment variable is defined by :subcmd:`config` sub-command when
   changing this configuration option from its default value. See
   :envvar:`MODULES_COLORS` description for details.
+
+ .. mconfig:: conflict_unload
+
+  Automated unload of conflicting modules when loading a module. This
+  mechanism is part of the :ref:`automated module handling
+  mode<MODULES_AUTO_HANDLING>` and also requires enablement of
+  :mconfig:`auto_handling` configuration option.
+
+  Default value is ``0``. It can be changed at installation time with
+  :instopt:`--enable-conflict-unload` option. The
+  :envvar:`MODULES_CONFLICT_UNLOAD` environment variable is defined by
+  :subcmd:`config` sub-command when changing this configuration option from
+  its default value. See :envvar:`MODULES_CONFLICT_UNLOAD` description for
+  details.
+
+  .. only:: html
+
+     .. versionadded:: 5.5
 
  .. mconfig:: contact
 
@@ -1315,6 +1426,21 @@ Module Sub-Commands
 
      .. versionadded:: 5.1
 
+ .. mconfig:: require_via
+
+  Consider loaded module enabling a modulepath a requirement for loaded
+  modules stored in this modulepath.
+
+  Default value is ``0``. It can be changed at installation time with
+  :instopt:`--enable-require-via` option. The :envvar:`MODULES_REQUIRE_VIA`
+  environment variable is defined by :subcmd:`config` sub-command when
+  changing this configuration option from its default value. See
+  :envvar:`MODULES_REQUIRE_VIA` description for details.
+
+  .. only:: html
+
+     .. versionadded:: 5.6
+
  .. mconfig:: reset_target_state
 
   Control behavior of :subcmd:`reset` sub-command. Whether environment should
@@ -1417,6 +1543,56 @@ Module Sub-Commands
 
      .. versionadded:: 5.4
 
+ .. mconfig:: spider_indepth
+
+  :subcmd:`spider` sub-command in depth search mode.
+
+  Default value is ``1``. It can be changed at installation time with
+  :instopt:`--disable-spider-indepth<--enable-spider-indepth>` option. The
+  :envvar:`MODULES_SPIDER_INDEPTH` environment variable is defined by
+  :subcmd:`config` sub-command when changing this configuration option from
+  its default value. The :option:`--indepth` and :option:`--no-indepth`
+  command line switches change the value of this configuration option. See
+  :envvar:`MODULES_SPIDER_INDEPTH` description for details.
+
+  .. only:: html
+
+     .. versionadded:: 5.6
+
+ .. mconfig:: spider_output
+
+  Content to report in addition to module names on :subcmd:`spider`
+  sub-command regular output mode.
+
+  Default value is ``modulepath:alias:dirwsym:sym:tag:variantifspec:via:key``.
+  It can be changed at installation time with :instopt:`--with-spider-output`
+  option. The :envvar:`MODULES_SPIDER_OUTPUT` environment variable is defined
+  by :subcmd:`config` sub-command when changing this configuration option from
+  its default value. The :option:`--output`/:option:`-o` command line switches
+  change the value of this configuration option. See
+  :envvar:`MODULES_SPIDER_OUTPUT` description for details.
+
+  .. only:: html
+
+     .. versionadded:: 5.6
+
+ .. mconfig:: spider_terse_output
+
+  Content to report in addition to module names on :subcmd:`spider`
+  sub-command terse output mode.
+
+  Default value is ``modulepath:alias:dirwsym:sym:tag:variantifspec``. It can
+  be changed at installation time with :instopt:`--with-spider-terse-output`
+  option. The :envvar:`MODULES_SPIDER_TERSE_OUTPUT` environment variable is
+  defined by :subcmd:`config` sub-command when changing this configuration
+  option from its default value. The :option:`--output`/:option:`-o` command
+  line switches change the value of this configuration option. See
+  :envvar:`MODULES_SPIDER_TERSE_OUTPUT` description for details.
+
+  .. only:: html
+
+     .. versionadded:: 5.6
+
  .. mconfig:: sticky_purge
 
   Error behavior when unloading sticky or super-sticky module during a module
@@ -1437,7 +1613,7 @@ Module Sub-Commands
 
   Abbreviations to use to report module tags.
 
-  Default value is ``auto-loaded=aL:loaded=L:hidden=H:hidden-loaded=H:forbidden=F:nearly-forbidden=nF:sticky=S:super-sticky=sS:keep-loaded=kL``.
+  Default value is ``auto-loaded=aL:loaded=L:hidden=H:hidden-loaded=H:forbidden=F:nearly-forbidden=nF:sticky=S:super-sticky=sS:keep-loaded=kL:warning=W``.
   It can be changed at installation time with :instopt:`--with-tag-abbrev`
   option. The :envvar:`MODULES_TAG_ABBREV` environment variable is defined by
   :subcmd:`config` sub-command when changing this configuration option from
@@ -1582,6 +1758,22 @@ Module Sub-Commands
     .. versionchanged:: 5.3
        *Value* prefixes ``+`` and ``-`` added to append and subtract elements
        to list-value options
+
+.. subcmd:: describe [collection]
+
+ See :subcmd:`saveshow`.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
+.. subcmd:: disable [collection]
+
+ See :subcmd:`saverm`.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. subcmd:: display modulefile...
 
@@ -1759,18 +1951,21 @@ Module Sub-Commands
  module version (see `Advanced module version specifiers`_ section below).
 
  If no *modulefile* is specified, all the *modulefiles* and modulerc
- available in enabled modulepaths are analyzed as well as global and user rc
- files. Hidden modulefiles are also analyzed when :option:`--all`/:option:`-a`
- option is set.
+ available in enabled modulepaths are analyzed as well as global rc, user rc
+ and modulecache files . Hidden modulefiles are also analyzed when
+ :option:`--all`/:option:`-a` option is set.
 
  When :command:`nagelfar.tcl` is the selected linter command, a static Tcl
  syntax analysis is performed. In addition, syntax of modulefile commands are
- checked in these files based on their kind (global/user rc, modulerc or
- modulefile).
+ checked in these files based on their kind (global/user rc, modulerc,
+ modulecache or modulefile).
 
  .. only:: html
 
     .. versionadded:: 5.2
+
+    .. versionchanged:: 5.6
+       Also lint :file:`.modulecache` files
 
 .. subcmd:: list [-t|-l|-j] [-a] [-o LIST] [-S|-C] [pattern...]
 
@@ -2370,6 +2565,78 @@ Module Sub-Commands
     .. versionchanged:: 5.2
        Accept modulefile specification as argument
 
+.. subcmd:: spider [-d|-L] [-t|-l|-j] [-a] [-o LIST] [-S|-C] [--indepth|--no-indepth] [pattern...]
+
+ List all available *modulefiles* found in enabled modulepaths and recursively
+ found in modulepaths enabled by available *modulefiles*.
+
+ :subcmd:`spider` sub-command first performs an :ref:`extra match search` to
+ get all modulepaths to look at. These modulepaths are collected from the
+ directory arguments set to the :mfcmd:`module use<module>`,
+ :mfcmd:`append-path MODULEPATH<append-path>` or :mfcmd:`prepend-path
+ MODULEPATH<prepend-path>` modulefile commands. Collecting modulepaths is
+ first achieved in the global/user rc section and modulepaths defined in
+ :envvar:`MODULEPATH` then in each modulepath collected from modulefiles, and
+ so on. As collecting modulepaths implies evaluating every available
+ modulefiles, it is advised to build and use :ref:`Module cache` to improve
+ search speed.
+
+ Once modulepaths are gathered, :subcmd:`spider` proceeds and reports like
+ :subcmd:`avail` sub-command. The same set of options are supported.
+
+ If a *pattern* argument is given, then each collected modulepath is searched
+ for *modulefiles* whose pathname, symbolic version-name or alias
+ match *pattern* in a case insensitive manner by default. *pattern* may
+ contain wildcard characters.i
+
+ Symbolic version-names and aliases found in the search are displayed in the
+ result of this sub-command. Symbolic version-names are displayed next to
+ the *modulefile* they are assigned to within parenthesis. Aliases are listed
+ in the modulepath section where they have been defined. To distinguish
+ aliases from *modulefiles* a ``@`` symbol is added within parenthesis next to
+ their name. Aliases defined through a global or user specific module RC file
+ are listed under the **global/user modulerc** section.
+
+ When colored output is enabled and a specific graphical rendition is defined
+ for module *default* version, the ``default`` symbol is omitted and instead
+ the defined graphical rendition is applied to the relative modulefile. When
+ colored output is enabled and a specific graphical rendition is defined for
+ module alias, the ``@`` symbol is omitted. The defined graphical rendition
+ applies to the module alias name. See :envvar:`MODULES_COLOR` and
+ :envvar:`MODULES_COLORS` sections for details on colored output.
+
+ Module tags applying to the available *modulefiles* returned by the
+ :subcmd:`spider` sub-command are reported along the module name they are
+ associated to (see `Module tags`_ section).
+
+ Module variants and their available values may be reported along the module
+ name they belong to (see `Module variants`_ section) if defined in spider
+ output configuration option (see :option:`--output`/:option:`-o` option). The
+ :ref:`extra match search` process is triggered to collect variant
+ information.
+
+ A *Key* section is added at the end of the output in case some elements are
+ reported in parentheses or chevrons along module name or if some graphical
+ rendition is made over some output elements. This *Key* section gives hints
+ on the meaning of such elements.
+
+ The parameter *pattern* may also refer to a symbolic modulefile name or a
+ modulefile alias. It may also leverage a specific syntax to finely select
+ module version (see `Advanced module version specifiers`_ section below).
+
+ If *pattern* contains variant specification or :ref:`extra specifier`, the
+ :ref:`extra match search` process is triggered to collect command information
+ used in modulefiles. Modules are included in results only if they match
+ *pattern* variant specification and extra specifier. *pattern* may be a bare
+ variant specification or extra specifier without mention of a module name.
+
+ When several *patterns* are provided all modulefiles matching at least one of
+ these *patterns* are listed.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
 .. subcmd:: stash [-f]
 
  :subcmd:`Save<save>` current environment in a stash collection then
@@ -2659,6 +2926,14 @@ Module Sub-Commands
     .. versionchanged:: 5.0
        Accept several modulepaths passed as a single string
 
+.. subcmd:: update [-f]
+
+ See :subcmd:`reload`.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
 .. subcmd:: use [-a|--append] directory...
 
  Prepend one or more *directories* to the :envvar:`MODULEPATH` environment
@@ -2716,6 +2991,10 @@ Module Sub-Commands
     .. versionchanged:: 5.3
        *pattern* may include variant specification or extra specifier to
        filter results
+
+    .. versionchanged:: 5.6
+       Results from a multi *pattern* search are consolidated under a single
+       output
 
 
 Modulefiles
@@ -2833,6 +3112,10 @@ to variant name. With a shortcut defined, variant could be specified with the
 shortcut for variant ``foo``, the ``%value`` syntax is equivalent to the
 ``foo=value`` syntax.
 
+A variant shortcut must be of one character length and must avoid characters
+used for other concerns or in module names or version specifications (i.e.,
+*[-+~/@=:,a-zA-Z0-9]*).
+
 Variant *name* should only be composed of characters part of the
 ``A-Za-z0-9_-`` range. Also, a variant name cannot start with ``-`` (minus)
 character and the overall name cannot just be a number.
@@ -2872,28 +3155,35 @@ an environment variable, a shell alias, a module specification, etc.
 Supported extra specifier *elements* are:
 
 * ``variant``, ``complete``, ``uncomplete``, ``set-alias``, ``unset-alias``,
-  ``set-function``, ``unset-function``, ``chdir``, ``family``, ``tag``
+  ``set-function``, ``unset-function``, ``chdir``, ``tag``
 * ``setenv``, ``unsetenv``, ``append-path``, ``prepend-path``, ``remove-path``
   and ``pushenv``: these elements related to environment variable handling may
   also be aliased ``envvar``
-* ``prereq``, ``prereq-any``, ``prereq-all``, ``depends-on``, ``always-load``,
-  ``load``, ``load-any``, ``try-load``, ``switch`` and ``switch-on``: these
-  elements related to module requirement definition accept a module
-  specification as value *name* and may be aliased ``require``
+* ``family`` and ``provide``: these elements related to module alias may also
+  be aliases ``provided-alias``
+* ``prereq``, ``prereq-any``, ``prereq-all``, ``depends-on``,
+  ``depends-on-any``, ``always-load``, ``load``, ``load-any``, ``try-load``,
+  ``switch`` and ``switch-on``: these elements related to module requirement
+  definition accept a module specification as value *name* and may be aliased
+  ``require``
 * ``conflict``, ``unload``, ``switch`` and ``switch-off``: these elements
   related to module incompatibility definition accept a module specification
   as value *name* and may be aliased ``incompat``
+* ``use``
 
 Each of the above supported *elements* corresponds to a Tcl modulefile
-command. ``load``, ``load-any``, ``try-load``, ``switch`` and ``unload`` match
-corresponding module sub-commands. ``prereq-any`` is an alias on ``prereq``
-and vice versa as both Tcl modulefile commands are the same. Following the
-same trend ``prereq-all`` is an alias on ``depends-on`` and vice versa.
-Regarding ``switch-off`` and ``switch-on`` elements they correspond
-respectively to the module to unload (if specified) and the module to load on
-a ``module switch`` command. ``switch`` is an alias that matches both
-``switch-off`` and ``switch-on`` elements. ``require`` and ``incompat``
-*elements* do not match module commands where ``--not-req`` option is set.
+command. ``load``, ``load-any``, ``try-load``, ``switch``, ``unload`` and
+``use`` match corresponding module sub-commands. ``prereq-any`` is an alias on
+``prereq``, ``depends-on-any`` and vice versa as both Tcl modulefile commands
+are the same. Following the same trend ``prereq-all`` is an alias on
+``depends-on`` and vice versa. Regarding ``switch-off`` and ``switch-on``
+elements they correspond respectively to the module to unload (if specified)
+and the module to load on a ``module switch`` command. ``switch`` is an alias
+that matches both ``switch-off`` and ``switch-on`` elements. ``require`` and
+``incompat`` *elements* do not match module commands where ``--not-req``
+option is set. Setting the ``MODULEPATH`` environment variable with
+``append-path`` or ``prepend-path`` commands can be queried with ``use``
+element.
 
 When several *names* are set on one *element* criterion (e.g.,
 ``env:PATH,LD_LIBRARY_PATH``), they act as an *OR* operation. Which means
@@ -2917,9 +3207,10 @@ resolved to their target either if set in extra specifier query or in
 modulefile definition.
 
 Extra specifier can only be set in a module search context (:subcmd:`avail`,
-:subcmd:`whatis` and :subcmd:`paths` sub-commands). An error is raised if used
-on a module specification query in another context. An error is also raised
-if an unknown extra specifier *element* is defined in search query.
+:subcmd:`spider`, :subcmd:`whatis` and :subcmd:`paths` sub-commands). An error
+is raised if used on a module specification query in another context. An error
+is also raised if an unknown extra specifier *element* is defined in search
+query.
 
 .. only:: html
 
@@ -2935,6 +3226,15 @@ if an unknown extra specifier *element* is defined in search query.
    .. versionchanged:: 5.5
       ``not:`` prefix for extra specifier criterion added to select modules
       not matching specified names
+
+   .. versionchanged:: 5.6
+      Extra specifiers ``use`` and ``depends-on-any`` added
+
+   .. versionchanged:: 5.6
+      Support for :subcmd:`spider` sub-command added
+
+   .. versionchanged:: 5.6
+      Extra specifiers ``provide`` and ``provided-alias`` added
 
 
 .. _Module tags:
@@ -2954,14 +3254,16 @@ or consequence of a module action. The inherited tags are:
   :mfcmd:`module-forbid` command and thus this module cannot be loaded.
 * ``hidden``: module has been set *hidden* through the use of the
   :mfcmd:`module-hide` command and thus it is not reported by default among
-  the result of an :subcmd:`avail` sub-command.
+  the result of :subcmd:`avail` or :subcmd:`spider` sub-commands.
 * ``hidden-loaded``: module has been set *hidden once loaded* through the use
   of the :mfcmd:`module-hide --hidden-loaded<module-hide>` command thus it is
-  not reported bu default among the result of a :subcmd:`list` sub-command.
+  not reported by default among the result of a :subcmd:`list` sub-command.
 * ``loaded``: module is currently loaded
 * ``nearly-forbidden``: module will soon be *forbidden*, which has been set
   through the use of the :mfcmd:`module-forbid` command. Thus this module
   will soon not be able to load anymore.
+* ``warning``: a warning message for the use of the module is set through the
+  use of the :mfcmd:`module-warn` command.
 
 Tags may also be associated to modules by using the :mfcmd:`module-tag`
 modulefile command. Among tags that could be set this way, some have a special
@@ -2977,15 +3279,15 @@ meaning:
 The :option:`--tag` option helps to apply additional tags to modules. It is
 available on :subcmd:`load`, :subcmd:`load-any`, :subcmd:`switch` and
 :subcmd:`try-load` sub-commands and on :mfcmd:`always-load`,
-:mfcmd:`depends-on`, :mfcmd:`module`, :mfcmd:`prereq`, :mfcmd:`prereq-all` and
-:mfcmd:`prereq-any` modulefile commands. In case the designated module is
-already loaded, the additional tags are added to the list of tags already
-applied to this module.
+:mfcmd:`depends-on`, :mfcmd:`depends-on-any`, :mfcmd:`module`,
+:mfcmd:`prereq`, :mfcmd:`prereq-all` and :mfcmd:`prereq-any` modulefile
+commands. In case the designated module is already loaded, the additional tags
+are added to the list of tags already applied to this module.
 
 Module tags are reported along the module they are associated to on
-:subcmd:`avail` and :subcmd:`list` sub-command results and also when module's
-loading, unloading, refreshing or tagging evaluation is mentioned. Tags could
-be reported either:
+:subcmd:`avail`, :subcmd:`list` and :subcmd:`spider` sub-command results and
+also when module's loading, unloading, refreshing or tagging evaluation is
+mentioned. Tags could be reported either:
 
 * along the module name, all tags set within angle brackets, each tag
   separated from the others with a colon character (e.g.,
@@ -3026,6 +3328,11 @@ Module tags cannot be used in search query to designate a modulefile.
    .. versionchanged:: 5.1
       Tag ``keep-loaded`` added
 
+   .. versionchanged:: 5.6
+      Support for :subcmd:`spider` sub-command added
+
+   .. versionchanged:: 5.6
+      Tag ``warning`` added
 
 .. _Sticky modules:
 
@@ -3093,9 +3400,9 @@ requirements or produce different environment variable setup.
 Variants are interpreted in contexts where *modulefiles* are evaluated.
 Variants specified on module designation are ignored by the
 :subcmd:`is-avail` or :subcmd:`path` sub-commands. On search sub-commands
-(:subcmd:`avail`, :subcmd:`whatis` and :subcmd:`paths`), variants are
-interpreted and trigger the :ref:`extra match search` process to filter
-results.
+(:subcmd:`avail`, :subcmd:`spider`, :subcmd:`whatis` and :subcmd:`paths`),
+variants are interpreted and trigger the :ref:`extra match search` process to
+filter results.
 
 When modulefile is evaluated a value should be specified for each variant this
 modulefile declares. When reaching the :mfcmd:`variant` modulefile command
@@ -3130,18 +3437,19 @@ or defining a ``bar`` variant but without ``value1`` among available values.
 
 Module variants are reported along the module they are associated to on
 :subcmd:`list` sub-command results. They are also reported on :subcmd:`avail`
-sub-command if specified in search query or added to the element to report in
-sub-command output (see :option:`--output`/:option:`-o` option).
+and :subcmd:`spider` sub-commands if specified in search query or added to the
+element to report in sub-command output (see :option:`--output`/:option:`-o`
+option).
 
 Variants are reported within curly braces next to module name, each variant
 definition separated from the others with a colon character (e.g.,
 ``foo/1.2{variant1=value:+variant2}``). Boolean variants are reported with the
 ``+name`` or ``-name`` syntaxes on :subcmd:`list` sub-command or with the
-``name=on,off`` syntax on :subcmd:`avail` sub-command. When a shortcut
-character is defined for a variant (see :envvar:`MODULES_VARIANT_SHORTCUT`) it
-is reported with the ``<shortcut>value`` syntax. For instance if ``%``
-character is defined as a shortcut for *variant1*:
-``foo/1.2{%value:+variant2}``.
+``name=on,off`` syntax on :subcmd:`avail` and :subcmd:`spider` sub-commands.
+When a shortcut character is defined for a variant (see
+:envvar:`MODULES_VARIANT_SHORTCUT`) it is reported with the
+``<shortcut>value`` syntax. For instance if ``%`` character is defined as a
+shortcut for *variant1*: ``foo/1.2{%value:+variant2}``.
 
 When the JSON output mode is enabled (with :option:`--json`), variants are
 reported under the ``variants`` JSON object as name/value pairs. Values of
@@ -3164,6 +3472,9 @@ Variant shortcut and color rendering do not apply on JSON output.
       ``not:`` prefix for variant search criterion added to select modules not
       matching specified variant values
 
+   .. versionchanged:: 5.6
+      Variants specified in :subcmd:`spider` search query interpreted to
+      filter results
 
 .. _Extra match search:
 
@@ -3177,13 +3488,16 @@ version specified in search query, these remaining modulefiles are evaluated
 to collect their content.
 
 Extra match search is available on the following module search sub-commands:
-:subcmd:`avail`, :subcmd:`whatis` and :subcmd:`paths`.
+:subcmd:`avail`, :subcmd:`spider`, :subcmd:`whatis` and :subcmd:`paths`.
 
 Extra match search is triggered when:
 
 * :ref:`Module variants` and their available values have to be reported in
-  avail output (see :option:`--output`/:option:`-o` option): extra match
-  search is triggered to collect variant information
+  avail and spider outputs (see :option:`--output`/:option:`-o` option): extra
+  match search is triggered to collect variant information
+* Provided module aliases have to be reported in avail and spider outputs (see
+  :option:`--output`/:option:`-o` option): extra match search is triggered to
+  collect these module aliases defined within modulefiles
 * Module variant is specified in search query: extra match search is triggered
   to collect variant information then match them against variant specified in
   query
@@ -3191,11 +3505,13 @@ Extra match search is triggered when:
   triggered to collect commands used in modulefiles or modulercs then match
   them against extra specifier query
 
-If search query does not contain an extra query and if variant information
-should not be reported, no extra match search is performed. If search query
-does not contain any module name and version but contains an extra query or if
-variant information should be reported, extra match search is applied to all
-available modulefiles.
+If search query does not contain an extra query and if variant or provided
+alias information should not be reported, no extra match search is performed.
+If search query does not contain any module name and version but contains an
+extra query or if variant information should be reported, extra match search
+is applied to all available modulefiles. If provided alias information should
+be reported, extra match search is applied to all available modulefiles even
+if search query contains a module specification.
 
 During this specific evaluation, modulefiles are interpreted in *scan* mode.
 This mode aims to collect the different Tcl modulefile commands used. Special
@@ -3217,6 +3533,11 @@ to build and use :ref:`Module cache` to improve search speed.
 
    .. versionadded:: 5.3
 
+   .. versionchanged:: 5.6
+      Support for :subcmd:`spider` sub-command added
+
+   .. versionchanged:: 5.6
+      Extra match search triggered when reporting provided module aliases
 
 .. _collections:
 
@@ -3663,8 +3984,8 @@ has to be run by someone who owns write access in modulepath directory to
 create cache file.
 
 Cache files are used any time a module search occurs in modulepaths. They are
-analyzed for instance during :subcmd:`avail`, :subcmd:`load`,
-:subcmd:`display` or :subcmd:`whatis` sub-commands.
+analyzed for instance during :subcmd:`avail`, :subcmd:`spider`,
+:subcmd:`load`, :subcmd:`display` or :subcmd:`whatis` sub-commands.
 
 Cache files are removed with :subcmd:`cacheclear` sub-command. This command
 has to be run by someone who own write access in modulepath directory to
@@ -3810,6 +4131,26 @@ ENVIRONMENT
     .. versionchanged:: 5.0
        Variable renamed from ``MODULES_LMPREREQ`` to ``__MODULES_LMPREREQ``
 
+.. envvar:: __MODULES_LMPREREQPATH
+
+ A colon separated list of the :mfcmd:`prereq` statements set with a specific
+ ``--modulepath`` option defined by all loaded *modulefiles*. Each element in
+ this list starts by the name of the loaded *modulefile* declaring the
+ pre-requirement followed by the name of all modulefiles it declares a
+ :mfcmd:`prereq` with and their specific modulepath. These loaded modulefiles,
+ pre-required modulefile names and specific modulepaths set are separated by
+ the ampersand character. When a :mfcmd:`prereq` statement is composed of
+ multiple modulefiles or multiple specific modulepaths, these names are
+ separated by the pipe character.
+
+ This environment variable is intended for :command:`module` command internal
+ use to get knowledge of the pre-requirement declared by the loaded
+ *modulefiles* in order to keep environment consistent.
+
+ .. only:: html
+
+    .. versionadded:: 5.5
+
 .. envvar:: __MODULES_LMREFRESH
 
  A colon separated list of the loaded modules that are qualified for refresh
@@ -3887,6 +4228,23 @@ ENVIRONMENT
 
     .. versionchanged:: 5.0
        Variable renamed from ``MODULES_LMTAG`` to ``__MODULES_LMTAG``
+
+.. envvar:: __MODULES_LMUSE
+
+ A colon separated list of the modulepaths enabled by all loaded
+ *modulefiles*. Each element in this list starts by the name of the loaded
+ *modulefile* enabling modulepath followed by all modulepaths it enables.
+ These loaded modulefiles and enabled modulepaths are separated by the
+ ampersand character.
+
+ This environment variable is intended for :command:`module` command internal
+ use to get knowledge of the modulepath enabled by the loaded *modulefiles*
+ in order to keep environment consistent when unloading these modules whereas
+ modulefiles from the enabled modulepaths are loaded.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. envvar:: __MODULES_LMVARIANT
 
@@ -4086,6 +4444,8 @@ ENVIRONMENT
 
     .. versionadded:: 4.4
 
+.. _MODULES_AUTO_HANDLING:
+
 .. envvar:: MODULES_AUTO_HANDLING
 
  If set to ``1``, enable automated module handling mode. If set to ``0``
@@ -4095,18 +4455,31 @@ ENVIRONMENT
  loading or unloading a *modulefile* to satisfy the constraints it declares.
  When loading a *modulefile*, following actions are triggered:
 
+ * Conflict Unload: unload of the *modulefiles* declared as a
+   :mfcmd:`conflict` of the loading *modulefile* or if it is the same
+   *modulefile* than the one loading but with a different set of variant or
+   coming from a different modulepath.
+
  * Requirement Load: load of the *modulefiles* declared as a :mfcmd:`prereq`
    of the loading *modulefile*.
 
+ * Useless Requirement Unload: unload of the :mfcmd:`prereq` modulefiles that
+   have been automatically loaded for either an unloaded conflicting
+   modulefile or a modulefile part of this useless requirement unloading
+   batch. Modulefiles are added to this unloading batch only if they are not
+   required by any other loaded modulefiles and if they are not tagged
+   ``keep-loaded``, ``sticky`` or ``super-sticky``.
+
  * Dependent Reload: reload of the modulefiles declaring a :mfcmd:`prereq`
-   onto loaded *modulefile* or declaring a :mfcmd:`prereq` onto a *modulefile*
-   part of this reloading batch.
+   onto loading *modulefile* or declaring a :mfcmd:`prereq` or a :ref:`via
+   requirement<MODULES_REQUIRE_VIA>` onto a *modulefile* part of this
+   reloading batch.
 
  When unloading a *modulefile*, following actions are triggered:
 
  * Dependent Unload: unload of the modulefiles declaring a non-optional
-   :mfcmd:`prereq` onto unloaded modulefile or declaring a non-optional
-   :mfcmd:`prereq` onto a modulefile part of this unloading batch. A
+   :mfcmd:`prereq` or a :ref:`via requirement<MODULES_REQUIRE_VIA>` onto
+   unloaded modulefile or a modulefile part of this unloading batch. A
    :mfcmd:`prereq` modulefile is considered optional if the :mfcmd:`prereq`
    definition order is made of multiple modulefiles and at least one
    alternative modulefile is loaded.
@@ -4116,12 +4489,13 @@ ENVIRONMENT
    unloaded dependent modulefile or a modulefile part of this useless
    requirement unloading batch. Modulefiles are added to this unloading batch
    only if they are not required by any other loaded modulefiles and if they
-   are not tagged ``keep-loaded``.
+   are not tagged ``keep-loaded``, ``sticky`` or ``super-sticky``.
 
  * Dependent Reload: reload of the modulefiles declaring a :mfcmd:`conflict`
    or an optional :mfcmd:`prereq` onto either the unloaded modulefile, an
    unloaded dependent or an unloaded useless requirement or declaring a
-   :mfcmd:`prereq` onto a modulefile part of this reloading batch.
+   :mfcmd:`prereq` or a :ref:`via requirement<MODULES_REQUIRE_VIA>` onto a
+   modulefile part of this reloading batch.
 
  In case a loaded *modulefile* has some of its declared constraints
  unsatisfied (pre-required modulefile not loaded or conflicting modulefile
@@ -4131,7 +4505,28 @@ ENVIRONMENT
  For the specific case of the :subcmd:`switch` sub-command, where a modulefile
  is unloaded to then load another modulefile. Dependent modulefiles to Unload
  are merged into the Dependent modulefiles to Reload that are reloaded after
- the load of the switched-to modulefile.
+ the load of the switched-to modulefile. Such process also applies to the
+ Dependent Unload modulefiles of Conflict Unload modules.
+
+ The reload phase of all Dependent Reload modulefiles occurs after the
+ evaluation of the main *modulefile* (either load, unload or switch
+ evaluation).
+
+ The reload phase of a Dependent Reload modulefile is skipped if any of the
+ following conditions are met:
+
+ * The required modules for this modulefile are not loaded.
+ * A conflict is detected with the currently loaded environment.
+ * The enabled modulepaths have changed, and the modulefile is no longer
+   available.
+
+ However, reload is always attempted if the modulefile is tagged as
+ ``super-sticky`` or ``sticky``, and force mode is not enabled. Dependent
+ Reload modulefiles whose reload has been skipped are treated as Dependent
+ Unload modulefiles.
+
+ Conflict Unload mechanism is activated only if :mconfig:`conflict_unload`
+ configuration option is also enabled.
 
  This environment variable value supersedes the default value set on the
  :mconfig:`auto_handling` configuration option. It can be defined with the
@@ -4145,6 +4540,20 @@ ENVIRONMENT
     .. versionchanged:: 5.1
        Modules with keep-loaded tag set are excluded from Useless Requirement
        Unload mechanism
+
+    .. versionchanged:: 5.5
+       Modules with sticky or super-sticky tag set are excluded from Useless
+       Requirement Unload mechanism
+
+    .. versionchanged:: 5.5
+       Conflict Unload and Useless Requirement Unload mechanisms added on
+       module load context
+
+    .. versionchanged:: 5.5
+       Reload of a Dependent Reload module is skipped if it is not loadable
+
+    .. versionchanged:: 5.5
+       Reload of all Dependent Reload modules occurs after the main evaluation
 
 .. envvar:: MODULES_AVAIL_INDEPTH
 
@@ -4175,7 +4584,10 @@ ENVIRONMENT
  Accepted elements that can be set in value list are:
 
  * ``alias``: module aliases.
+ * ``provided-alias``: show module aliases and evaluate all modulefiles to get
+   aliases provided by them.
  * ``dirwsym``: directories associated with symbolic versions.
+ * ``hidden``: show all hidden modules.
  * ``indesym``: symbolic versions reported independently from the module or
    directory they are attached to.
  * ``key``: legend appended at the end of the output to explain it.
@@ -4187,6 +4599,8 @@ ENVIRONMENT
    modules.
  * ``variantifspec``: like ``variant`` but only if a variant has been
    specified in search query.
+ * ``via``: mention next to modulepath name which loaded module enables it if
+   any.
 
  The order of the elements in the list does not matter. Module names are the
  only content reported when *LIST* is set to an empty value.
@@ -4213,13 +4627,17 @@ ENVIRONMENT
     .. versionchanged:: 5.3.1
        Element ``indesym`` added
 
+    .. versionchanged:: 5.6
+       Elements ``hidden``, ``provided-alias`` and ``via`` added
+
 .. envvar:: MODULES_AVAIL_TERSE_OUTPUT
 
  A colon separated list of the elements to report in addition to module names
  on :subcmd:`avail` sub-command terse output mode.
 
  See :envvar:`MODULES_AVAIL_OUTPUT` to get the accepted elements that can be
- set in value list.
+ set in value list. Exception for ``via`` element which is not accepted for
+ terse output mode.
 
  The order of the elements in the list does not matter. Module names are the
  only content reported when *LIST* is set to an empty value.
@@ -4235,6 +4653,9 @@ ENVIRONMENT
 
     .. versionchanged:: 5.3
        Elements ``variant`` and ``variantifspec`` added
+
+    .. versionchanged:: 5.6
+       Elements ``hidden`` and ``provided-alias`` added
 
 .. envvar:: MODULES_CACHE_BUFFER_BYTES
 
@@ -4383,8 +4804,8 @@ ENVIRONMENT
  abbreviation to get a graphical rendering. Each basic tag has by default a
  key set in the color palette, based on its abbreviated string: auto-loaded
  (``aL``), forbidden (``F``), hidden and hidden-loaded (``H``), loaded
- (``L``), nearly-forbidden (``nF``), sticky (``S``), super-sticky (``sS``) and
- keep-loaded (``kL``).
+ (``L``), nearly-forbidden (``nF``), sticky (``S``), super-sticky (``sS``),
+ keep-loaded (``kL``) and warning (``W``).
 
  See the Select Graphic Rendition (SGR) section in the documentation of the
  text terminal that is used for permitted values and their meaning as
@@ -4393,7 +4814,7 @@ ENVIRONMENT
  assembling the result into a complete SGR sequence (``\33[...m``). Common
  values to concatenate include ``1`` for bold, ``4`` for underline, ``30`` to
  ``37`` for foreground colors and ``90`` to ``97`` for 16-color mode
- foreground colors. See also https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters
+ foreground colors. See also https://en.wikipedia.org/wiki/ANSI_escape_code#Select_Graphic_Rendition_parameters
  for a complete SGR code reference.
 
  No graphical rendition will be applied to an output item that could normally
@@ -4421,6 +4842,26 @@ ENVIRONMENT
 
     .. versionchanged:: 5.1
        Output item for keep-loaded module tag (``kL``) added
+
+    .. versionchanged:: 5.6
+       Output item for warning module tag (``W``) added
+
+.. envvar:: MODULES_CONFLICT_UNLOAD
+
+ If set to ``1``, enable automated unload of conflicting modules when loading
+ a module. If set to ``0``, disable this automated conflict unload mechanism.
+
+ Conflict Unload is a mechanism part of the :ref:`automated module handling
+ mode<MODULES_AUTO_HANDLING>`. To activate this mechanism,
+ :mconfig:`auto_handling` configuration option should also be enabled.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`conflict_unload` configuration option. It can be defined with
+ the :subcmd:`config` sub-command.
+
+ .. only:: html
+
+    .. versionadded:: 5.5
 
 .. envvar:: MODULES_EDITOR
 
@@ -4499,10 +4940,10 @@ ENVIRONMENT
  them. When :envvar:`MODULES_ICASE` is set to ``never``, a case sensitive
  match is applied in any cases. When set to ``search``, a case insensitive
  match is applied to the :subcmd:`avail`, :subcmd:`list`, :subcmd:`whatis`,
- :subcmd:`paths` and :subcmd:`savelist` sub-commands. When set to ``always``,
- a case insensitive match is also applied to the other module sub-commands
- and modulefile Tcl commands for the module specification they receive as
- argument.
+ :subcmd:`paths`, :subcmd:`savelist` and :subcmd:`spider` sub-commands. When
+ set to ``always``, a case insensitive match is also applied to the other
+ module sub-commands and modulefile Tcl commands for the module specification
+ they receive as argument.
 
  This environment variable value supersedes the default value set in the
  :mconfig:`icase` configuration option. It can be defined with the
@@ -4519,6 +4960,9 @@ ENVIRONMENT
 
     .. versionchanged:: 5.2
        Search mode applied to :subcmd:`savelist` sub-command
+
+    .. versionchanged:: 5.6
+       Search mode applied to :subcmd:`spider` sub-command
 
 .. envvar:: MODULES_IGNORE_CACHE
 
@@ -4563,10 +5007,9 @@ ENVIRONMENT
  * restored from a collection, unless already loaded in collection-specified
    order.
 
- * automatically loaded by automated module handling mechanisms (see
-   :envvar:`MODULES_AUTO_HANDLING` section) when declared as module
-   requirement, with :mfcmd:`prereq` or :mfcmd:`module load<module>`
-   modulefile commands.
+ * automatically loaded by :ref:`automated module handling
+   mechanisms<MODULES_AUTO_HANDLING>` when declared as module requirement,
+   with :mfcmd:`prereq` or :mfcmd:`module load<module>` modulefile commands.
 
  An error is returned in the above situations if either no explicit or
  implicit default version is defined.
@@ -4609,6 +5052,7 @@ ENVIRONMENT
  * ``alias``: module aliases targeting loaded modules.
  * ``header``: sentence to introduce the list of loaded modules or to state
    that no modules are loaded currently.
+ * ``hidden``: show hidden loaded modules.
  * ``idx``: index position of each loaded module.
  * ``indesym``: symbolic versions reported independently from the loaded
    module they are attached to.
@@ -4635,6 +5079,9 @@ ENVIRONMENT
     .. versionchanged:: 5.4
        Elements ``alias`` and ``indesym`` added
 
+    .. versionchanged:: 5.6
+       Element ``hidden`` added
+
 .. envvar:: MODULES_LIST_TERSE_OUTPUT
 
  A colon separated list of the elements to report in addition to module names
@@ -4660,6 +5107,9 @@ ENVIRONMENT
 
     .. versionchanged:: 5.4
        Elements ``alias`` and ``indesym`` added
+
+    .. versionchanged:: 5.6
+       Element ``hidden`` added
 
 .. envvar:: MODULES_LOGGED_EVENTS
 
@@ -4792,9 +5242,15 @@ ENVIRONMENT
  If :envvar:`MODULES_PAGER` variable is set to an empty string or to the value
  ``cat``, pager will not be launched.
 
+ Pager is never launched if :file:`modulecmd.tcl` program is run for scripting
+ language rather shells.
+
  .. only:: html
 
     .. versionadded:: 4.1
+
+    .. versionchanged:: 5.5
+       No pager when :file:`modulecmd.tcl` is run for scripting languages
 
 .. envvar:: MODULES_PROTECTED_ENVVARS
 
@@ -4858,6 +5314,24 @@ ENVIRONMENT
 
     .. versionadded:: 5.1
 
+.. _MODULES_REQUIRE_VIA:
+
+.. envvar:: MODULES_REQUIRE_VIA
+
+ If set to ``1``, consider loaded module that enables a modulepath (through
+ the use of the modulefile commands :mfcmd:`module use<module>`,
+ :mfcmd:`append-path MODULEPATH<append-path>`, or :mfcmd:`prepend-path
+ MODULEPATH<prepend-path>`) a requirement for loaded modules stored in this
+ modulepath. If set to ``0``, no dependency is made between these modules.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`require_via` configuration option. It can be defined with the
+ :subcmd:`config` sub-command.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
 .. envvar:: MODULES_RESET_TARGET_STATE
 
  Defines behavior of :subcmd:`reset` sub-command. When set to ``__init__``,
@@ -4908,11 +5382,13 @@ ENVIRONMENT
 
 .. envvar:: MODULES_SEARCH_MATCH
 
- When searching for modules with :subcmd:`avail` sub-command, defines the way
- query string should match against available module names. With
- ``starts_with`` value, returned modules are those whose name begins by search
- query string. When set to ``contains``, any modules whose fully qualified
- name contains search query string are returned.
+ When searching for modules with :subcmd:`avail`, :subcmd:`list`,
+ :subcmd:`spider` or collections with :subcmd:`savelist` sub-commands, defines
+ the way query string should match against available module/collection names.
+ With ``starts_with`` value, returned modules/collections are those whose
+ name begins by search query string. When set to ``contains``, any
+ modules/collections whose fully qualified name contains search query string
+ are returned.
 
  This environment variable value supersedes the default value set in the
  :mconfig:`search_match` configuration option. It can be defined with the
@@ -4923,6 +5399,15 @@ ENVIRONMENT
  .. only:: html
 
     .. versionadded:: 4.3
+
+    .. versionchanged:: 5.1
+       Support for :subcmd:`list` sub-command added
+
+    .. versionchanged:: 5.2
+       Support for :subcmd:`savelist` sub-command added
+
+    .. versionchanged:: 5.6
+       Support for :subcmd:`spider` sub-command added
 
 .. envvar:: MODULES_SET_SHELL_STARTUP
 
@@ -5020,6 +5505,92 @@ ENVIRONMENT
  .. only:: html
 
     .. versionadded:: 5.4
+
+.. envvar:: MODULES_SPIDER_INDEPTH
+
+ If set to ``1``, enable in depth search results for :subcmd:`spider`
+ sub-command. If set to ``0`` disable :subcmd:`spider` sub-command in depth
+ mode. Other values are ignored.
+
+ When in depth mode is enabled, modulefiles and directories contained in
+ directories matching search query are also included in search results. When
+ disabled these modulefiles and directories contained in matching directories
+ are excluded.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`spider_indepth` configuration option. It can be defined with the
+ :subcmd:`config` sub-command. The :option:`--indepth` and
+ :option:`--no-indepth` command line switches override this environment
+ variable.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
+.. envvar:: MODULES_SPIDER_OUTPUT
+
+ A colon separated list of the elements to report in addition to module names
+ on :subcmd:`spider` sub-command regular output mode.
+
+ Accepted elements that can be set in value list are:
+
+ * ``alias``: module aliases.
+ * ``provided-alias``: show module aliases and evaluate all modulefiles to get
+   aliases provided by them.
+ * ``dirwsym``: directories associated with symbolic versions.
+ * ``hidden``: show all hidden modules.
+ * ``indesym``: symbolic versions reported independently from the module or
+   directory they are attached to.
+ * ``key``: legend appended at the end of the output to explain it.
+ * ``modulepath``: modulepath names set as header prior the list of available
+   modules found in them.
+ * ``sym``: symbolic versions associated with available modules.
+ * ``tag``: tags associated with available modules.
+ * ``variant``: variants and their possible values associated with available
+   modules.
+ * ``variantifspec``: like ``variant`` but only if a variant has been
+   specified in search query.
+ * ``via``: mention next to modulepath name which module enables it if any.
+
+ The order of the elements in the list does not matter. Module names are the
+ only content reported when *LIST* is set to an empty value.
+
+ In case the ``modulepath`` element is missing from value list, the available
+ modules from global/user rc and all enabled modulepaths are reported as a
+ single list.
+
+ When ``indesym`` element is set, ``dirwsym`` and ``sym`` elements are
+ disabled.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`spider_output` configuration option. It can be defined with
+ the :subcmd:`config` sub-command. The :option:`--output`/:option:`-o` command
+ line switches override this environment variable.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
+.. envvar:: MODULES_SPIDER_TERSE_OUTPUT
+
+ A colon separated list of the elements to report in addition to module names
+ on :subcmd:`spider` sub-command terse output mode.
+
+ See :envvar:`MODULES_SPIDER_OUTPUT` to get the accepted elements that can be
+ set in value list. Exception for ``via`` element which is not accepted for
+ terse output mode.
+
+ The order of the elements in the list does not matter. Module names are the
+ only content reported when *LIST* is set to an empty value.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`spider_terse_output` configuration option. It can be defined with
+ the :subcmd:`config` sub-command. The :option:`--output`/:option:`-o`
+ command line switches override this environment variable.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. envvar:: MODULES_STICKY_PURGE
 
@@ -5156,7 +5727,8 @@ ENVIRONMENT
  (e.g., *variantname=shortcutchar*).
 
  A variant shortcut must be of one character length and must avoid characters
- used for other concerns or in module names (i.e., *[-+~/@=a-zA-Z0-9]*).
+ used for other concerns or in module names or version specifications (i.e.,
+ *[-+~/@=:,a-zA-Z0-9]*).
 
  If a shortcut is associated to an empty string or an invalid character, this
  shortcut definition will be ignored.
@@ -5212,7 +5784,7 @@ ENVIRONMENT
 .. envvar:: MODULES_WA_277
 
  If set to ``1`` prior to Modules package initialization, enables workaround
- for Tcsh history issue (see https://github.com/cea-hpc/modules/issues/277).
+ for Tcsh history issue (see https://github.com/envmodules/modules/issues/277).
  This issue leads to erroneous history entries under Tcsh shell. When
  workaround is enabled, an alternative *module* alias is defined which fixes
  the history mechanism issue. However the alternative definition of the
@@ -5324,5 +5896,5 @@ FILES
 SEE ALSO
 --------
 
-:ref:`ml(1)`, :ref:`modulefile(5)`
+:ref:`ml(1)`, :ref:`modulefile(5)`, :ref:`envml(1)`
 

@@ -46,7 +46,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Modules'
-copyright = '1996-1999 John L. Furlani & Peter W. Osel, 1998-2017 R.K.Owen, 2002-2004 Mark Lakata, 2004-2017 Kent Mein, 2016-2024 Xavier Delaruelle'
+copyright = '1996-2025, Modules Contributors'
 author = ''
 
 # The version info for the project you're documenting, acts as replacement for
@@ -79,7 +79,7 @@ def get_version_release_from_git():
             else:
                 return version, version + '+' + branch + '-' + tags
     else:
-        return '5.4.0', ''
+        return '5.6.0', ''
 
 # The short X.Y version.
 # The full version, including alpha/beta/rc tags.
@@ -140,7 +140,16 @@ else:
 #
 # html_theme_options = {}
 if os_rtd:
-    html_theme_options = { 'logo_only' : True }
+    html_theme_options = {
+        'logo_only': True,
+    }
+    html_context = {
+        'conf_py_path': '/doc/source/',
+        'display_github': True,
+        'github_user': 'envmodules',
+        'github_repo': 'modules',
+        'github_version': 'main',
+    }
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -254,7 +263,7 @@ rst_epilog += '.. |emph modulefilesdir| replace:: *%s*\n' % modulefilesdir
 rst_epilog += '.. |bold modulefilesdir| replace:: **%s**\n' % modulefilesdir
 rst_epilog += '.. |file modulefilesdir| replace:: :file:`%s`\n' % modulefilesdir
 rst_epilog += '.. |code version| replace:: ``%s``\n' % version
-rst_epilog += '.. |gh_tgz_dl_url| replace:: https://github.com/cea-hpc/modules/releases/download/v%s/modules-%s.tar.gz\n' % (version, version)
+rst_epilog += '.. |gh_tgz_dl_url| replace:: https://github.com/envmodules/modules/releases/download/v%s/modules-%s.tar.gz\n' % (version, version)
 
 # define roles used to color text in parsed-literal to render output like in terminal
 rst_epilog += """.. role:: noparse
@@ -296,7 +305,8 @@ rst_epilog += """.. role:: noparse
 man_pages = [
     ('module', 'module', u'command interface to the Modules package', [], 1),
     ('ml', 'ml', u'handy command interface to the Modules package', [], 1),
-    ('modulefile', 'modulefile', u'files containing Tcl code for the Modules package', [], 5)
+    ('modulefile', 'modulefile', u'files containing Tcl code for the Modules package', [], 5),
+    ('envml', 'envml', u'run a command in an environment setting up by Modules', [], 1)
 ]
 
 
@@ -307,6 +317,18 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
 ]
+
+
+# -- Options for linkcheck ------------------------------------------------
+
+linkcheck_ignore = [
+    'https://matrix.to/#',
+    'module.html#version-specifiers',
+    'tag:S,F',
+    'tag:sticky',
+]
+linkcheck_timeout = 5
+linkcheck_workers = 1
 
 
 # -- Extension interface --------------------------------------------------
@@ -343,7 +365,7 @@ def parse_opt_args_node(env, sig, signode):
 from docutils import nodes
 def ghcommit_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     commit_id = str(text)
-    commit_url = 'https://github.com/cea-hpc/modules/commit/' + commit_id
+    commit_url = 'https://github.com/envmodules/modules/commit/' + commit_id
     title = nodes.reference('', commit_id, refuri=commit_url)
     return [title], []
 

@@ -3,7 +3,7 @@
 # MODEVAL.TCL, module evaluation procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -59,6 +59,10 @@ proc registerModuleEval {context msgrecid {failedmod {}} {failedcontext {}}} {
    # add mod to failed evaluation list
    if {$unset} {
       lappend ::g_moduleFailedEval($evalid) $failedcontext $failedmod
+      if {[depthState reportholdid]} {
+         lappend ::g_holdModuleFailedEval([currentState reportholdid])\
+            $evalid $failedcontext $failedmod
+      }
    }
 }
 
@@ -70,6 +74,71 @@ proc registerModuleEvalHidden {context msgrecid} {
       set context depun
    }
    lappend ::g_moduleHiddenEval($evalid:$context) $msgrecid
+}
+
+proc changeContextOfModuleEval {mod old_context new_context} {
+   set evalid [topState evalid]
+   # find old and new context evaluations
+   for {set i 0} {$i < [llength $::g_moduleEval($evalid)]} {incr i 1} {
+      set context_eval_list [lindex $::g_moduleEval($evalid) $i]
+      if {[lindex $context_eval_list 0] eq $old_context} {
+         set old_context_idx $i
+         set old_context_eval_list $context_eval_list
+      } elseif {[lindex $context_eval_list 0] eq $new_context} {
+         set new_context_idx $i
+         set new_context_eval_list $context_eval_list
+      }
+      if {[info exists old_context_idx] && [info exists new_context_idx]} {
+         break
+      }
+   }
+
+   # module evaluation not found
+   if {![info exists old_context_idx]} {
+      return
+   }
+
+   # new context has no evaluation yet
+   if {![info exists new_context_idx]} {
+      set new_context_idx end+1
+      set new_context_eval_list [list $new_context]
+   }
+
+   # find evaluation id of module
+   foreach msgrecid [lrange $old_context_eval_list 1 end] {
+      if {$mod eq [getModuleFromEvalId $msgrecid]} {
+         set mod_evalid $msgrecid
+         break
+      }
+   }
+   if {![info exists mod_evalid]} {
+      return
+   }
+
+   # remove evaluation from old context
+   set old_context_eval_list [replaceFromList $old_context_eval_list\
+      $mod_evalid]
+   lset ::g_moduleEval($evalid) $old_context_idx $old_context_eval_list
+
+   # insert evaluation at start of new context
+   set new_context_eval_list [linsert $new_context_eval_list 1 $mod_evalid]
+   # on Tcl 8.5, lset command cannot append a list
+   if {$new_context_idx eq {end+1}} {
+      lappend ::g_moduleEval($evalid) $new_context_eval_list
+   } else {
+      lset ::g_moduleEval($evalid) $new_context_idx $new_context_eval_list
+   }
+
+   # change context of hidden evaluation
+   set old_hidden_evalid $evalid:$old_context
+   if {[info exists ::g_moduleHiddenEval($old_hidden_evalid)]} {
+      if {$mod_evalid in $::g_moduleHiddenEval($old_hidden_evalid)} {
+         set ::g_moduleHiddenEval($old_hidden_evalid) [replaceFromList\
+            $::g_moduleHiddenEval($old_hidden_evalid) $mod_evalid]
+         set new_hidden_evalid $evalid:$new_context
+         lappend ::g_moduleHiddenEval($new_hidden_evalid) $mod_evalid
+      }
+   }
 }
 
 # get context of currently evaluated module
@@ -247,7 +316,7 @@ proc sortModulePerLoadedAndDepOrder {modlist {nporeq 0} {loading 0}} {
 
 # return list of loaded modules having an unmet requirement on passed mod
 # and their recursive dependent
-proc getUnmetDependentLoadedModuleList {modnamevr} {
+proc getUnmetDependentLoadedModuleList {modnamevr mod_file} {
    set unmetdeplist {}
    set depmodlist {}
    defineModEqProc [isIcase] [getConf extended_default] 1
@@ -255,11 +324,16 @@ proc getUnmetDependentLoadedModuleList {modnamevr} {
    set vrlist [getVariantList $modnamevr 0 0 1]
 
    # skip dependent analysis if mod has a conflict with a loaded module
-   lassign [doesModuleConflict $mod] doescon modconlist
-   if {!$doescon} {
+   set modconlist [getModuleLoadedConflict $mod]
+   if {![llength $modconlist]} {
       foreach ummod [array names ::g_unmetDepHash] {
          if {[modEq $ummod $mod eqstart 1 2 1 $vrlist]} {
-            foreach depmod $::g_unmetDepHash($ummod) {
+            foreach {depmod prereq_path_list} $::g_unmetDepHash($ummod) {
+               if {![isModulefileMatchSpecificPath $mod_file\
+                  $prereq_path_list]} {
+                  continue
+               }
+
                lappend depmodlist $depmod
                # temporarily remove prereq violation of depmod if mod
                # load solves it (no other prereq is missing)
@@ -364,29 +438,20 @@ proc getDirectDependentList {mod {strong 0} {nporeq 0} {loading 0}\
 
    # take currently loading modules into account if asked
    if {$loading} {
-      set modlist [getEnvLoadedModulePropertyParsedList name]
-      defineModEqProc [isIcase] [getConf extended_default] 1
-      # reverse list to get closest match if returning lastly loaded module
-      if {[getConf unload_match_order] eq {returnlast}} {
-         set modlist [lreverse $modlist]
-      }
-      foreach loadingmod [getLoadingModuleList] {
-         foreach prereq [getLoadedPrereq $loadingmod] {
+      foreach loading_mod [getLoadingModuleList] {
+         foreach prereq_match [getLoadedModulePrereqListAndLoadedMatch\
+            $loading_mod] {
             set lmprelist {}
-            set moddep 0
-            foreach modpre $prereq {
-               foreach lmmod $modlist {
-                  if {[modEq $modpre $lmmod eqstart 1 2 1]} {
-                     lappend lmprelist $lmmod
-                     if {$lmmod eq $mod} {
-                        set moddep 1
-                     }
-                     break
-                  }
+            set item_match_list [lassign $prereq_match prereq\
+               prereq_path_list]
+            foreach {prereq_mod_item loaded_mod_match ign} $item_match_list {
+               if {[string length $loaded_mod_match]} {
+                  lappend lmprelist $loaded_mod_match
                }
             }
-            if {$moddep && (!$strong || [llength $lmprelist] == 1)} {
-               lappend deplist $loadingmod
+            if {$mod in $lmprelist && (!$strong || [llength $lmprelist]\
+               == 1)} {
+               lappend deplist $loading_mod
                break
             }
          }
@@ -428,8 +493,8 @@ proc getDependentLoadedModuleList {modlist {strong 1} {direct 1} {nporeq 0}\
       # with their own dependent modules as mod is being unloaded. Achieve so
       # by faking that conflict violation is gone
       foreach mod $modlist {
-         lassign [doesModuleConflict $mod] doescon modconlist
-         if {$doescon} {
+         set modconlist [getModuleLoadedConflict $mod]
+         if {[llength $modconlist]} {
             unsetModuleConflictViolation $mod
             set conunvioarr($mod) $modconlist
             appendNoDupToList fulllist {*}$modconlist
@@ -472,10 +537,6 @@ proc getDependentLoadedModuleList {modlist {strong 1} {direct 1} {nporeq 0}\
 # unmodlist: pass a list of modules that are going to be unloaded
 proc isModuleUnloadable {mod {unmodlist {}}} {
    set ret 1
-   # get currently unloading modules if no specific unmodlist set
-   if {![llength $unmodlist]} {
-      set unmodlist [getUnloadingModuleList]
-   }
 
    # module may be unloaded if it has been automatically loaded, it is not
    # tagged keep-loaded and it is not sticky.
@@ -496,54 +557,29 @@ proc isModuleUnloadable {mod {unmodlist {}}} {
    return $ret
 }
 
-# gets the list of all loaded modules which are required by passed modlist
-# ordered by load position.
-proc getRequiredLoadedModuleList {modlist} {
+# gets the list of all loaded modules which are required by passed mod_list
+# ordered by load position. a list of modules to exclude may be provided
+# (usually to skip requirements that will be unloaded)
+proc getRequiredLoadedModuleList {mod_list {excluded_mod_list {}}} {
    # search over all list of loaded modules, starting with passed module
    # list, then adding in turns their requirements
-   set fulllist $modlist
-   for {set i 0} {$i < [llength $fulllist]} {incr i 1} {
+   set full_list $mod_list
+   for {set i 0} {$i < [llength $full_list]} {incr i 1} {
       # gets the list of loaded modules which are required by depmod
-      appendNoDupToList fulllist {*}$::g_moduleDepend([lindex $fulllist $i])
-   }
-
-   # sort complete result list to match both loaded and dependency orders
-   set sortlist [sortModulePerLoadedAndDepOrder [lrange $fulllist [llength\
-      $modlist] end]]
-   reportDebug "got '$sortlist'"
-   return $sortlist
-}
-
-# finds required modules that can be unloaded if passed modules are unloaded
-proc getUnloadableLoadedModuleList {modlist} {
-   # search over all list of unloaded modules, starting with passed module
-   # list, then adding in turns unloadable requirements
-   set fulllist $modlist
-   for {set i 0} {$i < [llength $fulllist]} {incr i 1} {
-      set depmod [lindex $fulllist $i]
-      # gets the list of loaded modules which are required by depmod
-      set deplist {}
-      foreach lmmodlist $::g_moduleDepend($depmod) {
-         foreach lmmod $lmmodlist {
-            if {$lmmod ni $fulllist} {
-               lappend deplist $lmmod
+      foreach req_mod_list $::g_moduleDepend([lindex $full_list $i]) {
+         foreach req_mod $req_mod_list {
+            if {$req_mod ni $excluded_mod_list} {
+               appendNoDupToList full_list $req_mod
             }
          }
       }
-
-      # get those required module that may be unloaded
-      foreach lmmod $deplist {
-         if {[isModuleUnloadable $lmmod $fulllist]} {
-            lappend fulllist $lmmod
-         }
-      }
    }
 
    # sort complete result list to match both loaded and dependency orders
-   set sortlist [sortModulePerLoadedAndDepOrder [lrange $fulllist [llength\
-      $modlist] end]]
-   reportDebug "got '$sortlist'"
-   return $sortlist
+   set sort_list [sortModulePerLoadedAndDepOrder [lrange $full_list [llength\
+      $mod_list] end]]
+   reportDebug "got '$sort_list'"
+   return $sort_list
 }
 
 # how many settings bundle are currently saved
@@ -563,12 +599,15 @@ proc pushSettings {} {
       g_loadedModuleAliasAltname g_moduleDepend g_dependHash\
       g_moduleNPODepend g_dependNPOHash g_prereqViolation\
       g_prereqNPOViolation g_conflictViolation g_moduleUnmetDep\
-      g_unmetDepHash g_moduleEval g_moduleHiddenEval g_scanModuleVariant} {
+      g_unmetDepHash g_moduleEval g_moduleHiddenEval g_scanModuleVariant\
+      g_savedLoReqOfReloadMod g_savedLoReqOfUnloadMod\
+      g_loadedModulePrereqPath} {
       ##nagelfar ignore Suspicious variable name
       lappend ::g_SAVE_$var [array get ::$var]
    }
    # save non-array variable and indication if it was set
-   foreach var {g_changeDir g_stdoutPuts g_prestdoutPuts g_return_text} {
+   foreach var {g_changeDir g_stdoutPuts g_prestdoutPuts g_return_text\
+      g_uReqUnFromDepReList} {
       ##nagelfar ignore #4 Suspicious variable name
       if {[info exists ::$var]} {
          lappend ::g_SAVE_$var [list 1 [set ::$var]]
@@ -590,7 +629,9 @@ proc popSettings {} {
       g_loadedModuleAliasAltname g_moduleDepend g_dependHash\
       g_moduleNPODepend g_dependNPOHash g_prereqViolation\
       g_prereqNPOViolation g_conflictViolation g_moduleUnmetDep\
-      g_unmetDepHash g_moduleEval g_moduleHiddenEval g_scanModuleVariant} {
+      g_unmetDepHash g_moduleEval g_moduleHiddenEval g_scanModuleVariant\
+      g_savedLoReqOfReloadMod g_savedLoReqOfUnloadMod g_uReqUnFromDepReList\
+      g_loadedModulePrereqPath} {
       ##nagelfar ignore Suspicious variable name
       set ::g_SAVE_$var [lrange [set ::g_SAVE_$var] 0 end-1]
    }
@@ -606,7 +647,9 @@ proc restoreSettings {} {
       g_loadedModuleAliasAltname g_moduleDepend g_dependHash\
       g_moduleNPODepend g_dependNPOHash g_prereqViolation\
       g_prereqNPOViolation g_conflictViolation g_moduleUnmetDep\
-      g_unmetDepHash g_moduleEval g_moduleHiddenEval g_scanModuleVariant} {
+      g_unmetDepHash g_moduleEval g_moduleHiddenEval g_scanModuleVariant\
+      g_savedLoReqOfReloadMod g_savedLoReqOfUnloadMod\
+      g_loadedModulePrereqPath} {
       # clear current $var arrays
       ##nagelfar ignore #5 Suspicious variable name
       if {[info exists ::$var]} {
@@ -628,7 +671,8 @@ proc restoreSettings {} {
       }
    }
    # restore non-array variable if it was set
-   foreach var {g_changeDir g_stdoutPuts g_prestdoutPuts g_return_text} {
+   foreach var {g_changeDir g_stdoutPuts g_prestdoutPuts g_return_text\
+      g_uReqUnFromDepReList} {
       ##nagelfar ignore #6 Suspicious variable name
       if {[info exists ::$var]} {
          unset ::$var
@@ -730,67 +774,92 @@ proc loadRequirementModuleList {tryload optional tag_list modulepath_list\
    return [list $ret $prereqloaded]
 }
 
+# save reloading module properties before they vanish with unload phase
+proc savePropsOfReloadingModule {mod} {
+   set is_user_asked [isModuleTagged $mod loaded 1]
+   set vr_list [getVariantList $mod 1 2]
+   set tag_list [getTagList $mod]
+   set extra_tag_list [getExtraTagList $mod]
+   set conflict_list [getLoadedConflict $mod]
+   set prereq_list [getLoadedPrereq $mod]
+   set prereq_path_list [getLoadedPrereqPath $mod]
+   set modpath [getModulepathFromLoadedOrLoadingModule $mod]
+   set ::g_savedPropsOfReloadMod($mod) [list $is_user_asked $vr_list\
+      $tag_list $extra_tag_list $conflict_list $prereq_list $prereq_path_list\
+      $modpath]
+}
+
+proc getSavedPropsOfReloadingModule {mod} {
+   return $::g_savedPropsOfReloadMod($mod)
+}
+
 # unload phase of a list of modules reload process
-proc reloadModuleListUnloadPhase {lmname {errmsgtpl {}} {context unload}} {
-   upvar $lmname lmlist
+proc reloadModuleListUnloadPhase {mod_list {err_msg_tpl {}} {context\
+   unload}} {
    # unload one by one to ensure same behavior whatever auto_handling state
-   foreach mod [lreverse $lmlist] {
-      # record hint that mod will be reloaded (useful in case mod is sticky)
-      lappendState reloading_sticky $mod
-      lappendState reloading_supersticky $mod
-      # save user asked state before it vanishes
-      set isuasked($mod) [isModuleTagged $mod loaded 1]
-      # save variants set for modules
-      set vr($mod) [getVariantList $mod 1 2]
-      # save extra tags set
-      set extratag($mod) [getExtraTagList $mod]
-      # force unload even if requiring mods are not part of the unload list
-      # (violation state) as modules are loaded again just after
-      if {[cmdModuleUnload $context match 0 1 0 $mod]} {
-         # avoid failing module on load phase
-         # if force state is enabled, cmdModuleUnload returns 0
-         set lmlist [replaceFromList $lmlist $mod]
-         set errMsg [string map [list _MOD_ [getModuleDesignation loaded\
-            $mod]] $errmsgtpl]
-         lpopState reloading_sticky
-         lpopState reloading_supersticky
-         # no process stop if ongoing reload command in continue behavior
-         if {![isStateEqual commandname reload] || [commandAbortOnError]} {
-            knerror $errMsg
-         }
+   foreach mod [lreverse $mod_list] {
+      if {[reloadModuleUnloadPhase $mod $err_msg_tpl $context]} {
+         set mod_list [replaceFromList $mod_list $mod]
       }
+   }
+   return $mod_list
+}
+
+proc reloadModuleUnloadPhase {mod {err_msg_tpl {}} {context unload}} {
+   # record hint that mod will be reloaded (useful in case mod is sticky)
+   lappendState reloading_sticky $mod
+   lappendState reloading_supersticky $mod
+   savePropsOfReloadingModule $mod
+   if {[set ret [cmdModuleUnload $context match 0 s 0 $mod]]} {
+      # avoid failing module on load phase
+      # if force state is enabled, cmdModuleUnload returns 0
+      set err_msg [string map [list _MOD_ [getModuleDesignation loaded $mod]]\
+         $err_msg_tpl]
       lpopState reloading_sticky
       lpopState reloading_supersticky
+      # no process stop if ongoing reload command in continue behavior
+      if {![isStateEqual commandname reload] || [commandAbortOnError]} {
+         knerror $err_msg
+      }
    }
-   return [list [array get isuasked] [array get vr] [array get extratag]]
+   lpopState reloading_sticky
+   lpopState reloading_supersticky
+   return $ret
 }
 
 # load phase of a list of modules reload process
-proc reloadModuleListLoadPhase {lmname isuaskedlist vrlist extrataglist\
-   {errmsgtpl {}} {context load}} {
-   upvar $lmname lmlist
-   array set isuasked $isuaskedlist
-   array set vr $vrlist
-   array set extratag $extrataglist
-
+proc reloadModuleListLoadPhase {mod_list {errmsgtpl {}} {context load}} {
+   if {![llength $mod_list]} {
+      return
+   }
    # loads are made with auto handling mode disabled to avoid disturbances
    # from a missing prereq automatically reloaded, so these module loads may
    # fail as prereq may not be satisfied anymore
    setConf auto_handling 0
-   foreach mod $lmlist {
+   foreach mod $mod_list {
+      lassign [getSavedPropsOfReloadingModule $mod] is_user_asked vr_list\
+         tag_list extra_tag_list conflict_list prereq_list prereq_path_list\
+         modpath
       # if an auto set default was excluded, module spec need parsing
-      lassign [parseModuleSpecification 0 0 0 0 $mod {*}$vr($mod)] modnamevr
+      lassign [parseModuleSpecification 0 0 0 0 $mod {*}$vr_list] modnamevr
+
+      # do not try to reload DepRe module if requirements are not satisfied
+      # unless if sticky
+      if {$context eq {depre} && ![isModuleLoadable $mod $modnamevr\
+         $conflict_list $prereq_list $prereq_path_list $modpath] &&\
+         ![isModuleStickyFromTagList {*}$tag_list {*}$extra_tag_list]} {
+         continue
+      }
+
       # reload module with user asked property and extra tags preserved
-      if {[cmdModuleLoad $context $isuasked($mod) 0 0 $extratag($mod) {}\
+      if {[cmdModuleLoad $context $is_user_asked 0 0 $extra_tag_list {}\
          $modnamevr]} {
          set errMsg [string map [list _MOD_ [getModuleDesignation spec\
             $modnamevr]] $errmsgtpl]
          # no process stop if forced, or ongoing reload or switch cmd in
-         # continue behavior, or non-top switch cmd
+         # continue behavior
          if {[getState force] || (([isStateEqual commandname reload] ||\
-            [isStateEqual commandname switch]) && ![commandAbortOnError]) ||\
-            ([getCallingProcName] eq {cmdModuleSwitch} &&\
-            ![isTopEvaluation])} {
+            [isStateEqual commandname switch]) && ![commandAbortOnError])} {
             # no msg for reload sub-cmd which provides an empty msg template
             reportWarning $errMsg
          # stop if one load fails unless force mode enabled
@@ -800,6 +869,54 @@ proc reloadModuleListLoadPhase {lmname isuaskedlist vrlist extrataglist\
       }
    }
    setConf auto_handling 1
+}
+
+proc isModuleLoadable {mod mod_vr conflict_list prereq_list\
+   prereq_path_list modpath} {
+   setLoadedConflict $mod {*}$conflict_list
+   set is_conflicting [llength [getModuleLoadedConflict $mod]]
+   unsetLoadedConflict $mod
+
+   if {$is_conflicting} {
+      return 0
+   }
+
+   array set prereq_path_arr $prereq_path_list
+   foreach prereq_arg $prereq_list {
+      if {[info exists prereq_path_arr($prereq_arg)]} {
+         set prereq_arg_path $prereq_path_arr($prereq_arg)
+      } else {
+         set prereq_arg_path {}
+      }
+      set is_requirement_loaded 0
+      foreach req_mod $prereq_arg {
+         # is requirement loaded, loading or optional
+         if {[string length [getLoadedMatchingName $req_mod returnfirst 0 {}\
+            $prereq_arg_path]] || [string length [getLoadedMatchingName\
+            $req_mod returnfirst 1 {} $prereq_arg_path]] || $req_mod eq\
+            $mod} {
+            set is_requirement_loaded 1
+            break
+         }
+      }
+      if {!$is_requirement_loaded} {
+         return 0
+      }
+   }
+
+   # module is loadable if its modulepath is still enabled or if it can be
+   # found in another modulepath (variant availability is currently not
+   # checked by is-avail procedure)
+   if {![is-used $modpath] && ![is-avail $mod_vr]} {
+      return 0
+   }
+
+   return 1
+}
+
+proc isModuleStickyFromTagList {args} {
+   return [expr {{super-sticky} in $args || ({sticky} in $args && ![getState\
+      force])}]
 }
 
 # test if loaded module 'mod' is sticky and if stickiness definition applies
@@ -856,6 +973,219 @@ proc isStickinessReloading {mod reloading_mod_list {tag sticky}} {
 proc isModuleSticky {mod} {
    return [expr {[isModuleTagged $mod super-sticky 1] || ([isModuleTagged\
       $mod sticky 1] && ![getState force])}]
+}
+
+proc saveLoadedReqOfUnloadingModule {unload_mod} {
+   # fetch requirements of unloading module
+   set ::g_savedLoReqOfUnloadMod($unload_mod)\
+      [getRequiredLoadedModuleList [list $unload_mod]]
+}
+
+proc getLoadedReqOfUnloadingModuleList {} {
+   set unloading_req_mod_list {}
+   foreach unloading_mod [array names ::g_savedLoReqOfUnloadMod] {
+      appendNoDupToList unloading_req_mod_list\
+         {*}$::g_savedLoReqOfUnloadMod($unloading_mod)
+   }
+   return [sortModulePerLoadedAndDepOrder $unloading_req_mod_list]
+}
+
+proc clearLoadedReqOfUnloadingModuleList {} {
+   array unset ::g_savedLoReqOfUnloadMod
+}
+
+proc saveLoadedReqOfReloadingModuleList {reload_mod_list unload_mod_list} {
+   # fetch requirements of reloading modules skipping unloading ones
+   foreach reload_mod $reload_mod_list {
+      set ::g_savedLoReqOfReloadMod($reload_mod) [getRequiredLoadedModuleList\
+         [list $reload_mod] $unload_mod_list]
+   }
+}
+
+proc getLoadedReqOfReloadingModuleList {} {
+   set reloading_req_mod_list {}
+   foreach reloading_mod [array names ::g_savedLoReqOfReloadMod] {
+      appendNoDupToList reloading_req_mod_list\
+         {*}$::g_savedLoReqOfReloadMod($reloading_mod)
+   }
+   return [sortModulePerLoadedAndDepOrder $reloading_req_mod_list]
+}
+
+proc unsetLoadedReqOfReloadingModule {mod} {
+   unset -nocomplain ::g_savedLoReqOfReloadMod($mod)
+}
+
+proc clearLoadedReqOfReloadingModuleList {} {
+   array unset ::g_savedLoReqOfReloadMod
+}
+
+proc identityUReqUnFromDepRe {depre_list unload_mod_list} {
+   foreach depre [lreverse $depre_list] {
+      if {[isModuleUnloadable $depre $unload_mod_list]} {
+         lappend unload_mod_list $depre
+         lappend ::g_uReqUnFromDepReList $depre
+      }
+   }
+}
+
+proc clearUReqUnFromDepReList {} {
+   unset -nocomplain ::g_uReqUnFromDepReList
+}
+
+proc getIdentifiedUReqUnFromDepRe {} {
+   if {[info exists ::g_uReqUnFromDepReList]} {
+      return $::g_uReqUnFromDepReList
+   }
+}
+
+proc removeUReqUnFromDepReAndConvertEval {} {
+   set depre_list [getDepReList]
+   set urequn_from_depre_list [getIdentifiedUReqUnFromDepRe]
+   lassign [getDiffBetweenList $depre_list $urequn_from_depre_list] depre_list
+   setDepReList $depre_list
+   foreach urequn_from_depre [lreverse $urequn_from_depre_list] {
+      changeContextOfModuleEval $urequn_from_depre depun urequn
+   }
+}
+
+proc getUReqUnModuleList {} {
+   set unloadable_mod_list {}
+
+   # add DepRe modules that are UReqUn modules and unset their requirements
+   # from reloading list (to check them for potential UReqUn modules)
+   foreach urequn_from_depre [getIdentifiedUReqUnFromDepRe] {
+      lappend unloadable_mod_list $urequn_from_depre
+      unsetLoadedReqOfReloadingModule $urequn_from_depre
+   }
+
+   set reloading_req_mod_list [getLoadedReqOfReloadingModuleList]
+   # useless requirement unload modules are unloadable req of unloaded mods
+   # treat lastly loaded module first to build unloadable module list
+   foreach unloading_req_mod [lreverse [getLoadedReqOfUnloadingModuleList]] {
+      if {$unloading_req_mod ni $reloading_req_mod_list &&\
+         [isModuleUnloadable $unloading_req_mod $unloadable_mod_list]} {
+         lappend unloadable_mod_list $unloading_req_mod
+      }
+   }
+   # return result in loaded order
+   return [lreverse $unloadable_mod_list]
+}
+
+proc unloadUReqUnModules {} {
+   set urequn_list [getUReqUnModuleList]
+   reportDebug "urequn mod list is '$urequn_list'"
+
+   if {[llength $urequn_list]} {
+      # DepRe: Dependent to Reload (modules optionally dependent or in
+      # conflict with modname, DepUn or UReqUn modules + modules dependent of
+      # a module part of this DepRe batch)
+      set urequn_depre_list [getDependentLoadedModuleList $urequn_list 0 0 1\
+         0 1 1]
+      set urequn_depre_list [reloadModuleListUnloadPhase $urequn_depre_list\
+         {Unload of dependent _MOD_ failed} depre_un]
+      lprependDepReList $urequn_depre_list
+
+      set urequn_list [lreverse $urequn_list]
+      for {set i 0} {$i < [llength $urequn_list]} {incr i 1} {
+         set unmod [lindex $urequn_list $i]
+         if {[cmdModuleUnload urequn match 0 s 0 $unmod]} {
+            # main unload process continues, but the UReqUn modules that are
+            # required by unmod (whose unload failed) are withdrawn from
+            # UReqUn module list
+            lassign [getDiffBetweenList $urequn_list\
+               [getRequiredLoadedModuleList [list $unmod]]] urequn_list
+         }
+      }
+   }
+}
+
+proc getDepUnModuleList {mod} {
+   set depun_npo_list [getDependentLoadedModuleList [list $mod] 1 0 1 0]
+   set depun_list [getDependentLoadedModuleList [list $mod] 1 0 0 0]
+   # look at both regular dependencies or No Particular Order dependencies:
+   # use NPO result if situation can be healed with NPO dependencies, which
+   # will be part of DepRe list to restore the correct loading order for them
+   if {[llength $depun_npo_list] <= [llength $depun_list]} {
+      set depun_list $depun_npo_list
+   }
+   return $depun_list
+}
+
+proc clearDepReList {} {
+   unset -nocomplain ::g_depReList
+}
+
+proc getDepReList {} {
+   if {[info exists ::g_depReList]} {
+      return $::g_depReList
+   }
+}
+
+proc setDepReList {mod_list} {
+   set ::g_depReList $mod_list
+}
+
+proc lprependDepReList {mod_list} {
+   lprepend ::g_depReList {*}$mod_list
+}
+
+proc unloadDepUnDepReModules {unload_mod_list reload_mod_list} {
+   set err_msg_tpl {Unload of dependent _MOD_ failed}
+   set unload_mod_list [sortModulePerLoadedAndDepOrder [list\
+      {*}$unload_mod_list {*}$reload_mod_list]]
+   lprependDepReList $reload_mod_list
+
+   foreach unload_mod [lreverse $unload_mod_list] {
+      if {$unload_mod in $reload_mod_list} {
+         # an error is raised if an unload eval fails
+         reloadModuleUnloadPhase $unload_mod $err_msg_tpl depre_un
+      } else {
+         if {[cmdModuleUnload depun match 0 s 0 $unload_mod]} {
+            # stop if one unload fails unless force mode enabled
+            set err_msg [string map [list _MOD_ [getModuleDesignation loaded\
+               $unload_mod]] $err_msg_tpl]
+            knerrorOrWarningIfForced $err_msg
+         }
+      }
+   }
+}
+
+proc reloadDepReModules {} {
+   set err_msg_tpl {Reload of dependent _MOD_ failed}
+   set depre_list [getDepReList]
+   reloadModuleListLoadPhase $depre_list $err_msg_tpl depre
+}
+
+# Fail unload attempt if module is sticky, unless if forced or reloading
+# Also fail unload if mod is super-sticky even if forced, unless reloading
+proc failOrSkipUnloadIfSticky {modname modfile} {
+   # when loaded, tags applies to mod name and version (not with variant)
+   set is_supersticky_not_reloading [expr {[isModuleTagged $modname\
+      super-sticky 1 $modfile] && [currentState reloading_supersticky] ne\
+      $modname}]
+   set is_sticky_not_reloading [expr {[isModuleTagged $modname sticky 1\
+      $modfile] && [currentState reloading_sticky] ne $modname &&\
+      [currentState unloading_sticky] ne $modname}]
+   set sticky_purge [expr {[getState commandname] eq {purge} ? [getConf\
+      sticky_purge] : {}}]
+
+   if {!$is_supersticky_not_reloading && $is_sticky_not_reloading &&\
+      [getState force]} {
+      reportWarning [getStickyForcedUnloadMsg]
+   } elseif {$is_supersticky_not_reloading || $is_sticky_not_reloading} {
+      set msg [getStickyUnloadMsg [expr {$is_supersticky_not_reloading ?\
+         {super-sticky} : {sticky}}]]
+      # no message if sticky_purge is set to silent
+      switch -- $sticky_purge {
+         error - {} {knerror $msg}
+         warning {reportWarning $msg}
+      }
+
+      # skip unload without raising error
+      return 1
+   }
+
+   return 0
 }
 
 # ;;; Local Variables: ***

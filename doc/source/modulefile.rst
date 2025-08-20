@@ -66,6 +66,16 @@ the Module commands return the empty string. Some commands behave differently
 when a *modulefile* is loaded or unloaded. The command descriptions assume
 the *modulefile* is being loaded.
 
+.. mfcmd:: add-property name value
+
+ Associate module tag *value* to currently loading *modulefile*. Argument
+ *name* is ignored. See :mfcmd:`module-tag` command for more information on
+ tags.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
 .. mfcmd:: always-load [options] modulefile...
 
  Load *modulefile* and apply the ``keep-loaded`` tag to it in order to avoid
@@ -146,10 +156,8 @@ the *modulefile* is being loaded.
 
       #%Module
 
-      proc ModulesHelp {} {
-          puts stderr {This module does nothing but alert the user}
-          puts stderr "that the [module-info name] module is not available"
-      }
+      module-help {This module does nothing but alert the user}
+      module-help "that the [module-info name] module is not available"
 
       module-whatis {Notifies user that module is not available.}
 
@@ -208,6 +216,17 @@ the *modulefile* is being loaded.
  modulefile alias. It may also leverage a specific syntax to finely select
  module version (see `Advanced module version specifiers`_ section below).
 
+ If the :mconfig:`conflict_unload` and :mconfig:`auto_handling` configuration
+ options are enabled, :mfcmd:`conflict` will attempt to unload all loaded
+ modules that match specification. (see :ref:`Automated module handling
+ mechanisms<MODULES_AUTO_HANDLING>` in :ref:`module(1)`).
+
+ .. only:: html
+
+    .. versionchanged:: 5.5
+       An attempt to unload module is made if :mconfig:`conflict_unload` and
+       :mconfig:`auto_handling` configuration options are enabled
+
 .. mfcmd:: continue
 
  This is not a modules specific command but another overloaded Tcl command
@@ -231,6 +250,14 @@ the *modulefile* is being loaded.
     .. versionchanged:: 5.5
        Option ``--modulepath`` added
 
+.. mfcmd:: depends-on-any [options] modulefile...
+
+ Alias of :mfcmd:`prereq` command.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
 .. mfcmd:: exit [N]
 
  This is not a modules specific command but another overloaded Tcl command
@@ -240,6 +267,17 @@ the *modulefile* is being loaded.
  :mconfig:`abort_on_error` configuration option is disabled for running
  module sub-command. This module and the subsequent modules will not be listed
  as loaded. No environment commands will be performed in the current module.
+
+.. mfcmd:: extensions modulefile...
+
+ Alias of :mfcmd:`provide` command.
+
+ .. only:: html
+
+    .. versionadded:: 5.1
+
+    .. versionchanged:: 5.6
+       Changed from *no-operation* command to alias of :mfcmd:`provide`
 
 .. mfcmd:: family name
 
@@ -264,9 +302,19 @@ the *modulefile* is being loaded.
  *name* should be a non-empty string only containing characters that could be
  part of an environment variable name (i.e., *[a-zA-Z0-9_]*).
 
+ If the :mconfig:`conflict_unload` and :mconfig:`auto_handling` configuration
+ options are enabled, an attempt to unload loaded module that defines the same
+ family is made. (see :ref:`Automated module handling
+ mechanisms<MODULES_AUTO_HANDLING>` in :ref:`module(1)`).
+
  .. only:: html
 
     .. versionadded:: 5.1
+
+    .. versionchanged:: 5.5
+       An attempt to unload module defining same family is made if
+       :mconfig:`conflict_unload` and :mconfig:`auto_handling` configuration
+       options are enabled
 
 .. mfcmd:: getenv [--return-value] variable [value]
 
@@ -314,6 +362,21 @@ the *modulefile* is being loaded.
     .. versionchanged:: 5.1
        Option ``--return-value`` added.
 
+
+.. mfcmd:: haveDynamicMPATH
+
+ :mfcmd:`haveDynamicMPATH` command signals that a modulefile modifies the
+ :envvar:`MODULEPATH` environment variable. It is useful when the modulefile
+ conditionally updates :envvar:`MODULEPATH` and is processed by Lmod tool.
+
+ Here in the Modules tool, this command is implemented as a *no-operation*,
+ since the :subcmd:`spider` sub-command evaluates the modulefile in the
+ context of the current user to determine whether :envvar:`MODULEPATH` is
+ updated.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. mfcmd:: hide-modulefile modulefile
 
@@ -427,6 +490,18 @@ the *modulefile* is being loaded.
  operation is performed if a *modulefile* from the list is found already
  loaded.
 
+ The ``unload`` sub-command unloads one matching *modulefile* for each module
+ specification provided as argument if :mconfig:`auto_handling` or
+ :mconfig:`conflict_unload` configuration options are disabled. When both
+ options are enabled, ``unload`` removes all loaded modules matching each
+ module specification. When both options are enabled, modules dependent of the
+ unloaded modules are also unloaded. Otherwise an error is raised if module to
+ unload has a dependent module loaded.
+
+ If the :mconfig:`require_via` configuration option is enabled, the ``use``
+ sub-command defines a requirement of modulefiles stored in the added
+ modulepath onto current *modulefile*.
+
  The ``unuse`` sub-command accepts the ``--remove-on-unload``,
  ``--noop-on-unload``, ``--append-on-unload`` and ``--prepend-on-unload``
  options to control the behavior to apply when *modulefile* is unloaded. See
@@ -497,7 +572,7 @@ the *modulefile* is being loaded.
 
     .. versionchanged:: 5.1
        Options ``--remove-on-unload``, ``--noop-on-unload``,
-       ``--append-on-unload`` and ``--prepend-on-unload`` added for ``use``
+       ``--append-on-unload`` and ``--prepend-on-unload`` added for ``unuse``
        sub-command
 
     .. versionchanged:: 5.1
@@ -507,6 +582,16 @@ the *modulefile* is being loaded.
     .. versionchanged:: 5.1
        Option ``--not-req`` added for ``try-load`` and ``load-any``
        sub-commands
+
+    .. versionchanged:: 5.5
+       When :mconfig:`auto_handling` and :mconfig:`conflict_unload`
+       configuration options are enabled, ``unload`` sub-command removes all
+       matching modules loaded and modules that depend on them
+
+    .. versionchanged:: 5.6
+       When :mconfig:`require_via` configuration option is enabled, a
+       modulefile using new modulepath is considered a requirement of
+       modulefiles stored in this modulepath.
 
 .. mfcmd:: module-alias name modulefile
 
@@ -549,17 +634,19 @@ the *modulefile* is being loaded.
  If ``--not-user`` option is set, forbidding is not applied if the username of
  the user currently running :file:`modulecmd.tcl` is part of the list of
  username specified. Following the same approach, if ``--not-group`` option is
- set, forbidding is not applied if current user is member of one the group
+ set, forbidding is not applied if current user is member of one of the groups
  specified. When both options are set, forbidding is not applied if a match is
  found for ``--not-user`` or ``--not-group``.
 
  If ``--user`` option is set, forbidding is applied only if the username of
  the user currently running :file:`modulecmd.tcl` is part of the list of
  username specified. Following the same approach, if ``--group`` option is
- set, forbidding is applied only if current user is member of one the group
- specified. When both options are set, forbidding is applied if a match is
- found for ``--user`` or ``--group``. These two options prevail over
- ``--not-user`` and ``--not-group`` options.
+ set, forbidding is applied only if current user is member of one of the
+ groups specified. When both options are set, forbidding is applied if a match
+ is found for ``--user`` or ``--group``. If the same user name is set on both
+ ``--user`` and ``--not-user`` options, ``--user`` prevails over
+ ``--not-user``. If the same group name is set on both ``--group`` and
+ ``--not-group``, ``--group`` prevails over ``--not-group``.
 
  Error message returned when trying to evaluate a forbidden module can be
  supplemented with the *text message* set through ``--message`` option.
@@ -577,11 +664,12 @@ the *modulefile* is being loaded.
  by a :mfcmd:`module-hide --hard<module-hide>` command, this module is
  unveiled when precisely named to return an access error.
 
- Forbidden modules included in the result of an :subcmd:`avail` sub-command
- are reported with a ``forbidden`` tag applied to them. Nearly forbidden
- modules included in the result of an :subcmd:`avail` or a :subcmd:`list`
- sub-command are reported with a ``nearly-forbidden`` tag applied to them. See
- :ref:`Module tags` section in :ref:`module(1)`.
+ Forbidden modules included in the result of :subcmd:`avail` or
+ :subcmd:`spider` sub-commands are reported with a ``forbidden`` tag applied
+ to them. Nearly forbidden modules included in the result of :subcmd:`avail`,
+ :subcmd:`list` or :subcmd:`spider` sub-commands are reported with a
+ ``nearly-forbidden`` tag applied to them. See :ref:`Module tags` section in
+ :ref:`module(1)`.
 
  The parameter *modulefile* may leverage a specific syntax to finely select
  module version (see `Advanced module version specifiers`_ section below). It
@@ -597,6 +685,24 @@ the *modulefile* is being loaded.
 
     .. versionchanged:: 5.4
        Options ``--user`` and ``--group`` added
+
+.. mfcmd:: module-help string
+
+ Defines a string which is displayed in case of the invocation of the
+ :subcmd:`module help<help>` command. This command takes no action on non-help
+ *modulefile* evaluation.
+
+ Multi-word *string* should be enclosed in curly-braces or double-quotes.
+ There may be more than one :mfcmd:`module-help` command call in a
+ *modulefile*. In which case each command call is reported as a separate line.
+
+ If a *modulefile* also defines a ``ModulesHelp`` procedure, the text defined
+ with :mfcmd:`module-help` is printed before running this procedure on
+ ``help`` evaluation mode.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. mfcmd:: module-hide [options] modulefile...
 
@@ -644,27 +750,30 @@ the *modulefile* is being loaded.
  If ``--not-user`` option is set, hiding is not applied if the username of the
  user currently running :file:`modulecmd.tcl` is part of the list of username
  specified. Following the same approach, if ``--not-group`` option is set,
- hiding is not applied if current user is member of one the group specified.
- When both options are set, hiding is not applied if a match is found for
- ``--not-user`` or ``--not-group``.
+ hiding is not applied if current user is member of one of the groups
+ specified. When both options are set, hiding is not applied if a match is
+ found for ``--not-user`` or ``--not-group``.
 
  If ``--user`` option is set, hiding is applied only if the username of the
  user currently running :file:`modulecmd.tcl` is part of the list of username
  specified. Following the same approach, if ``--group`` option is set, hiding
- is applied only if current user is member of one the group specified. When
- both options are set, hiding is applied if a match is found for ``--user`` or
- ``--group``. These two options prevail over ``--not-user`` and
- ``--not-group`` options.
+ is applied only if current user is member of one of the groups specified.
+ When both options are set, hiding is applied if a match is found for
+ ``--user`` or ``--group``. If the same user name is set on both ``--user``
+ and ``--not-user`` options, ``--user`` prevails over ``--not-user``. If the
+ same group name is set on both ``--group`` and ``--not-group``, ``--group``
+ prevails over ``--not-group``.
 
  If the :option:`--all` option is set on :subcmd:`avail`, :subcmd:`aliases`,
- :subcmd:`whatis` or :subcmd:`search` sub-commands, hiding is disabled thus
- hidden modulefiles are included in module search. Hard-hidden modules (i.e.,
- declared hidden with ``--hard`` option) are not affected by :option:`--all`
- and stay hidden even if option is set. :option:`--all` option does not apply
- to *module selection* sub-commands like :subcmd:`load`. Thus in such context
- a hidden module should always be referred by its exact full name (e.g.,
- ``foo/1.2.3`` not ``foo``) unless if it has been hidden in ``--soft`` mode. A
- hard-hidden module cannot be unveiled or selected in any case.
+ :subcmd:`whatis`, :subcmd:`search` or :subcmd:`spider` sub-commands, hiding
+ is disabled thus hidden modulefiles are included in module search.
+ Hard-hidden modules (i.e., declared hidden with ``--hard`` option) are not
+ affected by :option:`--all` and stay hidden even if option is set.
+ :option:`--all` option does not apply to *module selection* sub-commands like
+ :subcmd:`load`. Thus in such context a hidden module should always be
+ referred by its exact full name (e.g., ``foo/1.2.3`` not ``foo``) unless if
+ it has been hidden in ``--soft`` mode. A hard-hidden module cannot be
+ unveiled or selected in any case.
 
  If several :mfcmd:`module-hide` commands target the same *modulefile*, the
  strongest hiding level is retained which means if both a regular, a
@@ -675,12 +784,12 @@ the *modulefile* is being loaded.
  is superseded by a stronger :mfcmd:`module-hide` statement with no
  ``--hidden-loaded`` option set.
 
- Hidden modules included in the result of an :subcmd:`avail` sub-command are
- reported with a ``hidden`` tag applied to them. Hidden loaded modules
- included in the result of a :subcmd:`list` sub-command are reported with a
- ``hidden-loaded`` tag applied to them. This tag is not reported on
- :subcmd:`avail` sub-command context. See :ref:`Module tags` section in
- :ref:`module(1)`.
+ Hidden modules included in the result of :subcmd:`avail` or :subcmd:`spider`
+ sub-commands are reported with a ``hidden`` tag applied to them. Hidden
+ loaded modules included in the result of :subcmd:`list` sub-command are
+ reported with a ``hidden-loaded`` tag applied to them. This tag is not
+ reported on :subcmd:`avail` or :subcmd:`spider` sub-commands context. See
+ :ref:`Module tags` section in :ref:`module(1)`.
 
  The parameter *modulefile* may also be a symbolic modulefile name or a
  modulefile alias. It may also leverage a specific syntax to finely select
@@ -722,8 +831,8 @@ the *modulefile* is being loaded.
   *commandname* can be: ``load``, ``unload``, ``refresh``, ``reload``,
   ``source``, ``switch``, ``display``, ``avail``, ``aliases``, ``list``,
   ``whatis``, ``search``, ``purge``, ``restore``, ``help``, ``test``,
-  ``try-load``, ``load-any``, ``mod-to-sh``, ``reset``, ``stash`` or
-  ``stashpop``.
+  ``try-load``, ``load-any``, ``mod-to-sh``, ``reset``, ``stash``,
+  ``stashpop`` or ``spider``.
 
   .. only:: html
 
@@ -775,8 +884,8 @@ the *modulefile* is being loaded.
 
   If a *shellname* is given, returns ``1`` if :file:`modulecmd.tcl`'s current
   shell is *shellname*, returns ``0`` otherwise. *shellname* can be: ``sh``,
-  ``bash``, ``ksh``, ``zsh``, ``csh``, ``tcsh``, ``fish``, ``cmd``, ``tcl``,
-  ``perl``, ``python``, ``ruby``, ``lisp``, ``cmake``, ``r``.
+  ``bash``, ``ksh``, ``zsh``, ``csh``, ``tcsh``, ``fish``, ``cmd``, ``pwsh``,
+  ``tcl``, ``perl``, ``python``, ``ruby``, ``lisp``, ``cmake``, ``r``.
 
  **module-info shelltype** [shelltypename]
 
@@ -788,8 +897,8 @@ the *modulefile* is being loaded.
 
   If a *shelltypename* is given, returns ``1`` if :file:`modulecmd.tcl`'s
   current shell type is *shelltypename*, returns ``0`` otherwise.
-  *shelltypename* can be: ``sh``, ``csh``, ``fish``, ``cmd``, ``tcl``,
-  ``perl``, ``python``, ``ruby``, ``lisp``, ``cmake``, ``r``.
+  *shelltypename* can be: ``sh``, ``csh``, ``fish``, ``cmd``, ``pwsh``,
+  ``tcl``, ``perl``, ``python``, ``ruby``, ``lisp``, ``cmake``, ``r``.
 
  **module-info specified**
 
@@ -865,11 +974,11 @@ the *modulefile* is being loaded.
 .. mfcmd:: module-tag [options] tag modulefile...
 
  Associate *tag* to designated *modulefile*. This tag information will be
- reported along *modulefile* on :subcmd:`avail` and :subcmd:`list`
- sub-commands (see :ref:`Module tags` section in :ref:`module(1)`). Tag
- information can be queried during *modulefile* evaluation with the
- :mfcmd:`module-info tags<module-info>` modulefile command.
- :mfcmd:`module-tag` commands should be placed in one of the
+ reported along *modulefile* on :subcmd:`avail`, :subcmd:`list` and
+ :subcmd:`spider` sub-commands (see :ref:`Module tags` section in
+ :ref:`module(1)`). Tag information can be queried during *modulefile*
+ evaluation with the :mfcmd:`module-info tags<module-info>` modulefile
+ command. :mfcmd:`module-tag` commands should be placed in one of the
  :file:`modulecmd.tcl` rc files.
 
  :mfcmd:`module-tag` command accepts the following options:
@@ -882,17 +991,19 @@ the *modulefile* is being loaded.
  If ``--not-user`` option is set, the tag is not applied if the username of
  the user currently running :file:`modulecmd.tcl` is part of the list of
  username specified. Following the same approach, if ``--not-group`` option is
- set, the tag is not applied if current user is member of one the group
+ set, the tag is not applied if current user is member of one of the groups
  specified. When both options are set, the tag is not applied if a match is
  found for ``--not-user`` or ``--not-group``.
 
  If ``--user`` option is set, the tag is applied only if the username of the
  user currently running :file:`modulecmd.tcl` is part of the list of username
  specified. Following the same approach, if ``--group`` option is set, the tag
- is applied only if current user is member of one the group specified. When
- both options are set, the tag is applied if a match is found for ``--user``
- or ``--group``. These two options prevail over ``--not-user`` and
- ``--not-group`` options.
+ is applied only if current user is member of one of the groups specified.
+ When both options are set, the tag is applied if a match is found for
+ ``--user`` or ``--group``. If the same user name is set on both ``--user``
+ and ``--not-user`` options, ``--user`` prevails over ``--not-user``. If the
+ same group name is set on both ``--group`` and ``--not-group``, ``--group``
+ prevails over ``--not-group``.
 
  The parameter *modulefile* may also be a symbolic modulefile name or a
  modulefile alias. It may also leverage a specific syntax to finely select
@@ -903,7 +1014,7 @@ the *modulefile* is being loaded.
  Tags inherited from other modulefile commands or module states cannot be set
  with :mfcmd:`module-tag`. Otherwise an error is returned. Those special tags
  are: ``auto-loaded``, ``forbidden``, ``hidden``, ``hidden-loaded``,
- ``loaded`` and ``nearly-forbidden``.
+ ``loaded``, ``nearly-forbidden`` and ``warning``.
 
  When *tag* equals ``sticky`` or ``super-sticky``, designated *modulefile* is
  defined :ref:`Sticky modules`.
@@ -962,6 +1073,59 @@ the *modulefile* is being loaded.
 
     .. versionadded:: 4.1
 
+.. mfcmd:: module-warn [options] --message {text message} modulefile...
+
+ Print warning message when evaluating *modulefile*. This command could be
+ placed in one of the :file:`modulecmd.tcl` rc files or within *modulefiles*.
+ Warning is emitted when *modulefile* is evaluated in ``load``, ``display``,
+ ``test``, ``help``.
+
+ :mfcmd:`module-warn` command accepts the following options:
+
+ * ``--after datetime``
+ * ``--before datetime``
+ * ``--not-user {user...}``
+ * ``--not-group {group...}``
+ * ``--user {user...}``
+ * ``--group {group...}``
+
+ If ``--after`` option is set, warning is only effective after specified date
+ time. Following the same principle, if ``--before`` option is set, warning is
+ only effective before specified date time. Accepted date time format is
+ ``YYYY-MM-DD[THH:MM]``. If no time (``HH:MM``) is specified, ``00:00`` is
+ assumed. ``--after`` and ``--before`` options are not supported on Tcl
+ versions prior to 8.5.
+
+ If ``--not-user`` option is set, warning is not applied if the username of
+ the user currently running :file:`modulecmd.tcl` is part of the list of
+ username specified. Following the same approach, if ``--not-group`` option is
+ set, warning is not applied if current user is member of one of the groups
+ specified. When both options are set, warning is not applied if a match is
+ found for ``--not-user`` or ``--not-group``.
+
+ If ``--user`` option is set, warning is applied only if the username of the
+ user currently running :file:`modulecmd.tcl` is part of the list of username
+ specified. Following the same approach, if ``--group`` option is set, warning
+ is applied only if current user is member of one of the groups specified.
+ When both options are set, warning is applied if a match is found for
+ ``--user`` or ``--group``. If the same user name is set on both ``--user``
+ and ``--not-user`` options, ``--user`` prevails over ``--not-user``. If the
+ same group name is set on both ``--group`` and ``--not-group``, ``--group``
+ prevails over ``--not-group``.
+
+ Modules in warning included in the result of :subcmd:`avail`, :subcmd:`list`
+ or :subcmd:`spider` sub-commands are reported with a ``warning`` tag applied
+ to them. See :ref:`Module tags` section in :ref:`module(1)`.
+
+ The parameter *modulefile* may leverage a specific syntax to finely select
+ module version (see `Advanced module version specifiers`_ section below). It
+ may also be a full path file name to precisely designate one module in a
+ specific modulepath.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
+
 .. mfcmd:: module-whatis string
 
  Defines a string which is displayed in case of the invocation of the
@@ -977,7 +1141,8 @@ the *modulefile* is being loaded.
 .. mfcmd:: modulepath-label directory label
 
  Assigns *label* string to modulepath *directory*. This *label* is used on
- :subcmd:`avail` output to refer to the modulepath.
+ :subcmd:`avail`, :subcmd:`whatis`, :subcmd:`search` and :subcmd:`spider`
+ output to refer to the modulepath.
 
  The parameter *directory* corresponds to a fully or partially qualified
  modulepath. If *directory* is ``.`` (dot) then the current directory of the
@@ -986,6 +1151,9 @@ the *modulefile* is being loaded.
  .. only:: html
 
     .. versionadded:: 5.4
+
+    .. versionchanged:: 5.6
+       Label also applied on :subcmd:`whatis` and :subcmd:`search` output
 
 .. mfcmd:: prepend-path [-d C|--delim C|--delim=C] [--duplicates] variable value...
 
@@ -1014,6 +1182,10 @@ the *modulefile* is being loaded.
  If *value* corresponds to the concatenation of multiple elements separated by
  colon, or *delimiter*, character, each element is treated separately.
 
+ If the *variable* is :envvar:`MODULEPATH` and :mconfig:`require_via`
+ configuration option is activated, the *modulefile* is considered a
+ dependency by the loaded modulefiles stored in the added modulepaths.
+
  .. only:: html
 
     .. versionchanged:: 4.1
@@ -1021,6 +1193,11 @@ the *modulefile* is being loaded.
 
     .. versionchanged:: 5.4
        *value* equal to *delimiter* character allowed
+
+    .. versionchanged:: 5.6
+       When :mconfig:`require_via` configuration option is enabled, a
+       modulefile adding path to :envvar:`MODULEPATH` environment variable is
+       considered a requirement of modulefiles stored in this path.
 
 .. mfcmd:: prereq [options] modulefile...
 
@@ -1054,7 +1231,8 @@ the *modulefile* is being loaded.
 
  If the :mconfig:`auto_handling` configuration option is enabled
  :mfcmd:`prereq` will attempt to load specified modulefile if not found loaded
- yet (see :envvar:`MODULES_AUTO_HANDLING` in :ref:`module(1)`).
+ yet (see :ref:`Automated module handling mechanisms<MODULES_AUTO_HANDLING>`
+ in :ref:`module(1)`).
 
  The ``--tag`` option accepts a list of module tags to apply to *modulefile*
  once loaded. *taglist* corresponds to the concatenation of multiple tags
@@ -1134,6 +1312,25 @@ the *modulefile* is being loaded.
 
     .. versionchanged:: 5.5
        Option ``--modulepath`` added
+
+.. mfcmd:: provide modulefile...
+
+ Define each specified *modulefile* as a module alias of currently evaluating
+ module. :mfcmd:`provide` command helps to declare the additional elements
+ included in a modulefile.
+
+ The :mfcmd:`provide` command should be paired with a :mfcmd:`conflict`
+ command if the specified alias should be uniquely provided in the currently
+ loaded environment.
+
+ Note: A module alias defined using :mfcmd:`provide` command will not be
+ recognized during module resolution. It is recommended to use the
+ :mfcmd:`module-alias` command to define an alias that points to the default
+ resolution target.
+
+ .. only:: html
+
+    .. versionadded:: 5.6
 
 .. mfcmd:: pushenv variable value
 
@@ -1320,10 +1517,15 @@ the *modulefile* is being loaded.
  When the ``--set-if-undef`` option is set, environment variable is defined
  when *modulefile* is loaded only if not yet defined.
 
+ Any newline character in *value* is chopped if using *csh* or *tcsh* shells.
+
  .. only:: html
 
     .. versionchanged:: 5.1
        Option ``--set-if-undef`` added
+
+    .. versionchanged:: 5.6
+       Newline character in value supported except for *csh* and *tcsh* shells
 
 .. mfcmd:: source-sh [--ignore eltlist] shell script [arg...]
 
@@ -1433,8 +1635,8 @@ the *modulefile* is being loaded.
 
  Unsets environment *variable*. When a *modulefile* is unloaded, no operation
  is performed unless if an optional *value* is defined, in which case
- *variable* is to *value*. The :mfcmd:`unsetenv` command changes the process'
- environment like :mfcmd:`setenv`.
+ *variable* is set to *value*. The :mfcmd:`unsetenv` command changes the
+ process' environment like :mfcmd:`setenv`.
 
  If the ``--noop-on-unload`` option is set, no operation is performed when
  *modulefile* is unloaded. If the ``--unset-on-unload`` option is set,
@@ -1561,9 +1763,9 @@ for each interpretation context.
 |                           | :mfcmd:`module-forbid`, :mfcmd:`module-hide`,       |
 |                           | :mfcmd:`module-info`, :mfcmd:`module-tag`,          |
 |                           | :mfcmd:`module-version`, :mfcmd:`module-virtual`,   |
-|                           | :mfcmd:`modulepath-label`, :mfcmd:`system`,         |
-|                           | :mfcmd:`uname`, :mfcmd:`versioncmp` and standard    |
-|                           | Tcl commands                                        |
+|                           | :mfcmd:`module-warn`, :mfcmd:`modulepath-label`,    |
+|                           | :mfcmd:`system`, :mfcmd:`uname`,                    |
+|                           | :mfcmd:`versioncmp` and standard Tcl commands       |
 +---------------------------+-----------------------------------------------------+
 
 .. note:: Global and user run-command files are interpreted like modulefiles
@@ -1783,12 +1985,21 @@ When loading a *modulefile* or a virtual module targeted by a
 inherits the ``hidden-loaded`` tag. Hidden loaded modules are not reported
 among :subcmd:`list` sub-command results.
 
-If the :option:`--all` is set on :subcmd:`avail`, :subcmd:`aliases`,
-:subcmd:`whatis` or :subcmd:`search` sub-commands, hidden modules are taken
-into account in search. Hard-hidden modules are unaffected by this option.
+If the :option:`--all` option is set on :subcmd:`avail`, :subcmd:`aliases`,
+:subcmd:`whatis`, :subcmd:`search` or :subcmd:`spider` sub-commands, hidden
+modules are taken into account in search. Hard-hidden modules are unaffected
+by this option.
 
-If the :option:`--all` is set on :subcmd:`list` sub-command, hidden loaded
-modules are included in result output.
+If the :option:`--all` option is set on :subcmd:`list` sub-command, hidden
+loaded modules are included in result output.
+
+A behavior equivalent to the use of the :option:`--all` option is obtained on
+:subcmd:`avail`, :subcmd:`list` and :subcmd:`spider` sub-commands by adding
+the ``hidden`` element to the output configuration option controlling regular
+or terse reporting of these sub-commands: :mconfig:`avail_output`,
+:mconfig:`avail_terse_output`, :mconfig:`list_output`,
+:mconfig:`list_terse_output`, :mconfig:`spider_output`,
+:mconfig:`spider_terse_output`.
 
 Advanced module version specifiers
 ----------------------------------
@@ -1917,21 +2128,38 @@ requirement. The latter means specified modulefiles should not be loaded for
 the modulefile that express the conflict to be loaded too.
 
 Pre-requirement could be expressed with :mfcmd:`prereq`, :mfcmd:`prereq-any`,
-:mfcmd:`prereq-all`, :mfcmd:`depends-on`, :mfcmd:`always-load`,
-:mfcmd:`module load<module>`, :mfcmd:`module switch<module>`,
-:mfcmd:`module try-load<module>` or :mfcmd:`module load-any<module>`
-modulefile commands. When the :mconfig:`auto_handling` configuration option is
-disabled, required modulefile should be manually loaded prior their dependent
-modulefile when expressed with the :mfcmd:`prereq`, :mfcmd:`prereq-any`,
-:mfcmd:`prereq-all` or :mfcmd:`depends-on` modulefile commands. For other
+:mfcmd:`prereq-all`, :mfcmd:`depends-on`, :mfcmd:`depends-on-any`,
+:mfcmd:`always-load`, :mfcmd:`module load<module>`,
+:mfcmd:`module switch<module>`, :mfcmd:`module try-load<module>` or
+:mfcmd:`module load-any<module>` modulefile commands. When the
+:mconfig:`auto_handling` configuration option is disabled, required modulefile
+should be manually loaded prior their dependent modulefile when expressed with
+the :mfcmd:`prereq`, :mfcmd:`prereq-any`, :mfcmd:`prereq-all`,
+:mfcmd:`depends-on` or :mfcmd:`depends-on-any` modulefile commands. For other
 commands or when :mconfig:`auto_handling` is enabled, pre-required modulefiles
 are automatically loaded.
 
-Conflict is expressed with :mfcmd:`conflict` or :mfcmd:`module unload<module>`
-modulefile commands. A conflicting loaded modulefile should be manually
-unloaded prior loading the modulefile that express such conflict when defined
-with :mfcmd:`conflict`. It is automatically unloaded when expressed with
-:mfcmd:`module unload<module>`.
+Another form of pre-requirement is expressed through the use of the modulefile
+commands :mfcmd:`module use<module>`, :mfcmd:`append-path
+MODULEPATH<append-path>`, or :mfcmd:`prepend-path MODULEPATH<prepend-path>`,
+when the :mconfig:`require_via` configuration option is enabled. In this
+context, a modulefile that adds a modulepath is treated as a requirement for
+the modulefiles loaded from that path. This pre-requirement is considered when
+such modules are already loaded, helping to maintain consistency when
+attempting to unload a modulefile that enables a modulepath.
+
+Conflict is expressed with :mfcmd:`conflict`, :mfcmd:`family` or
+:mfcmd:`module unload<module>` modulefile commands. When the
+:mconfig:`auto_handling` or :mconfig:`conflict_unload` configuration options
+are disabled, a conflicting loaded modulefile should be manually unloaded
+prior loading the modulefile that express such conflict when defined with
+:mfcmd:`conflict` or :mfcmd:`family`. It is automatically unloaded when
+expressed with :mfcmd:`module unload<module>` (unless dependent modulefiles
+are loaded) or if :mconfig:`auto_handling` and :mconfig:`conflict_unload`
+options are enabled. An error is raised when trying to load a module that is
+already loaded but with a different variant set or coming from a different
+modulepath. If both options are enabled the loaded module is automatically
+unloaded to satisfy the new set of variant or modulepath asked.
 
 It is strongly advised to define dependencies prior environment changes in a
 modulefile. Dependency resolution should be done before any environment change
@@ -1947,7 +2175,7 @@ the modulefiles are loaded.
 :command:`module` keeps environment consistent which means a modulefile cannot
 be loaded if its requirements are not loaded or if a conflicting module is
 loaded. In addition a loaded module cannot be unloaded if other loaded modules
-depends on it. The :envvar:`automated module handling
+depends on it. The :ref:`automated module handling
 mechanisms<MODULES_AUTO_HANDLING>` attempt to solve the dependencies expressed
 by loading or unloading additional modulefiles. When the :option:`--no-auto`
 option is set on :command:`module` command when loading or unload modulefile,
@@ -1960,12 +2188,13 @@ with the :mfcmd:`module` command will attempt to load or unload the designated
 modulefile but it will not mark them as pre-requirement or conflict.
 
 Adding the ``--optional`` option on :mfcmd:`prereq`, :mfcmd:`prereq-any`,
-:mfcmd:`prereq-all`, :mfcmd:`depends-on` or :mfcmd:`always-load` modulefile
-commands declares the pre-requirement as optional. If an optional
-pre-requirement is not found loaded or cannot be automatically loaded, the
-dependency expressed is yet considered satisfied. When an optional requirement
-is loaded afterward, the dependent module will get automatically reloaded if
-the :mconfig:`auto_handling` configuration option is enabled.
+:mfcmd:`prereq-all`, :mfcmd:`depends-on`, :mfcmd:`depends-on-any` or
+:mfcmd:`always-load` modulefile commands declares the pre-requirement as
+optional. If an optional pre-requirement is not found loaded or cannot be
+automatically loaded, the dependency expressed is yet considered satisfied.
+When an optional requirement is loaded afterward, the dependent module will
+get automatically reloaded if the :mconfig:`auto_handling` configuration
+option is enabled.
 
 By adding the :option:`--force` option to the :command:`module` command when
 loading or unloading modulefile, the consistency checks are by-passed. This
@@ -1988,6 +2217,22 @@ pre-requirement modulefile gets loaded or conflicting modulefile gets unloaded
 the inconsistent loaded module will be automatically reloaded to make user
 environment consistent again.
 
+.. only:: html
+
+   .. versionchanged:: 4.2
+      Options :option:`--force`, :option:`--auto` and :option:`--no-auto`
+      added
+
+   .. versionchanged:: 4.2
+      :ref:`Automated module handling mechanisms<MODULES_AUTO_HANDLING>` added
+
+   .. versionchanged:: 4.7
+      Option ``--not-req`` added
+
+   .. versionchanged:: 5.6
+      A modulefile enabling a modulepath is considered a requirement of
+      modulefiles stored in this path if :mconfig:`require_via` configuration
+      option is enabled
 
 Modulefile Specific Help
 ------------------------
@@ -1997,6 +2242,10 @@ Users can request help about a specific *modulefile* through the
 start help oriented programs by defining a ``ModulesHelp`` subroutine. The
 subroutine will be called when the :subcmd:`module help modulefile<help>`
 command is used.
+
+Help text may also be defined within *modulefile* with :mfcmd:`module-help`
+command. Text defined such way is printed before evaluation of ``ModulesHelp``
+subroutine if any.
 
 
 Modulefile Specific Test
@@ -2028,15 +2277,32 @@ Compatibility with Lmod Tcl modulefile
 
 The :file:`modulecmd.tcl` program supports Tcl modulefile or modulerc written
 for Lmod, the alternative :command:`module` implementation developed in Lua.
-Such modulefiles can be evaluated by Modules without raising error.
-Differences between the two implementations are listed below.
+Except for the specific cases listed below, such modulefiles can be evaluated
+by Modules without producing errors. Key differences between the two
+implementations are outlined below.
 
-The ``add-property``, ``remove-property`` and ``extensions`` modulefile
-commands are evaluated as a *no-operation* command. No error is obtained if
-these commands are used in modulefiles but no change occurs.
+The ``remove-property`` modulefile command is evaluated as a *no-operation*
+command. No error is obtained if this command is used in modulefiles but no
+change occurs.
+
+The :mfcmd:`haveDynamicMPATH` is evaluated as a *no-operation* modulefile
+command. If modulefile conditionally updates :envvar:`MODULEPATH` environment
+variable, this command is needed to help Lmod know that modulefile changes
+:envvar:`MODULEPATH`. :subcmd:`spider` sub-command on Modules does not need
+this information as modulefile is evaluated in the context of the current
+user to determine whether :envvar:`MODULEPATH` is updated.
 
 The :mfcmd:`break` command does not accept any argument. A ``msg`` argument
 can be set on Lmod to provide a customized break error message.
+
+The :mfcmd:`setenv`, :mfcmd:`unsetenv`, :mfcmd:`prepend-path`,
+:mfcmd:`append-path`, :mfcmd:`remove-path`, :mfcmd:`pushenv` and ``module``
+:mfcmd:`load<module>`, :mfcmd:`load-any<module>`, :mfcmd:`try-load<module>`
+and :mfcmd:`unload<module>` modulefile commands do not support the ``--mode``
+option. An error is raised if this option is used.
+
+The :mfcmd:`setenv` and :mfcmd:`unsetenv` modulefile commands do not support
+the ``--respect`` option. An error is raised if this option is used.
 
 Use of :mfcmd:`reportError` command aborts modulefile evaluation on Lmod. This
 command only reports an error message on Modules.
@@ -2062,9 +2328,14 @@ on Modules whereas on Lmod it is equivalent to the :mfcmd:`prereq-all`
 command.
 
 If the :mconfig:`auto_handling` configuration option is disabled, the
-requirements defined with the :mfcmd:`depends-on` command are not
-automatically loaded and an error is raised if none of these requirements are
-found loaded.
+requirements defined with the :mfcmd:`depends-on` or :mfcmd:`depends-on-any`
+commands are not automatically loaded and an error is raised if none of these
+requirements are found loaded.
+
+If the :mconfig:`auto_handling` or :mconfig:`conflict_unload` configuration
+options are disabled, the conflicts defined with the :mfcmd:`family` command
+are not automatically unloaded and an error is raised when trying to load a
+module defining a family already defined by a loaded module.
 
 On :subcmd:`module load-any<load-any>` sub-command and modulefile command, a
 modulefile evaluation error is not reported and :subcmd:`module
@@ -2077,6 +2348,17 @@ specified is considered an optional pre-requirement. If it is loaded
 afterward and if the :mconfig:`auto_handling` configuration option is enabled,
 the dependent module will get automatically reloaded.
 
+.. only:: html
+
+   .. versionadded:: 5.1
+
+   .. versionchanged:: 5.5
+      Modulefile commands :mfcmd:`hide-modulefile` and :mfcmd:`hide-version`
+      implemented
+
+   .. versionchanged:: 5.6
+      Modulefile commands :mfcmd:`add-property`, :mfcmd:`depends-on-any` and
+      :mfcmd:`haveDynamicMPATH` implemented
 
 .. _Shell support:
 
@@ -2085,8 +2367,8 @@ Shell support
 
 The :file:`modulecmd.tcl` program that evaluates *modulefiles* supports a
 variety of shells or languages: *sh* family shells (*sh*, *bash*, *ksh* and
-*zsh*), *csh* family shells (*csh* and *tcsh*), *fish*, *cmd*, *python*,
-*perl*, *ruby*, *tcl*, *cmake*, *r*, and *lisp*.
+*zsh*), *csh* family shells (*csh* and *tcsh*), *fish*, *cmd*, *pwsh*,
+*python*, *perl*, *ruby*, *tcl*, *cmake*, *r*, and *lisp*.
 
 Modulefiles produce environment changes when evaluated, like defining an
 environment variable. The :file:`modulecmd.tcl` program outputs the
@@ -2105,7 +2387,7 @@ changes that are supported by the shells supported by :file:`modulecmd.tcl`.
 |        | :mfcmd:`append-path`, |                      |                         |                     |                |                     |
 |        | :mfcmd:`prepend-path`,|                      |                         |                     |                |                     |
 |        | :mfcmd:`remove-path`) |                      |                         |                     |                |                     |
-+--------+-----------------------+----------------------+-------------------------+---------------------+----------------+---------------------+
++========+=======================+======================+=========================+=====================+================+=====================+
 | sh     | ⦁                     | ⦁                    | ⦁                       |                     | ⦁              | ⦁                   |
 +--------+-----------------------+----------------------+-------------------------+---------------------+----------------+---------------------+
 | bash   | ⦁                     | ⦁                    | ⦁                       | ⦁                   | ⦁              | ⦁                   |
@@ -2121,6 +2403,8 @@ changes that are supported by the shells supported by :file:`modulecmd.tcl`.
 | fish   | ⦁                     | ⦁                    | ⦁                       | ⦁                   | ⦁              | ⦁                   |
 +--------+-----------------------+----------------------+-------------------------+---------------------+----------------+---------------------+
 | cmd    | ⦁                     | ⦁                    |                         |                     | ⦁              |                     |
++--------+-----------------------+----------------------+-------------------------+---------------------+----------------+---------------------+
+| pwsh   | ⦁                     | ⦁                    | ⦁                       | ⦁                   | ⦁              |                     |
 +--------+-----------------------+----------------------+-------------------------+---------------------+----------------+---------------------+
 | python | ⦁                     |                      |                         |                     | ⦁              | ⦁                   |
 +--------+-----------------------+----------------------+-------------------------+---------------------+----------------+---------------------+
@@ -2156,10 +2440,10 @@ See the :ref:`ENVIRONMENT<module ENVIRONMENT>` section in the
 SEE ALSO
 --------
 
-:ref:`module(1)`, :ref:`ml(1)`, :manpage:`Tcl(n)`, :manpage:`TclX(n)`,
-:manpage:`id(1)`, :manpage:`xrdb(1)`, :manpage:`exec(n)`, :manpage:`uname(1)`,
-:manpage:`domainname(1)`, :manpage:`tclvars(n)`, :manpage:`lsort(n)`,
-:manpage:`string(n)`
+:ref:`module(1)`, :ref:`ml(1)`, :ref:`envml(1)`, :manpage:`Tcl(n)`,
+:manpage:`TclX(n)`, :manpage:`id(1)`, :manpage:`xrdb(1)`, :manpage:`exec(n)`,
+:manpage:`uname(1)`, :manpage:`domainname(1)`, :manpage:`tclvars(n)`,
+:manpage:`lsort(n)`, :manpage:`string(n)`
 
 
 NOTES

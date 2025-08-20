@@ -6,10 +6,204 @@ Release notes
 This file describes changes in recent versions of Modules. It primarily
 documents those changes that are of interest to users and admins.
 
+.. _5.6 release notes:
+
+Modules 5.6.0 (2025-07-31)
+--------------------------------
+
+* Rename :file:`contrib` directory as :file:`share` in sources to use clearer
+  name for architecture and configuration independent files.
+* Set a `Security policy`_ for the project.
+* Add red, white and black SVG logo files of Modules project.
+* Doc: improve Links, Community sections in documentation index and README
+* Doc: improve Authors and Acknowledgments sections in README
+* Doc: add :ref:`create-new-release` guide
+* Update repository URL to https://github.com/envmodules/modules.
+* Install: update :file:`configure` script to allow running it from a current
+  working directory different than where this file is stored. (fix issue #558)
+* Doc: create *Developer HowTos* section on documentation website to group
+  development how-to guides.
+* Doc: add :ref:`acknowledgments` page in the documentation.
+* Doc: describe :ref:`GOVERNANCE`.
+* Doc: add :ref:`CHARTER`.
+* Escape square brackets (``[]``) used in values within produced shell code as
+  these characters may have special meaning on some shells (like *csh*). (fix
+  issue #565)
+* Doc: advertise the `Modules chat room`_ (``#modules:matrix.org``) to discuss
+  with the community.
+* Doc: describe the :ref:`developer-certificate-of-origin` process now applied
+  on contributions.
+* Doc: add :ref:`add-new-maintainer` guide
+* Fix interpreter variable reset between multiple modulefile or modulerc
+  evaluations when variable initial value is an invalid list. (fix issue #570)
+* Fix :mfcmd:`source-sh` and :subcmd:`sh-to-mod` shell translation when used
+  with new *fish* shell version (4.0).
+* Doc: add :ref:`mode-select` design notes.
+* Introduce ``use`` extra specifier to search for :envvar:`MODULEPATH` changes
+  performed with :mfcmd:`module use<module>`, :mfcmd:`append-path` or
+  :mfcmd:`prepend-path` modulefile commands on :subcmd:`avail`,
+  :subcmd:`whatis` and :subcmd:`paths` sub-commands.
+* Add :option:`--dumpname` option to report name of current Environment
+  Modules implementation. Here it returns ``Modules``. This option is also
+  available on Lmod starting version 8.7.50.
+* Add the :mfcmd:`depends-on-any` modulefile command, alias over the
+  :mfcmd:`prereq` command for compatibility with Lmod Tcl modulefiles.
+* Add ``depends-on-any`` extra specifier to query modulefile requirement
+  definitions. The extra specifier aliases ``prereq``, ``prereq-any`` or
+  ``require`` may also be used to query this modulefile command.
+* Introduce the :subcmd:`spider` sub-command that lists available modules
+  found in enabled modulepaths and recursively found in modulepaths enabled by
+  available modules. After a first step aimed at collecting all modulepaths,
+  :subcmd:`spider` proceeds and reports like :subcmd:`avail` sub-command. The
+  same set of options are supported.
+* Introduce the :mconfig:`spider_output` and :mconfig:`spider_terse_output`
+  configuration options to define the content to report in addition to the
+  available module names respectively for :subcmd:`spider` sub-command regular
+  and terse output modes. Excepted value for these configuration options is a
+  colon separated list of elements to report. Default value is
+  ``modulepath:alias:dirwsym:sym:tag:variantifspec:key`` for
+  :mconfig:`spider_output` and
+  ``modulepath:alias:dirwsym:sym:tag:variantifspec`` for
+  :mconfig:`spider_terse_output`. These values can be changed at installation
+  time respectively with the :instopt:`--with-spider-output` and
+  :instopt:`--with-spider-terse-output` options. These values can then be
+  superseded by using the :subcmd:`config` sub-command which sets the
+  :envvar:`MODULES_SPIDER_OUTPUT` and :envvar:`MODULES_SPIDER_TERSE_OUTPUT`
+  environment variables.
+* Introduce the ability to control whether :subcmd:`spider` command search
+  results should recursively include or not modulefiles from directories
+  matching search query by use of the :option:`--indepth` and
+  :option:`--no-indepth` command-line switches or :mconfig:`spider_indepth`
+  configuration option (that sets :envvar:`MODULES_SPIDER_INDEPTH` environment
+  variable through :subcmd:`config` command). Default value (enabled) may also
+  be changed at installation time with
+  :instopt:`--disable-spider-indepth<--enable-spider-indepth>` option.
+* Doc: add :ref:`spider-sub-command` design notes.
+* The :subcmd:`lint` sub-command now also lint any readable modulecache files
+  when no modulefile specification is passed as argument or if
+  :file:`.modulecache` file location is specifically passed as argument.
+* Add the ``hidden`` element in the allowed value list of the
+  :mconfig:`avail_output`, :mconfig:`avail_terse_output`,
+  :mconfig:`list_output`, :mconfig:`list_terse_output`,
+  :mconfig:`spider_output` and :mconfig:`spider_terse_output` configuration
+  options. When set, it is equivalent to use :option:`--all` option: hidden
+  modules are shown.
+* Produce a single output for multi pattern :subcmd:`avail` search rather than
+  a separate output for each submitted pattern.
+* Produce a single output for multi pattern :subcmd:`whatis` search rather
+  than a separate output for each submitted pattern.
+* Doc: clarify that character used in version specification like *,* and *:*
+  cannot be used as variant shortcut.
+* Introduce :envvar:`__MODULES_LMUSE` environment variable to keep track of
+  the loaded modules that enable modulepaths.
+* Apply modulepath label defined with :mfcmd:`modulepath-label` also on output
+  of :subcmd:`whatis` and :subcmd:`search` sub-commands.
+* Report *via* information for each module entry on JSON output of
+  :subcmd:`avail` and :subcmd:`spider` sub-commands. *Via* information is the
+  name of the loaded or interpreted module that enables the modulepath in
+  which reported modules are stored.
+* Add the ``via`` element in the allowed value list of the
+  :mconfig:`avail_output` and :mconfig:`spider_output` configuration options.
+  When set, if a modulepath is enabled by a module, this module name is
+  reported next to the modulepath name. ``via`` element is not available for
+  terse output mode. ``via`` is set by default in :mconfig:`spider_output`
+  configuration option.
+* Add ``modules_release`` internal state. It will help to know the current
+  version of Modules within :file:`siteconfig.tcl` script.
+* Introduce :mfcmd:`module-help` modulefile command which defines help text to
+  print when modulefile is evaluated in ``help`` mode.
+* Update :mfcmd:`add-property` modulefile command to use its *value* argument
+  to define tag on currently loading module.
+* Doc: add :ref:`module-warn` design notes.
+* Add :mfcmd:`module-warn` modulerc and modulefile command which prints a
+  warning message when designated modulefile is evaluated. This command
+  accepts options to emit the warning only for specific users, groups or
+  times.
+* Introduce the ``warning`` informational :ref:`module tag<Module tags>` on
+  modulefiles targeted by :mfcmd:`module-warn` command. Update default
+  :mconfig:`tag_abbrev` configuration option to add an abbreviation for the
+  new tag (``W``) and default light and dark color palettes.
+* Change light and dark color palettes for ``nearly-forbidden`` tag (red text
+  with yellow background), to make it look closer to ``forbidden`` tag (red
+  background) and distinguish it from new ``warning`` tag (black text and
+  yellow background).
+* No raise of *nearly-forbidden* warning when affected modulefile is evaluated
+  in ``refresh`` mode.
+* Issue the *nearly-forbidden* warning at the end of the affected modulefile
+  evaluation, ensuring it is always reported at the same stage regardless of
+  where it is defined.
+* Change underlying shell code to set environment variable on *sh*, *bash*,
+  *ksh*, *zsh* and *fish* shells: enclose value within single quotes rather
+  escaping each special characters.
+* :mfcmd:`setenv` modulefile command now supports environment variable value
+  containing newline character. Exception is made for *csh* and *tcsh* shells
+  where newline characters are chopped from value. (fix issue #557)
+* Sort modules in JSON output as done on regular output.
+* :subcmd:`cachebuild` command now sets the minimal Modules version specified
+  in the cache file magic cookie header to the oldest Modules version
+  compatible with this cache file, rather than the version that generated the
+  cache file. Freshly generated cache files are compatible with Modules 5.3
+  and above.
+* Doc: improve :ref:`enable-modules-in-shells` guidelines.
+* Doc: add :ref:`man-path` cookbook recipe.
+* Doc: add :ref:`other-implementations` document.
+* Add :subcmd:`update` sub-command, an alias of :subcmd:`reload`
+* Add :subcmd:`disable` sub-command, an alias of :subcmd:`saverm`
+* Add :subcmd:`describe` sub-command, an alias of :subcmd:`saveshow`
+* Add ``--show_hidden`` option, an alias of :option:`--all`
+* Add :mfcmd:`haveDynamicMPATH` modulefile command
+* Fix ``use.own`` example modulefile to report when creating local modulefiles
+  directory. (fix issue #576)
+* Doc: add manual page for :ref:`envml(1)` command. (fix issue #190)
+* Introduce Emacs addon files to highlight the modulefile syntax. Installation
+  of these files, which is enabled by default, is controlled by the
+  :instopt:`--enable-emacs-addons` and :instopt:`--emacsdatadir` configure
+  options. (contribution from Laurent Besson)
+* Add :mconfig:`require_via` configuration option that controls whether or not
+  a requirement is considered between a module stored in a modulepath and the
+  loaded module that enables this modulepath. With :ref:`Automated module
+  handling mechanisms<MODULES_AUTO_HANDLING>` enabled, modules stored in a
+  modulepath are unloaded or reloaded when the module enabling this modulepath
+  is changed. :mconfig:`require_via` is disabled by default but everyone
+  willing to hierarchically organize their modulefiles is encouraged to enable
+  this new option. This option can be changed at installation time with
+  :instopt:`--enable-require-via`. When :mconfig:`require_via` is changed with
+  :subcmd:`config` sub-command, it sets the :envvar:`MODULES_REQUIRE_VIA`
+  environment variable.
+* Install: installation option :instopt:`--enable-new-features` is updated to
+  include :instopt:`--enable-require-via`.
+* Doc: add :ref:`require-via` design notes.
+* Skip reload of a *Dependent Reload* module if it is not found after a change
+  in enabled modulepaths. Reload of a not found module is attempted only if it
+  is tagged *super-sticky* or *sticky* and force mode is disabled. Skipped
+  module is considered *Dependent Unload* module.
+* Script: update :command:`mb` tool to skip test for Modules version below 5.5
+  if Tcl 9 is selected.
+* Introduce the :mfcmd:`provide` modulefile command that defines module alias
+  over currently evaluating module. This helps convey that the module offers
+  additional functionality or components.
+* Change :mfcmd:`extensions` modulefile command to be an alias over the
+  :mfcmd:`provide` command.
+* Add the ``provided-alias`` element in the allowed value list of the
+  :mconfig:`avail_output`, :mconfig:`avail_terse_output`,
+  :mconfig:`spider_output` and :mconfig:`spider_terse_output` configuration
+  options. When set, module aliases are included into the output and the
+  *extra match search* mechanism is activated to scan modulefiles to get the
+  module aliases they define.
+* Doc: add :ref:`provide` design notes.
+* Introduce ``provide`` and ``provided-alias`` extra specifiers to search
+  modules on :subcmd:`avail`, :subcmd:`spider`, :subcmd:`whatis` and
+  :subcmd:`paths` sub-commands. ``provided-alias`` extra specifier is an alias
+  onto ``provide`` and ``family`` extra specifiers.
+
+.. _Security policy: https://github.com/envmodules/modules/blob/main/SECURITY.md
+.. _Modules chat room: https://matrix.to/#/#modules:matrix.org
+
+
 .. _5.5 release notes:
 
-Modules 5.5.0 (not yet released)
---------------------------------
+Modules 5.5.0 (2024-11-11)
+--------------------------
 
 * Init: update ``cmd`` shell initialization script to correctly define
   :envvar:`MODULESHOME` when installation pathname contains dot character.
@@ -41,7 +235,8 @@ Modules 5.5.0 (not yet released)
   :mfcmd:`depends-on`, :mfcmd:`prereq`, :mfcmd:`prereq-all` and
   :mfcmd:`prereq-any` modulefile commands. When this option is set, required
   module should be located in a path listed in the specified list or in an
-  enabled modulepath matching one path of the list.
+  enabled modulepath matching one path of the list. This information is
+  recorded in loaded environment in :envvar:`__MODULES_LMPREREQPATH` variable.
 * Add :mfcmd:`lsb-release` modulefile command to get certain Linux Standard
   Base (LSB) information. It accepts to following sub-commands: ``id``,
   ``codename`` and ``release``.
@@ -86,7 +281,7 @@ Modules 5.5.0 (not yet released)
   specification as long as the string following them is not a valid variant
   name (e.g., ``foo/1.2+8``). (fix issue #527)
 * In case of an issue external to Modules, do not mention at the end of the
-  error stack trace the web link to report this issue.
+  error stack trace the web link to report this issue. (fix issue #546)
 * When a modulefile performs a :mfcmd:`module unload<module>` command that
   fails due to dependent modules loaded, stop unload evaluation right after
   this failed command unless :option:`--force` option is used.
@@ -97,17 +292,111 @@ Modules 5.5.0 (not yet released)
   tags<module-info>`.
 * Doc: describe in :ref:`module(1)` man page how to initialize Modules in a
   Ruby script. (fix issue #535)
+* Add PowerShell Core (``pwsh``) shell support. (fix issue #326 with
+  contribution from Simon Lukas Märtens)
+* Lib: adapt Modules Tcl extension library to properly load on Tcl 9.
+* Doc: describe how to upgrade Modules in :ref:`INSTALL`. (fix issue #544)
+* Set exit code returned by :file:`modulecmd.tcl` script to ``1`` when a
+  modulefile evaluation fails (modulefile does not exist, is buggy, etc).
+  (fix issue #540)
+* Disable pager when running :file:`modulecmd.tcl` script for script language
+  (*python*, *perl*, *ruby*, *tcl*, *cmake*, *r* and *lisp*). (fix issue #542)
+* Update error and warning messages when attempting to unload a module
+  required by another. Distinguish if this module is a requirement of an
+  already loaded or a currently loading module.
+* Introduce :mconfig:`conflict_unload` configuration option that controls
+  whether or not conflicting modules and their dependent should be unloaded
+  when loading a module. All kind of conflicts are supported: conflicts
+  defined by already loaded modules, conflict declared by loading module
+  through :mfcmd:`conflict`, :mfcmd:`family` or :mfcmd:`module unload<module>`
+  commands. :mconfig:`conflict_unload` also handles the unload of a module
+  that is loaded again but with different variant values or from a different
+  modulepath. :mconfig:`conflict_unload` is disabled by default as it changes
+  behaviors of the :envvar:`automated module handling
+  mode<MODULES_AUTO_HANDLING>`. But everyone is encouraged to enable this new
+  option to benefit from an highly automated experience. This option can be
+  changed at installation time with :instopt:`--enable-conflict-unload`. When
+  :mconfig:`conflict_unload` is changed with :subcmd:`config` sub-command, it
+  sets the :envvar:`MODULES_CONFLICT_UNLOAD` environment variable. Both
+  :mconfig:`auto_handling` and :mconfig:`conflict_unload` options should be
+  enabled to activate *Conflict Unload* automated behavior. (fix issue #242)
+* When both :mconfig:`auto_handling` and :mconfig:`conflict_unload` options
+  are enabled, all loaded modules matching module specifications set on
+  :mfcmd:`conflict` or :mfcmd:`module unload<module>` commands are unloaded.
+  If both options are not enabled, only one matching loaded module per
+  specification argument of :mfcmd:`module unload<module>` is unloaded. (fix
+  issue #215)
+* When both :mconfig:`auto_handling` and :mconfig:`conflict_unload` options
+  are enabled, :option:`--force` option set on :subcmd:`load` sub-command is
+  taken into account during the *Conflict Unload* mechanism. For instance, it
+  continues this unload process even if one module unload fails.
+* Install: installation option :instopt:`--enable-new-features` is updated to
+  include :instopt:`--enable-conflict-unload`.
+* Fix detection of already loaded module with variant set. If trying to load
+  same module with compatible variant set, a *module is already loaded*
+  message is now returned instead of *another variant is loaded*.
+* Correctly report module evaluation error in case during the same execution
+  this module was already evaluated and failed silently during a *Requirement
+  Load* mechanism.
+* Split processing of *Dependent Reload* (DepRe) modules to treat the *DepRe*
+  modules consequence of *Useless Requirement Unload* (UReqUn) modules
+  separately, right before unloading the *UReqUn* modules. As a result,
+  modules in conflict with *UReqUn* modules are unloaded right before *UReqUn*
+  process and reloaded with the other *DepRe* modules.
+* Handle *UReqUn* process in case of :subcmd:`switch` sub-command after the
+  switch load phase. Unload of these modules were previously occurring at the
+  end of the switch unload phase. Unload of *DepRe* modules consequence of
+  *UReqUn* modules is also moved after switch load phase.
+* Introduce the *Useless Requirement Unload* (UReqUn) process on
+  :subcmd:`load` sub-command. It eliminates auto loaded modules that were
+  requirements of *Conflict Unload* modules. In case of :subcmd:`switch`
+  sub-command, *UReqUn* modules coming from the switch load phase are handled
+  with *UReqUn* modules coming from switch unload phase.
+* Rework handling of *DepRe* modules that also are *UReqUn* modules to unload
+  them during the *DepRe* unload phase instead of during *UReqUn* process. As
+  a consequence these modules part of both *DepRe* and *UReqUn* lists are
+  unloaded prior main module action and prior unload of the other *UReqUn*
+  modules. The *DepRe* modules may be also qualified *UReqUn* even if they are
+  not a dependency of a module unloaded in the current processing.
+* Mix unload of *Dependent Unload* and *Dependent Reload* modules to ensure
+  they are processed in their reverse loading order. As a result, if a module
+  is part of *DepUn* process and some of its requirements are part of *DepRe*
+  process, requirements are unloaded after their dependent modules.
+* Skip reload of a *Dependent Reload* module if found not loadable (either its
+  requirements are not loaded or a conflict is spotted with loaded
+  environment). Reload is attempted only if module is tagged *super-sticky* or
+  *sticky* and force mode is disabled. Skipped module is considered *Dependent
+  Unload* module.
+* Reload all Dependent Reload modules after the main load, unload or switch
+  module evaluation rather after the sub module evaluation that triggered the
+  Dependent Reload unload phase.
+* Dependent Unload modules of Conflict Unload modules are merged into the
+  Dependent Reload module list. An attempt to reload these dependent modules
+  is tried only if their requirements are satisfied by loaded environment.
+* When a loading module requires a Dependent Unload module, the unload of this
+  module was forced when it was triggered by a Conflict Unload or a
+  switched-off module. The unload of such Dependent Unload module is not
+  forced anymore by default and an error is raised if a loading module
+  requiring the Dependent Unload module is detected.
+* When unloading Dependent Reload modules, do not force by default this unload
+  unless asked with :option:`--force` option. As a result an error is obtained
+  when trying to reload Dependent Reload modules that conflict with other
+  loaded modules. This error may be by-passed with :option:`--force`
+  command-line option.
+* Move stickiness check when unloading a module prior processing any automated
+  module handling mechanism. (fix issue #536)
 
 .. warning:: Variant names are now fully checked instead of just verifying
    their first character. Only characters within the ``A-Za-z0-9_-`` range are
    allowed. Variant name cannot start with ``-`` character and the overall
    name cannot just be a number.
 
-.. warning:: Existing *versions* modulefiles installed for Modules 4.7 and
-   upward should be fixed by adding the ``--not-req`` option to the
-   :mfcmd:`module unload<module>` commands present in these modulefiles. This
-   command should fix these files ``sed -i "s|module unload|module unload
-   --not-req|" <version_modulefile>``.
+.. warning:: Existing *versions* modulefiles generated by
+   :instopt:`--enable-versioning` installation option and installed for
+   Modules 4.7 and upward should be manually fixed by adding the ``--not-req``
+   option to the :mfcmd:`module unload<module>` commands present in these
+   modulefiles. Following command should fix these files: ``sed -i "s|module
+   unload|module unload --not-req|" <version_modulefile>``.
 
 
 .. _5.4 release notes:
@@ -866,7 +1155,7 @@ Modules 5.1.0 (2022-04-30)
 * Mention tagging evaluation of a module, when tag list of an already loaded
   module is updated.
 
-.. _Code of conduct: https://github.com/cea-hpc/modules/blob/main/CODE_OF_CONDUCT.md
+.. _Code of conduct: https://github.com/envmodules/modules/blob/main/CODE_OF_CONDUCT.md
 .. _codespell: https://github.com/codespell-project/codespell
 .. _Aspell: http://aspell.net/
 

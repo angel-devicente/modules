@@ -5,8 +5,9 @@ Module cache
 
 Objective is to consolidate available module information in a few number of
 files in order to process these files when doing global module queries like
-done by :subcmd:`avail` or :subcmd:`whatis` sub-commands instead of walking
-through the whole modulepath directories to compute this information.
+done by :subcmd:`avail`, :subcmd:`spider` or :subcmd:`whatis` sub-commands
+instead of walking through the whole modulepath directories to compute this
+information.
 
 With cache files, it is expected to have lesser IO load and more efficiently
 handle environments with thousands modulefiles stored in a parallel
@@ -42,7 +43,8 @@ Cache content
 
 As cache files should be used instead of walking through modulepath directory
 to search for valid modulercs and modulefiles. Cache file should contain
-everything to be autonomous to proceed ``avail`` or ``whatis`` queries.
+everything to be autonomous to proceed ``avail``, ``spider`` or ``whatis``
+queries.
 
 Yet module search can be very dynamic as things set for instance in modulerc
 files may dynamically produce new modulefiles or define properties specific to
@@ -57,9 +59,9 @@ into the cache file. An entry is set for each valid modulerc file. Same goes
 for modulefiles as some conditional structure in their code can dynamically
 change dependency, whatis or other definitions.
 
-It is expected that modulefile will be evaluated on ``avail`` or ``whatis``
-commands for complex queries. So for such use case it is important to have
-modulefile content cached.
+It is expected that modulefile will be evaluated on ``avail``, ``spider`` or
+``whatis`` commands for complex queries. So for such use case it is important
+to have modulefile content cached.
 
 Thus by reading the cache file, in one IO the content of all the modulerc and
 modulefiles of the modulepath will be fetched.
@@ -110,7 +112,7 @@ syntax:
 
 For instance: ``modulerc-content foo/.modulerc #%Module {body}``. Modification
 time is not needed for modulerc as this information is not reported on an
-``avail`` sub-command in long mode.
+``avail``, ``spider`` sub-commands in long mode.
 
 Every modulercs and modulefiles file contained in modulepath are recorded
 in cache with ``modulerc-content`` or ``modulefile-content`` command.
@@ -181,6 +183,9 @@ used or not if only a subset of elements is recorded.
 Cache validity
 --------------
 
+From Modules 5.3 to 5.5
+^^^^^^^^^^^^^^^^^^^^^^^
+
 Cache file header indicates a Modules version number. It corresponds to the
 Modules version:
 
@@ -194,6 +199,35 @@ upgraded to a newer minor version (for instance from 5.3 to 5.4):
   account, when it is ignored
 * better to ensure cache file is accurate for the Modules version as modulerc
   and modulefile commands may evolve from one version to another
+
+Starting Modules 5.6
+^^^^^^^^^^^^^^^^^^^^
+
+Approach to cache validity is changed on Modules 5.6 to cover use cases where
+different Modules installation uses the same set of modulepaths. This is for
+instance the case when a service provides modulepaths with cache files in them
+and just requires a minimal version of Modules. Or on a computing center, when
+the same modulepaths are used by different supercomputers which may use
+different version of Modules at some point in time.
+
+With this change the cache file header still indicates a Modules version
+number. But this version number now corresponds to the minimal Modules version
+able to use this cache file.
+
+With such change, backward compatibility is expected on module cache Tcl
+commands. Addition of new commands will lead to an increase of the minimal
+version required. Argument change to existing command is not possible, only
+the introduction of optional argument will be ok (with increase of minimal
+version required).
+
+When generating cache file, minimal version required is set back to ``5.3`` as
+no change occurred on the cache file format since the introduction of the
+cache feature.
+
+As minimal Modules version check code is the same for cache file than for
+modulefile since the introduction of the cache feature, cache file has always
+been taken into account as soon as the Modules version matches the minimal
+requirement.
 
 Cache usage
 -----------
@@ -212,6 +246,7 @@ sub-commands:
 * whatis
 * aliases
 * avail
+* spider
 * switch
 * restore
 * save
@@ -321,7 +356,7 @@ access entries are tested if they match search query. Test is done through
 ``findModulesFromDirsAndFiles`` procedure which corresponds to the walk down
 code extracted from ``findModules``.
 
-This specific interpreter is re-used between different cache file evaluations.
+This specific interpreter is reused between different cache file evaluations.
 As for modulefile interpreter, a consistency check is performed before each
 reuse to test that the cache file-specific commands have not be rewritten
 during previous cache file evaluation.
@@ -330,12 +365,12 @@ Cache file evaluation is tracked to avoid evaluating twice the same cache
 file.
 
 Cache evaluation stops if an erroneous command or syntax is encountered. Like
-for erroneous modulerc, error is not reported during ``avail`` or ``whatis``
-commands unless if ran in debug mode. Error is reporting during a ``load``
-evaluation. Cache evaluation is considered failed if there is an error in the
-cache file, thus a non-cache module search will occur instead of relying on
-cache module listing. However descriptions of modulefile and modulerc
-evaluated in cache prior the error occurs are retained.
+for erroneous modulerc, error is not reported during ``avail``, ``spider`` or
+``whatis`` commands unless if ran in debug mode. Error is reporting during a
+``load`` evaluation. Cache evaluation is considered failed if there is an
+error in the cache file, thus a non-cache module search will occur instead of
+relying on cache module listing. However descriptions of modulefile and
+modulerc evaluated in cache prior the error occurs are retained.
 
 cachebuild sub-command
 ----------------------

@@ -53,12 +53,11 @@ if {$sh_kind eq {sh} && ![catch {exec /bin/sh -c {echo $BASH_VERSION}} errMsg] &
 }
 send_user "\tsh_kind is '$sh_kind'\n"
 
+# extract and format os name
+set os_name [string tolower [lindex [split $tcl_platform(os) _] 0]]
+
 # determine if sh-shell is a strict sh implementation
-if {$sh_kind eq "dash" || ($tcl_platform(os) ne "Linux"\
-   && $tcl_platform(os) ne "Darwin"\
-   && ![string match "CYGWIN*" $tcl_platform(os)]\
-   && ![string match "MINGW*" $tcl_platform(os)]\
-   && ![string match "MSYS_NT*" $tcl_platform(os)])} {
+if {$sh_kind eq "dash" || $os_name ni {linux darwin cygwin mingw msys}} {
    set sh_strict 1
 } else {
    set sh_strict 0
@@ -74,7 +73,7 @@ if {$bashbin ne {}} {
 }
 
 # check SIP is enabled or not on OS X
-if {$tcl_platform(os) eq "Darwin"} {
+if {$os_name eq "darwin"} {
     catch {
         regexp {System Integrity Protection status: enabled.} [exec csrutil status] csrutil_enabled
     } errMsg
@@ -108,7 +107,7 @@ array set shell_init {}
 array set shell_path {}
 array set shell_opts {}
 array set shell_test {}
-foreach shell [list sh bash basheu ksh zsh csh tcsh fish tcl perl python ruby cmake r] {
+foreach shell [list sh bash basheu ksh zsh csh tcsh fish tcl perl python ruby cmake r pwsh] {
    if {$shell eq {basheu} && $bash_version_is52} {
       send_user "\t'basheu' shell tests ignored on Bash 5.2\n"
       continue
@@ -129,13 +128,21 @@ foreach shell [list sh bash basheu ksh zsh csh tcsh fish tcl perl python ruby cm
             set shellbin [find_bin ksh93]
          }
       }
+      pwsh {
+         # Don't test pwsh in cygwin or msys (pwsh.exe won't work properly)
+         if {$os_name ni {cygwin mingw msys}} {
+            set shellbin [find_bin pwsh]
+         } else {
+            set shellbin ""
+         }
+      }
       default {
          set shellbin [find_bin $shell]
       }
    }
    if {$shellbin ne ""} {
       switch -- $shell {
-         tcl - perl - python - ruby - cmake - r {
+         tcl - perl - python - ruby - cmake - r - pwsh {
             lappend othlang_list $shell
          }
          sh - bash - basheu - ksh - zsh {
@@ -161,6 +168,9 @@ foreach shell [list sh bash basheu ksh zsh csh tcsh fish tcl perl python ruby cm
          }
          r {
             set shell_init($shell) "$install_initdir/$shell.R"
+         }
+         pwsh {
+            set shell_init($shell) "$install_initdir/$shell.ps1"
          }
          default {
             set shell_init($shell) "$install_initdir/$shell"
@@ -188,7 +198,7 @@ foreach shell [list sh bash basheu ksh zsh csh tcsh fish tcl perl python ruby cm
          }
       }
       switch -- $shell {
-         sh - bash - ksh - zsh - fish {
+         sh - bash - ksh - zsh - fish - pwsh {
             lappend shell_redir_list $shell
          }
       }
@@ -202,7 +212,7 @@ unset shell
 set autoinit_script "$install_libexecdir/modulecmd.tcl"
 
 # where to find modulefiles for test
-set contrib_modpath "$env(TESTSUITEDIR)/../contrib/modulefiles"
+set share_modpath "$env(TESTSUITEDIR)/../share/modulefiles"
 set testsuite_modpath "$env(TESTSUITEDIR)/modulefiles"
 
 # basic messages

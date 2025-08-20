@@ -15,7 +15,7 @@ Modules 4
 
 This section provides the list of differences with Modules version 3.2. This version of Modules is also referred in this document as *compatibility version*. Modules 4 is based on what was previously called Modules-Tcl. Comparison takes as a basis version ``3.2.10`` of compatibility version against Modules version ``4.0``. Any change made past these versions will explicitly mention the release number starting from the difference appears or disappears.
 
-.. note:: The numerous bugs or limitations spotted on Modules ``3.2`` across the years have been fixed in Modules ``4.0``. The list of reported issues that have been solved are available on `the project code forge <https://github.com/cea-hpc/modules/milestone/1?closed=1>`_.
+.. note:: The numerous bugs or limitations spotted on Modules ``3.2`` across the years have been fixed in Modules ``4.0``. The list of reported issues that have been solved are available on `the project code forge <https://github.com/envmodules/modules/milestone/1?closed=1>`_.
 
 Removed or changed features
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -318,6 +318,14 @@ The following command line switches appeared on Modules 4.
 | 4.7        | :option:`-vv`, :option:`--output`, :option:`-o`,                |
 |            | :option:`--width`, :option:`-w`                                 |
 +------------+-----------------------------------------------------------------+
+
+:option:`--long`, :option:`--terse`
+
+ Starting Modules 4.0, :subcmd:`savelist` sub-command is supported.
+
+:option:`--all`
+
+ Starting Modules 4.7, :subcmd:`list` sub-command is supported.
 
 
 Module Sub-Commands
@@ -818,6 +826,8 @@ Package Initialization
 When initializing Modules, :subcmd:`refresh` the loaded modules in case some
 user environment is already configured.
 
+Starting version ``5.5``, support for Windows *pwsh* shell is introduced.
+
 Command line switches
 """""""""""""""""""""
 
@@ -833,6 +843,8 @@ The following command line switches appeared on Modules 5.
 +------------+-----------------------------------------------------------------+
 | 5.3        | :option:`--ignore-cache`, :option:`--ignore-user-rc`            |
 +------------+-----------------------------------------------------------------+
+| 5.6        | :option:`--dumpname`                                            |
++------------+-----------------------------------------------------------------+
 
 :option:`--output`
 
@@ -840,11 +852,39 @@ The following command line switches appeared on Modules 5.
  ``+`` or ``-`` which means value should respectively be appended to or
  subtracted from current configuration option value.
 
+ Starting Modules 5.6, :subcmd:`spider` sub-command is supported.
+
 :option:`--force`
 
  Starting Modules 5.4, this command line switch by-passes *abort on error*
  behavior. Modulefile is unloaded anyway when an evaluation error occurs if
  :option:`--force` option is used.
+
+:option:`--all`
+
+ Starting Modules 5.2, :subcmd:`lint` and :subcmd:`savelist` sub-commands are
+ supported.
+
+ Starting Modules 5.6, :subcmd:`spider` sub-command is supported.
+
+:option:`--contains`, :option:`--starts-with`
+
+ Starting Modules 5.1, :subcmd:`list` sub-command is supported.
+
+ Starting Modules 5.2, :subcmd:`savelist` sub-command is supported.
+
+ Starting Modules 5.6, :subcmd:`spider` sub-command is supported.
+
+:option:`--json`, :option:`--long`, :option:`--terse`
+
+ Starting Modules 5.2, :subcmd:`stashlist` sub-command is supported.
+
+ Starting Modules 5.6, :subcmd:`spider` sub-command is supported.
+
+:option:`--default`, :option:`--latest`, :option:`--indepth`,
+:option:`--no-indepth`
+
+ Starting Modules 5.6, :subcmd:`spider` sub-command is supported.
 
 Module Sub-Commands
 """""""""""""""""""
@@ -862,6 +902,9 @@ The following module sub-commands appeared on Modules 5.
 |            | :subcmd:`stashshow`, :subcmd:`stashclear`, :subcmd:`stashlist`  |
 +------------+-----------------------------------------------------------------+
 | 5.3        | :subcmd:`cachebuild`, :subcmd:`cacheclear`                      |
++------------+-----------------------------------------------------------------+
+| 5.6        | :subcmd:`spider`, :subcmd:`update`, :subcmd:`disable`,          |
+|            | :subcmd:`describe`                                              |
 +------------+-----------------------------------------------------------------+
 
 :subcmd:`list`
@@ -943,6 +986,15 @@ The following module sub-commands appeared on Modules 5.
  * ``not:`` prefix may be added to variant specification to get modules not
    providing variant or not matching specified variant values.
 
+ Starting Modules 5.6:
+
+ * ``use`` :ref:`extra specifier` is introduced.
+ * setting :envvar:`MODULEPATH` environment variable with :mfcmd:`append-path`
+   or :mfcmd:`prepend-path` may also be queried with ``use`` extra specifier.
+ * ``depends-on-any`` :ref:`extra specifier` is introduced.
+ * result of a multi pattern search is consolidated under a single output
+ * ``provide`` and ``provided-alias`` :ref:`extra specifier` are introduced.
+
 :subcmd:`reload`
 
  Starting Modules 5.4, support for :option:`--force` option is added on this
@@ -952,6 +1004,24 @@ The following module sub-commands appeared on Modules 5.
 
  Starting Modules 5.5, definition of :command:`mogui` shell alias or function
  is added on this sub-command.
+
+:subcmd:`lint`
+
+ Starting Modules 5.6, readable modulecache files are also linted when no
+ module specification is provided as argument or if :file:`.modulecache` file
+ is specifically linted.
+
+:subcmd:`cachebuild`
+
+ Starting Modules 5.6, the minimal Modules version specified in the cache file
+ header indicates the oldest Modules version compatible with this cache file
+ (5.3), rather than the version that generated the cache file.
+
+:subcmd:`update`
+
+ This sub-command is reintroduced (was part of Modules v3) as a simple alias
+ of :subcmd:`reload` sub-command. No more support from ``MODULESBEGINENV``,
+ initial environment handling now covers this use case.
 
 Environment
 """""""""""
@@ -991,7 +1061,15 @@ The following environment variables appeared on Modules 5.
 |            | :envvar:`MODULES_SOURCE_CACHE`                                  |
 +------------+-----------------------------------------------------------------+
 | 5.5        | :envvar:`MODULES_HIDE_AUTO_LOADED`, :envvar:`MODULES_LOGGER`,   |
-|            | :envvar:`MODULES_LOGGED_EVENTS`                                 |
+|            | :envvar:`MODULES_LOGGED_EVENTS`,                                |
+|            | :envvar:`MODULES_CONFLICT_UNLOAD`,                              |
+|            | :envvar:`__MODULES_LMPREREQPATH`                                |
++------------+-----------------------------------------------------------------+
+| 5.6        | :envvar:`MODULES_SPIDER_OUTPUT`,                                |
+|            | :envvar:`MODULES_SPIDER_TERSE_OUTPUT`,                          |
+|            | :envvar:`MODULES_SPIDER_INDEPTH`,                               |
+|            | :envvar:`__MODULES_LMUSE`,                                      |
+|            | :envvar:`MODULES_REQUIRE_VIA`                                   |
 +------------+-----------------------------------------------------------------+
 
 Modules Specific Tcl Commands
@@ -1014,6 +1092,10 @@ The following modulefile Tcl commands appeared on Modules 5.
 +------------+-----------------------------------------------------------------+
 | 5.5        | :mfcmd:`hide-modulefile`, :mfcmd:`hide-version`,                |
 |            | :mfcmd:`lsb-release`                                            |
++------------+-----------------------------------------------------------------+
+| 5.6        | :mfcmd:`depends-on-any`, :mfcmd:`module-help`,                  |
+|            | :mfcmd:`module-warn`, :mfcmd:`haveDynamicMPATH`,                |
+|            | :mfcmd:`provide`                                                |
 +------------+-----------------------------------------------------------------+
 
 :mfcmd:`system`, :mfcmd:`is-used`
@@ -1045,6 +1127,16 @@ The following modulefile Tcl commands appeared on Modules 5.
 
  Starting Modules 5.1, these modulefile commands accept the ``--not-req``
  option.
+
+:mfcmd:`module unload<module>`
+
+ Starting version ``5.5`` all matching modules loaded and their dependent are
+ unloaded if both :mconfig:`auto_handling` and :mconfig:`conflict_unload`
+ configuration options are enabled.
+
+ Starting version ``5.6`` unloading a module that enables a modulepath unloads
+ all loaded modules stored in this modulepath if :mconfig:`require_via`
+ configuration option is enabled.
 
 :mfcmd:`module unuse<module>`
 
@@ -1078,6 +1170,9 @@ The following modulefile Tcl commands appeared on Modules 5.
 
  Starting with version ``5.1``, the ``--set-if-undef`` option is added to set
  environment variable when modulefile is loaded only if not yet defined.
+
+ Starting with version ``5.6``, value set can contain newline character.
+ Exception for csh shell family where such character is chopped from value.
 
 :mfcmd:`source-sh`
 
@@ -1119,6 +1214,29 @@ The following modulefile Tcl commands appeared on Modules 5.
  anyway if forced. To forbid unload of a modulefile, it is now advised to tag
  it ``super-sticky`` with :mfcmd:`module-tag` command.
 
+:mfcmd:`conflict`, :mfcmd:`family`
+
+ Starting with version ``5.5``, if :mconfig:`conflict_unload` and
+ :mconfig:`auto_handling` configuration options are enabled, all matching
+ loaded modules are unloaded.
+
+:mfcmd:`modulepath-label`
+
+ Starting version 5.6, label is also used on :subcmd:`whatis` and
+ :subcmd:`search` sub-command output.
+
+:mfcmd:`module use<module>`, :mfcmd:`append-path MODULEPATH<append-path>`,
+:mfcmd:`prepend-path MODULEPATH<prepend-path>`
+
+ Starting with version 5.6, if :mconfig:`require_via` configuration option is
+ enabled, modulefile enabling a modulepath is considered a requirement of the
+ loaded modules stored in this path.
+
+:mfcmd:`extensions`
+
+ Starting with version 5.6, :mfcmd:`extensions` becomes an alias of
+ :mfcmd:`provide` modulefile command.
+
 Modules Variables
 """""""""""""""""
 
@@ -1156,8 +1274,39 @@ The following Modules configuration option has been introduced on Modules 5.
 |            | :mconfig:`abort_on_error`, :mconfig:`source_cache`              |
 +------------+-----------------------------------------------------------------+
 | 5.5        | :mconfig:`hide_auto_loaded`, :mconfig:`logger`,                 |
-|            | :mconfig:`logged_events`                                        |
+|            | :mconfig:`logged_events`, :mconfig:`conflict_unload`            |
 +------------+-----------------------------------------------------------------+
+| 5.6        | :mconfig:`spider_output`, :mconfig:`spider_terse_output`,       |
+|            | :mconfig:`spider_indepth`, :mconfig:`require_via`               |
++------------+-----------------------------------------------------------------+
+
+:mconfig:`auto_handling`
+
+ Starting version 5.1, modules tagged ``keep-loaded`` are excluded from
+ Useless Requirement Unload mechanism.
+
+ Starting version 5.5:
+
+ * Modules tagged ``sticky`` or ``super-sticky`` are excluded from Useless
+   Requirement Unload mechanism.
+ * No attempt to reload a Dependent Reload module is made if this module is
+   not loadable (requirement not loaded or conflict found with loaded
+   environment), even if force mode is enabled. Reload is attempted when
+   module is not loadable if it is sticky (tagged super-sticky or sticky and
+   force mode not enabled).
+ * All reload of Dependent Reload modules are now performed on the top load,
+   unload or switch evaluation rather right after the load, unload or switch
+   that triggered the unload phase of the Dependent Reload mechanism.
+ * Dependent Unload modules of Conflict Unload modules are merged into the
+   Dependent Reload module list.
+
+ Starting version 5.6:
+
+ * No attempt to reload a Dependent Reload module is made if the modulepath
+   where this module is stored is not enabled anymore and module cannot be
+   found in other enabled modulepaths. Even if force mode is enabled. Reload
+   is attempted when module is not loadable if it is sticky (tagged
+   super-sticky or sticky and force mode not enabled).
 
 :mconfig:`avail_output`, :mconfig:`avail_terse_output`
 
@@ -1175,6 +1324,10 @@ The following Modules configuration option has been introduced on Modules 5.
  Starting version 5.3.1, element ``indesym`` is added to the list of accepted
  values.
 
+ Starting version 5.6, elements ``hidden``, ``provided-alias`` and ``via`` are
+ added to the list of accepted values. ``via`` is only supported on
+ :mconfig:`avail_output`.
+
 :mconfig:`list_output`, :mconfig:`list_terse_output`
 
  Starting Modules 5.3, these configuration options accept value prefixed by
@@ -1183,6 +1336,9 @@ The following Modules configuration option has been introduced on Modules 5.
 
  Starting version 5.4, elements ``alias`` and ``indesym`` are added to the
  list of accepted values.
+
+ Starting version 5.6, element ``hidden`` is added to the list of accepted
+ values.
 
 :mconfig:`colors`, :mconfig:`protected_envvars`,
 :mconfig:`shells_with_ksh_fpath`, :mconfig:`tag_abbrev`,
@@ -1196,3 +1352,8 @@ The following Modules configuration option has been introduced on Modules 5.
 
  Starting Modules 5.4, this configuration option accepts more than one global
  rc file location. A colon character separates each of these locations.
+
+:mconfig:`pager`
+
+ Starting Modules 5.5, pager is not launched if :file:`modulecmd.tcl` program
+ is run for scripting language.

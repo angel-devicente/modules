@@ -40,37 +40,47 @@ if {$verbose} {
 }
 
 set bad_cmd "$error_msgs: Invalid command 'foo'"
+set bad_cmd_re "(envmodule: )?$bad_cmd"
 
 foreach shell $shell_list {
    switch -- $shell {
       {csh} - {tcsh} {
          testall_cmd_re "$shell" "module --version" "" "Modules Release \\S+ (\\S+)" 0
          testall_cmd "$shell" "module foo" "" "$bad_cmd\n$type_help" 1
-         testall_cmd "$shell" "module use $contrib_modpath\; module purge\; module load null\; module list -t" "" "$cur_loaded\nnull" 0
-         testall_cmd "$shell" "module use $contrib_modpath\; module purge\; module load null\; module unload null\; module list -t" "" "$no_loaded" 0
+         testall_cmd "$shell" "module use $share_modpath\; module purge\; module load null\; module list -t" "" "$cur_loaded\nnull" 0
+         testall_cmd "$shell" "module use $share_modpath\; module purge\; module load null\; module unload null\; module list -t" "" "$no_loaded" 0
          testall_cmd "$shell" "module is-loaded unk" "" "" 1
-         testall_cmd "$shell" "module use $contrib_modpath\; module load null\; module is-loaded null" "" "" 0
+         testall_cmd "$shell" "module use $share_modpath\; module load null\; module is-loaded null" "" "" 0
          testall_cmd "$shell" "module info-loaded unk" "" "" 0
-         testall_cmd "$shell" "module use $contrib_modpath\; module load null\; module info-loaded null" "null" "" 0
+         testall_cmd "$shell" "module use $share_modpath\; module load null\; module info-loaded null" "null" "" 0
       }
       default {
          testall_cmd_re "$shell" "module --version" "Modules Release \\S+ (\\S+)" "" 0
          testall_cmd "$shell" "module foo" "$bad_cmd\n$type_help" "" 1
-         testall_cmd "$shell" "module use $contrib_modpath\; module purge\; module load null\; module list -t" "$cur_loaded\nnull" "" 0
-         testall_cmd "$shell" "module use $contrib_modpath\; module purge\; module load null\; module unload null\; module list -t" "$no_loaded" "" 0
+         testall_cmd "$shell" "module use $share_modpath\; module purge\; module load null\; module list -t" "$cur_loaded\nnull" "" 0
+         testall_cmd "$shell" "module use $share_modpath\; module purge\; module load null\; module unload null\; module list -t" "$no_loaded" "" 0
          testall_cmd "$shell" "module is-loaded unk" "" "" 1
-         testall_cmd "$shell" "module use $contrib_modpath\; module load null\; module is-loaded null" "" "" 0
+         testall_cmd "$shell" "module use $share_modpath\; module load null\; module is-loaded null" "" "" 0
          testall_cmd "$shell" "module info-loaded unk" "" "" 0
-         testall_cmd "$shell" "module use $contrib_modpath\; module load null\; module info-loaded null" "null" "" 0
+         testall_cmd "$shell" "module use $share_modpath\; module load null\; module info-loaded null" "null" "" 0
       }
    }
 }
 
 foreach shell $othlang_list {
-   testall_cmd_re "$shell" "--version" "" "Modules Release \\S+ (\\S+)" 0
-   testall_cmd_re "$shell" "foo" "" "$bad_cmd\n$type_help.*" 1
-   testall_cmd "$shell" "use,$contrib_modpath:purge:load,null:list,-t" "" "$cur_loaded\nnull" 0
-   testall_cmd "$shell" "use,$contrib_modpath:purge:load,null:unload,null:list,-t" "" "$no_loaded" 0
+   switch -- $shell {
+      pwsh {
+         testall_cmd_re "$shell" "--version" "Modules Release \\S+ (\\S+)" "" 0
+         testall_cmd "$shell" "use,$share_modpath:purge:load,null:list,-t" "$cur_loaded\nnull" "" 0
+         testall_cmd "$shell" "use,$share_modpath:purge:load,null:unload,null:list,-t" "$no_loaded" "" 0
+      }
+      default {
+         testall_cmd_re "$shell" "--version" "" "Modules Release \\S+ (\\S+)" 0
+         testall_cmd "$shell" "use,$share_modpath:purge:load,null:list,-t" "" "$cur_loaded\nnull" 0
+         testall_cmd "$shell" "use,$share_modpath:purge:load,null:unload,null:list,-t" "" "$no_loaded" 0
+      }
+   }
+   testall_cmd_re "$shell" "foo" "" "$bad_cmd_re\n$type_help.*" 1
    switch -- $shell {
       cmake - r {
          testall_cmd_re "$shell" "is-loaded,unk" "" ".*" 1
@@ -79,7 +89,7 @@ foreach shell $othlang_list {
          testall_cmd_re "$shell" "is-loaded,unk" "" "" 1
       }
    }
-   testall_cmd "$shell" "use,$contrib_modpath:load,null:is-loaded,null" "" "" 0
+   testall_cmd "$shell" "use,$share_modpath:load,null:is-loaded,null" "" "" 0
    switch -- $shell {
       r {
          testall_cmd "$shell" "info-loaded,unk" "\[1\] \"\"" {} 0
@@ -103,7 +113,7 @@ foreach shell $othlang_list {
          set anstxt "null"
       }
    }
-   testall_cmd "$shell" "use,$contrib_modpath:load,null:info-loaded,null" $anstxt "" 0
+   testall_cmd "$shell" "use,$share_modpath:load,null:info-loaded,null" $anstxt "" 0
 }
 
 
@@ -129,7 +139,14 @@ foreach shell $shell_list {
 }
 
 foreach shell $othlang_list {
-   testall_cmd_re "$shell" "--version" "" "Modules Release \\S+ (\\S+)" 0
+   switch -- $shell {
+      pwsh {
+         testall_cmd_re "$shell" "--version" "Modules Release \\S+ (\\S+)" "" 0
+      }
+      default {
+         testall_cmd_re "$shell" "--version" "" "Modules Release \\S+ (\\S+)" 0
+      }
+   }
 }
 
 
@@ -157,40 +174,47 @@ if {$is_stderr_tty} {
 }
 
 foreach shell $shell_redir_list {
-   testall_cmd_re $shell {module --version} $dflout $dflerr 0
-   testall_cmd_re autoinit:$shell {module --version} $dflout $dflerr 0
-   testall_cmd_re $shell {module --version --redirect} $tserr {} 0
-   testall_cmd_re autoinit:$shell {module --version --redirect} $tserr {} 0
-   testall_cmd_re $shell {module --version --no-redirect} {} $tserr 0
-   testall_cmd_re autoinit:$shell {module --version --no-redirect} {} $tserr 0
+   set modcmd "module"
+   if {$shell eq "pwsh"} {
+      set modcmd "envmodule"
+   }
+
+   testall_cmd_re $shell "$modcmd --version" $dflout $dflerr 0
+   testall_cmd_re $shell "$modcmd --version --redirect" $tserr {} 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect" {} $tserr 0
+   if {$shell ne "pwsh"} {
+      testall_cmd_re autoinit:$shell "$modcmd --version" $dflout $dflerr 0
+      testall_cmd_re autoinit:$shell "$modcmd --version --redirect" $tserr {} 0
+      testall_cmd_re autoinit:$shell "$modcmd --version --no-redirect" {} $tserr 0
+   }
    # if --no-redirect is part of arg list it wins even if --redirect is set after
-   testall_cmd_re $shell {module --version --redirect --no-redirect} {} $tserr 0
-   testall_cmd_re $shell {module --version --no-redirect --redirect} {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version --redirect --no-redirect" {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect --redirect" {} $tserr 0
 
    setenv_var MODULES_REDIRECT_OUTPUT 0
-   testall_cmd_re $shell {module --version} {} $tserr 0
-   testall_cmd_re $shell {module --version --redirect} $tserr {} 0
-   testall_cmd_re $shell {module --version --no-redirect} {} $tserr 0
-   testall_cmd_re $shell {module --version --redirect --no-redirect} {} $tserr 0
-   testall_cmd_re $shell {module --version --no-redirect --redirect} {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version" {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version --redirect" $tserr {} 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect" {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version --redirect --no-redirect" {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect --redirect" {} $tserr 0
 
    setenv_var MODULES_REDIRECT_OUTPUT 1
-   testall_cmd_re $shell {module --version} $tserr {} 0
-   testall_cmd_re $shell {module --version --redirect} $tserr {} 0
-   testall_cmd_re $shell {module --version --no-redirect} {} $tserr 0
-   testall_cmd_re $shell {module --version --redirect --no-redirect} {} $tserr 0
-   testall_cmd_re $shell {module --version --no-redirect --redirect} {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version" $tserr {} 0
+   testall_cmd_re $shell "$modcmd --version --redirect" $tserr {} 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect" {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version --redirect --no-redirect" {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect --redirect" {} $tserr 0
 
    # bad value set on MODULES_REDIRECT_OUTPUT env var
    # any value different than 0 or 1 is ignored
    setenv_var MODULES_REDIRECT_OUTPUT foo
-   testall_cmd_re $shell {module --version} $dflout $dflerr 0
-   testall_cmd_re $shell {module --version --redirect} $tserr {} 0
-   testall_cmd_re $shell {module --version --no-redirect} {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version" $dflout $dflerr 0
+   testall_cmd_re $shell "$modcmd --version --redirect" $tserr {} 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect" {} $tserr 0
    setenv_var MODULES_REDIRECT_OUTPUT {}
-   testall_cmd_re $shell {module --version} $dflout $dflerr 0
-   testall_cmd_re $shell {module --version --redirect} $tserr {} 0
-   testall_cmd_re $shell {module --version --no-redirect} {} $tserr 0
+   testall_cmd_re $shell "$modcmd --version" $dflout $dflerr 0
+   testall_cmd_re $shell "$modcmd --version --redirect" $tserr {} 0
+   testall_cmd_re $shell "$modcmd --version --no-redirect" {} $tserr 0
 
    unsetenv_var MODULES_REDIRECT_OUTPUT
 }

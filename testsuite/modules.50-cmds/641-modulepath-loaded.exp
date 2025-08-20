@@ -1,0 +1,234 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.50-cmds/%M%
+#   Revision:		%I%
+#   First Edition:	2024/10/29
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:		load
+#   Modulefiles:    modulepath-opt, qux
+#   Sub-Command:
+#
+#   Comment:	%C{
+#         Test --modulepath option of prereq, prereq-all and always-load
+#         modulefile commands over loaded environment
+#		}C%
+#
+##############################################################################
+
+set mp $modpath.4
+set mpre $modpathre.4
+setenv_path_var MODULEPATH $mp
+
+skip_if_quick_mode
+
+
+#
+# requirement already loaded but not from required modulepath
+#
+
+setenv_var TESTSUITE_MODULEPATH_OPT loaded_from_other_dir
+setenv_loaded_module [list qux/1] [list $mp/qux/1]
+
+setenv_var MODULES_CONFLICT_UNLOAD 0
+set tserr [msg_load qux/1 $err_modfromdiffpathloaded]\n\n[msg_load modulepath-opt/1 [err_reqlo_path qux/1]]
+testouterr_cmd sh {load --auto modulepath-opt/1} ERR $tserr
+
+setenv_var MODULES_CONFLICT_UNLOAD 1
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ modulepath-opt/1&qux/1]
+lappend ans [list set _LMFILES_ $modpath.3/qux/1:$mp/modulepath-opt/1]
+lappend ans [list set LOADEDMODULES qux/1:modulepath-opt/1]
+lappend ans [list set __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$modpath.3]
+lappend ans [list set __MODULES_LMTAG qux/1&auto-loaded]
+set tserr [msg_top_load_conun modulepath-opt/1 {} qux/1 {} qux/1 {}]
+testouterr_cmd sh {load --auto modulepath-opt/1} $ans $tserr
+
+
+#
+# requirement already loaded but not from required modulepath
+# and not required variant
+#
+
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+setenv_var TESTSUITE_MODULEPATH_OPT loaded_from_other_dir_variant
+setenv_loaded_module [list qux/1] [list $mp/qux/1]
+setenv_var __MODULES_LMVARIANT qux/1&foo|val2|0|0
+
+setenv_var MODULES_CONFLICT_UNLOAD 0
+set tserr [msg_load qux/1{foo=val1} $err_modfromdiffpathloaded]\n\n[msg_load modulepath-opt/1 [err_reqlo_path qux/1{foo=val1}]]
+testouterr_cmd sh {load --auto modulepath-opt/1} ERR $tserr
+
+setenv_var MODULES_CONFLICT_UNLOAD 1
+set ans [list]
+lappend ans [list set __MODULES_LMVARIANT qux/1&foo|val1|0|0]
+lappend ans [list set __MODULES_LMPREREQ modulepath-opt/1&qux/1\ foo=val1]
+lappend ans [list set _LMFILES_ $modpath.3/qux/1:$mp/modulepath-opt/1]
+lappend ans [list set LOADEDMODULES qux/1:modulepath-opt/1]
+lappend ans [list set __MODULES_LMPREREQPATH modulepath-opt/1&qux/1\ foo=val1&$modpath.3]
+lappend ans [list set __MODULES_LMTAG qux/1&auto-loaded]
+set tserr [msg_top_load_conun modulepath-opt/1 {} qux/1{foo=val2} {} qux/1{foo=val1} {}]
+testouterr_cmd sh {load --auto modulepath-opt/1} $ans $tserr
+
+unsetenv_var __MODULES_LMVARIANT
+unsetenv_var MODULES_ADVANCED_VERSION_SPEC
+
+
+#
+# requirement not loaded, then loaded but not from required modulepath
+#
+
+setenv_var TESTSUITE_MODULEPATH_OPT loaded_after_from_other_dir
+setenv_loaded_module [list modulepath-opt/1] [list $mp/modulepath-opt/1]
+setenv_var __MODULES_LMPREREQ modulepath-opt/1&qux/1
+setenv_var __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$modpath.3
+
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/modulepath-opt/1:$mp/qux/1]
+lappend ans [list set LOADEDMODULES modulepath-opt/1:qux/1]
+testouterr_cmd sh {load --auto qux/1} $ans {}
+
+
+#
+# requirement not loaded, then loaded but from required modulepath
+#
+
+setenv_var TESTSUITE_MODULEPATH_OPT loaded_after_from_correct_dir
+setenv_loaded_module [list modulepath-opt/1] [list $mp/modulepath-opt/1]
+setenv_var __MODULES_LMPREREQ modulepath-opt/1&qux/1
+setenv_var __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$mp
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ modulepath-opt/1&qux/1]
+lappend ans [list set _LMFILES_ $mp/qux/1:$mp/modulepath-opt/1]
+lappend ans [list set LOADEDMODULES qux/1:modulepath-opt/1]
+lappend ans [list set __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$mp]
+set tserr [msg_top_load qux/1 {} {} modulepath-opt/1]
+testouterr_cmd sh {load --auto qux/1} $ans $tserr
+
+
+#
+# dependent reload trigger with requirement chain specific to modulepath
+#
+
+setenv_var TESTSUITE_MODULEPATH_OPT depre_trigger
+
+# dependency from bad modulepath is loaded
+setenv_loaded_module [list qux/1 modulepath-opt/1] [list $mp/qux/1 $mp/modulepath-opt/1]
+setenv_var __MODULES_LMPREREQ qux/1&qux/1|foo/1.0:modulepath-opt/1&qux/1
+setenv_var __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$modpath.3
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ modulepath-opt/1&qux/1:qux/1&qux/1|foo/1.0]
+lappend ans [list set _LMFILES_ $mp/modulepath-opt/1:$mp/foo/1.0:$mp/qux/1]
+lappend ans [list set LOADEDMODULES modulepath-opt/1:foo/1.0:qux/1]
+set tserr [msg_top_load foo/1.0 {} {} qux/1]
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+
+setenv_var MODULEPATH $mp:$modpath.3
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+
+# FIXME: qux/1 is reloaded from mp3 as it is the priority enabled modulepath
+#   it should be kept from its initial modulepath
+#   or modulepath-opt/1 should get reloaded as modpath.3/qux/1 is dependency
+setenv_var MODULEPATH $modpath.3:$mp
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ modulepath-opt/1&qux/1:qux/1&qux/1|foo/1.0]
+lappend ans [list set _LMFILES_ $mp/modulepath-opt/1:$modpath.3/foo/1.0:$modpath.3/qux/1]
+lappend ans [list set LOADEDMODULES modulepath-opt/1:foo/1.0:qux/1]
+set tserr [msg_top_load foo/1.0 {} {} {qux/1}]
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+setenv_var MODULEPATH $mp
+
+
+# dependency from expected modulepath is loaded
+setenv_loaded_module [list qux/1 modulepath-opt/1] [list $modpath.3/qux/1 $mp/modulepath-opt/1]
+setenv_var __MODULES_LMPREREQ qux/1&qux/1|foo/1.0:modulepath-opt/1&qux/1
+setenv_var __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$modpath.3
+
+# FIXME: qux/1 is reloaded from mp4 as it is the enabled modulepath
+#   it should be kept from its initial modulepath
+#   or modulepath-opt/1 should not get reloaded as mp4/qux/1 is not a dependency
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ qux/1&qux/1|foo/1.0]
+lappend ans [list set _LMFILES_ $mp/foo/1.0:$mp/qux/1]
+lappend ans [list set LOADEDMODULES foo/1.0:qux/1]
+lappend ans [list unset __MODULES_LMPREREQPATH]
+set tserr [msg_top_load foo/1.0 {} {} {{modulepath-opt/1 qux/1} {qux/1}}]
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+
+setenv_var MODULEPATH $mp:$modpath.3
+# qux/1 is reloaded from mp4 as it is the priority enabled modulepath
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+
+# qux/1 is reloaded from mp3 as it is the priority enabled modulepath
+setenv_var MODULEPATH $modpath.3:$mp
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ qux/1&qux/1|foo/1.0:modulepath-opt/1&qux/1]
+lappend ans [list set _LMFILES_ $modpath.3/foo/1.0:$modpath.3/qux/1:$mp/modulepath-opt/1]
+lappend ans [list set LOADEDMODULES foo/1.0:qux/1:modulepath-opt/1]
+lappend ans [list set __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$modpath.3]
+set tserr [msg_top_load foo/1.0 {} {} {qux/1 modulepath-opt/1}]
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+setenv_var MODULEPATH $mp
+
+
+#
+# dependent reload trigger with requirement chain specific to modulepath or not
+#
+
+setenv_var TESTSUITE_MODULEPATH_OPT depre_trigger2_no_specific_path
+
+setenv_loaded_module [list qux/1 modulepath-opt/1] [list $mp/qux/1 $mp/modulepath-opt/1]
+setenv_var __MODULES_LMPREREQ modulepath-opt/1&qux/1
+unsetenv_var __MODULES_LMPREREQPATH
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ foo/1.0&qux/1:modulepath-opt/1&qux/1]
+lappend ans [list set _LMFILES_ $modpath.3/qux/1:$mp/foo/1.0:$mp/modulepath-opt/1]
+lappend ans [list set LOADEDMODULES qux/1:foo/1.0:modulepath-opt/1]
+lappend ans [list set __MODULES_LMPREREQPATH foo/1.0&qux/1&$modpath.3]
+lappend ans [list set __MODULES_LMTAG qux/1&auto-loaded]
+set tserr [msg_top_load_conun foo/1.0 {} qux/1 {} qux/1 {modulepath-opt/1}]
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+testouterr_cmd sh {load --force --auto foo/1.0} $ans $tserr
+
+
+setenv_var TESTSUITE_MODULEPATH_OPT depre_trigger2_with_specific_same_path
+
+setenv_loaded_module [list qux/1 modulepath-opt/1] [list $mp/qux/1 $mp/modulepath-opt/1]
+setenv_var __MODULES_LMPREREQ modulepath-opt/1&qux/1
+setenv_var __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$mp
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ modulepath-opt/1&qux/1:foo/1.0&qux/1]
+lappend ans [list set _LMFILES_ $mp/qux/1:$mp/modulepath-opt/1:$mp/foo/1.0]
+lappend ans [list set LOADEDMODULES qux/1:modulepath-opt/1:foo/1.0]
+lappend ans [list set __MODULES_LMPREREQPATH modulepath-opt/1&qux/1&$mp:foo/1.0&qux/1&$mp]
+testouterr_cmd sh {load --auto foo/1.0} $ans {}
+testouterr_cmd sh {load --force --auto foo/1.0} $ans {}
+
+
+setenv_var TESTSUITE_MODULEPATH_OPT depre_trigger2_with_specific_other_path
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ foo/1.0&qux/1]
+lappend ans [list set _LMFILES_ $modpath.3/qux/1:$mp/foo/1.0]
+lappend ans [list set LOADEDMODULES qux/1:foo/1.0]
+lappend ans [list set __MODULES_LMTAG qux/1&auto-loaded]
+lappend ans [list set __MODULES_LMPREREQPATH foo/1.0&qux/1&$modpath.3]
+set tserr [msg_top_load_conun foo/1.0 {} qux/1 {} qux/1 {modulepath-opt/1 {}}]
+testouterr_cmd sh {load --auto foo/1.0} $ans $tserr
+testouterr_cmd sh {load --force --auto foo/1.0} $ans $tserr
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

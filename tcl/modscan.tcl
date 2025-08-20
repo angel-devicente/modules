@@ -1,7 +1,7 @@
 ##########################################################################
 
 # MODSCAN.TCL, modulefile scan and extra match search procedures
-# Copyright (C) 2022-2024 Xavier Delaruelle
+# Copyright (C) 2022-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -58,6 +58,11 @@ proc edit-path-sc {cmd args} {
       idx_val ign_refcount val_set_is_delim glob_match bhv var path_list
 
    recordScanModuleElt $var $cmd envvar
+
+   # record MODULEPATH edition as "module use" command
+   if {$var eq {MODULEPATH} && $cmd in {append-path prepend-path}} {
+      recordScanModuleUsePathList $path_list
+   }
 
    setEnvVarIfUndefined $var {}
    return {}
@@ -119,7 +124,16 @@ proc family-sc {name} {
    if {![string length $name] || ![regexp {^[A-Za-z0-9_]*$} $name]} {
       knerror "Invalid family name '$name'"
    }
-   recordScanModuleElt $name family
+   recordScanModuleElt $name family provided-alias
+}
+
+proc provide-sc {args} {
+   if {![llength $args]} {
+      knerror {No module specified in argument}
+   }
+   foreach alias $args {
+      recordScanModuleElt $alias provide provided-alias
+   }
 }
 
 proc prereq-sc {args} {
@@ -127,7 +141,7 @@ proc prereq-sc {args} {
       optional opt_list args
 
    foreach modspec [parseModuleSpecification 0 0 0 0 {*}$args] {
-      recordScanModuleElt $modspec prereq prereq-any require
+      recordScanModuleElt $modspec prereq prereq-any depends-on-any require
    }
 }
 
@@ -158,7 +172,7 @@ proc conflict-sc {args} {
 proc module-sc {command args} {
    lassign [parseModuleCommandName $command help] command cmdvalid cmdempty
    # ignore sub-commands that do not either load or unload
-   if {$command in {load load-any switch try-load unload}} {
+   if {$command in {load load-any switch try-load unload use}} {
       # parse options to distinguish them from module version spec
       lassign [parseModuleCommandArgs 0 $command 0 {*}$args] show_oneperline\
          show_mtime show_filter search_filter search_match dump_state\
@@ -189,6 +203,8 @@ proc module-sc {command args} {
                recordScanModuleElt $swonarg switch switch-on {*}$xtaliasreq
             }
          }
+      } elseif {$command eq {use}} {
+         recordScanModuleUsePathList $modspeclist
       } else {
          set xtalias [expr {$command eq {unload} ? $xtaliasinc : $xtaliasreq}]
          # record each module spec
@@ -196,6 +212,13 @@ proc module-sc {command args} {
             recordScanModuleElt $modspec $command {*}$xtalias
          }
       }
+   }
+}
+
+proc recordScanModuleUsePathList {path_list} {
+   foreach path $path_list {
+      set resolved_abs_path [getAbsolutePath [resolvStringWithEnv $path]]
+      recordScanModuleElt $resolved_abs_path use
    }
 }
 
@@ -213,6 +236,14 @@ proc recordScanModuleElt {name args} {
          dict with ::g_scanModuleElt $modpath $elt {lappend $name $mod}
       }
       reportDebug "Module $mod defines $elt:$name"
+   }
+}
+
+proc getScanModuleElt {modpath elt} {
+   if {[info exists ::g_scanModuleElt]} {
+      if {[dict exists $::g_scanModuleElt $modpath $elt]} {
+         return [dict get $::g_scanModuleElt $modpath $elt]
+      }
    }
 }
 
@@ -291,8 +322,8 @@ proc getModMatchingExtraSpec {modpath pxtlist} {
          set one_crit_res [list]
          foreach name $namelist {
             if {$elt in {require incompat load unload prereq conflict\
-               prereq-all prereq-any depends-on always-load load-any try-load\
-               switch switch-on switch-off}} {
+               prereq-all prereq-any depends-on depends-on-any always-load\
+               load-any try-load switch switch-on switch-off}} {
                if {[dict exists $::g_scanModuleElt $modpath $elt]} {
                   foreach {modspec values} [dict get $::g_scanModuleElt\
                      $modpath $elt] {
@@ -335,13 +366,71 @@ proc getModMatchingExtraSpec {modpath pxtlist} {
 # determine if current module search requires an extra match search
 proc isExtraMatchSearchRequired {mod} {
    # an extra match search is required if not currently inhibited and:
-   # * variant should be reported in output
+   # * variant or provided-alias should be reported in output
    # * mod specification contains variant during avail/paths/whatis
    # * mod specification contains extra specifier during avail/paths/whatis
    return [expr {![getState inhibit_ems 0] && ([isEltInReport variant 0] ||\
-      (([llength [getVariantListFromVersSpec $mod]] || [llength\
+      [isEltInReport provided-alias 0] || (([llength\
+      [getVariantListFromVersSpec $mod]] || [llength\
       [getExtraListFromVersSpec $mod]]) && [currentState commandname] in\
-      {avail paths whatis}))}]
+      {avail paths whatis spider}))}]
+}
+
+proc insertProvidedAliases {modpath res_arrname} {
+   upvar $res_arrname found_list
+   foreach {alias target_mod} [getScanModuleElt $modpath provided-alias] {
+      if {![info exists found_list($alias)]} {
+         ##nagelfar ignore Found constant
+         set found_list($alias) [list alias $target_mod]
+      }
+   }
+}
+
+# scan modulefiles from currently being built module search result if extra
+# match search is needed
+proc scanExtraMatchSearch {modpath mod res_arrname} {
+   upvar $res_arrname found_list
+
+   # get extra match query properties
+   set spec_vr_list [getVariantListFromVersSpec $mod]
+   set check_variant [llength $spec_vr_list]
+   lassign [getSplitExtraListFromVersSpec $mod] spec_tag_list spec_xt_list
+   set check_extra [llength $spec_xt_list]
+
+   # no scan evaluation if extra match search not needed
+   if {!$check_variant && !$check_extra && ![isEltInReport variant 0] &&\
+      ![isEltInReport provided-alias 0]} {
+      return
+   }
+
+   # disable error reporting to avoid modulefile errors (not coping with
+   # scan evaluation for instance) to pollute result
+   set alreadyinhibit [getState inhibit_errreport]
+   if {!$alreadyinhibit} {
+      inhibitErrorReport
+   }
+   # evaluate all modules found in scan mode to gather content information
+   lappendState mode scan
+
+   foreach elt [array names found_list] {
+      switch -- [lindex $found_list($elt) 0] {
+         modulefile - virtual {
+            # skip evaluation of fully forbidden modulefile
+            if {![isModuleTagged $elt forbidden 0 [lindex $found_list($elt)\
+               2]]} {
+               ##nagelfar ignore Suspicious variable name
+               execute-modulefile [lindex $found_list($elt) 2] $elt $elt $elt\
+                  0 0 0 $modpath
+            }
+         }
+      }
+   }
+
+   lpopState mode
+   # re-enable error report only is it was disabled from this procedure
+   if {!$alreadyinhibit} {
+      setState inhibit_errreport 0
+   }
 }
 
 # perform extra match search on currently being built module search result
@@ -356,20 +445,7 @@ proc filterExtraMatchSearch {modpath mod res_arrname versmod_arrname} {
    lassign [getSplitExtraListFromVersSpec $mod] spec_tag_list spec_xt_list
    set check_extra [llength $spec_xt_list]
    set check_tag [llength $spec_tag_list]
-   set scan_eval [expr {$check_variant || $check_extra || [isEltInReport\
-      variant 0]}]
    set filter_res [expr {$check_variant || $check_extra || $check_tag}]
-
-   if {$scan_eval} {
-      # disable error reporting to avoid modulefile errors (not coping with
-      # scan evaluation for instance) to pollute result
-      set alreadyinhibit [getState inhibit_errreport]
-      if {!$alreadyinhibit} {
-         inhibitErrorReport
-      }
-      # evaluate all modules found in scan mode to gather content information
-      lappendState mode scan
-   }
 
    if {$check_tag} {
       # load tags from loaded mods prior collecting tags found during rc eval
@@ -381,20 +457,6 @@ proc filterExtraMatchSearch {modpath mod res_arrname versmod_arrname} {
    foreach elt [array names found_list] {
       if {$check_tag} {
          collectModuleTags $elt
-      }
-      # skip scan evaluation if only checking tags
-      if {$scan_eval} {
-         switch -- [lindex $found_list($elt) 0] {
-            modulefile - virtual {
-               # skip evaluation of fully forbidden modulefile
-               if {![isModuleTagged $elt forbidden 0 [lindex\
-                  $found_list($elt) 2]]} {
-                  ##nagelfar ignore Suspicious variable name
-                  execute-modulefile [lindex $found_list($elt) 2] $elt $elt\
-                     $elt 0 0 0 $modpath
-               }
-            }
-         }
       }
 
       # unset elements that do not match extra query
@@ -421,14 +483,6 @@ proc filterExtraMatchSearch {modpath mod res_arrname versmod_arrname} {
       }
    }
 
-   if {$scan_eval} {
-      lpopState mode
-      # re-enable error report only is it was disabled from this procedure
-      if {!$alreadyinhibit} {
-         setState inhibit_errreport 0
-      }
-   }
-
    if {$check_tag} {
       # indicate tags have been collected for this modulepath
       lappendState tags_collected_in $modpath
@@ -440,7 +494,7 @@ proc filterExtraMatchSearch {modpath mod res_arrname versmod_arrname} {
       set extra_keep_list [getModMatchingExtraSpec $modpath $spec_xt_list]
       lassign [getDiffBetweenList $keep_list $extra_keep_list]\
          extra_unset_list
-      set unset_list [list {*}$unset_list {*}$extra_unset_list]
+      lappend unset_list {*}$extra_unset_list
    }
 
    # unset marked elements

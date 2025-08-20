@@ -3,22 +3,36 @@
 Contributing
 ============
 
-Thank you for considering contributing to Modules!
+Thank you for considering contributing to Modules! Modules is an open source
+project. Questions, discussion, and contributions are welcome.
+
+By contributing to this project, you agree to follow our `Code of conduct`_,
+which ensures a respectful and inclusive environment for all contributors.
+Please review it before participating in discussions or submitting
+contributions.
+
+.. _Code of conduct: https://github.com/envmodules/modules?tab=coc-ov-file#readme
+
+This project also adheres to a :ref:`Technical charter<CHARTER>`, which
+defines its governance model, decision-making process, and long-term vision.
 
 Support questions
 -----------------
 
-Please use the `modules-interest mailing list`_ for questions. Do not use the
+Please use the `modules-interest mailing list`_
+(``modules-interest@lists.sourceforge.net``) or the `Modules chat room`_
+(``#modules:matrix.org``) for questions. Do not use the
 issue tracker for this.
 
 .. _modules-interest mailing list: https://sourceforge.net/projects/modules/lists/modules-interest
+.. _Modules chat room: https://matrix.to/#/#modules:matrix.org
 
 Asking for new features
 -----------------------
 
 Please submit your new feature wishes first to the `modules-interest mailing
-list`_. Discussion will help to clarify your needs and sometimes the wanted
-feature may already be available.
+list`_ or `Modules chat room`_. Discussion will help to clarify your needs and
+sometimes the wanted feature may already be available.
 
 Reporting issues
 ----------------
@@ -34,6 +48,11 @@ Reporting issues
 
 .. _minimal, complete, and verifiable example: https://stackoverflow.com/help/mcve
 
+If you find a security vulnerability, please refer to our `security policy`_
+for guidelines on how to report such issues responsibly.
+
+.. _security policy: https://github.com/envmodules/modules/security
+
 .. _submitting-patches:
 
 Submitting patches
@@ -46,7 +65,7 @@ Submitting patches
   read the `don't be afraid to commit`_ tutorial.
 
 .. _GitHub: https://github.com/
-.. _don't be afraid to commit: https://dont-be-afraid-to-commit.readthedocs.io/en/latest/index.html
+.. _don't be afraid to commit: https://afraid-to-commit.readthedocs.io/en/latest/index.html
 
 Start coding
 ~~~~~~~~~~~~
@@ -59,17 +78,18 @@ Start coding
 * Include tests that cover any code changes you make. Make sure the test fails
   without your patch.
 * `Run the tests <running-the-tests_>`_ and `verify coverage <running-test-coverage_>`_.
+* `Sign-off your commits <developer-certificate-of-origin_>`_.
 * Push your commits to GitHub and `create a pull request`_.
 
-.. _committing as you go: https://dont-be-afraid-to-commit.readthedocs.io/en/latest/git/commandlinegit.html#commit-your-changes
+.. _committing as you go: https://afraid-to-commit.readthedocs.io/en/latest/git/commandlinegit.html#commit-your-changes
 .. _create a pull request: https://help.github.com/articles/creating-a-pull-request/
 .. _Tcl 8.5 commands reference: https://www.tcl-lang.org/man/tcl8.5/TclCmd/contents.htm
 
-Design notes
-~~~~~~~~~~~~
+Developer notes
+~~~~~~~~~~~~~~~
 
-See the :ref:`design` for recent feature specifications. You may also find
-there some development howtos:
+See the :ref:`design` for recent feature specifications. Some development
+howtos are also available:
 
 * :ref:`add-new-sub-command`
 * :ref:`add-new-config-option`
@@ -102,8 +122,8 @@ execute :file:`testsuite/modules.50-cmds/470-variant.exp` testfile, run::
 Run :command:`script/mt` with ``--help`` option to get usage details and
 syntax to select several testfiles.
 
-.. _GitHub Actions: https://github.com/cea-hpc/modules/actions
-.. _Cirrus CI: https://cirrus-ci.com/github/cea-hpc/modules
+.. _GitHub Actions: https://github.com/envmodules/modules/actions
+.. _Cirrus CI: https://cirrus-ci.com/github/envmodules/modules
 
 .. _running-test-coverage:
 
@@ -204,7 +224,7 @@ Coding conventions
 * Use 3 spaces to indent code (do not use tab character)
 * Adopt `Tcl minimal escaping style`_
 * Procedure names: ``lowerCameCase``
-* Variable names: ``nocaseatall``
+* Variable names: ``no_case_at_all``
 * Curly brace and square bracket placement::
 
    if {![isStateDefined already_report]} {
@@ -214,6 +234,45 @@ Coding conventions
 * `No trailing space nor misspelling <commit-hooks_>`_
 
 .. _Tcl minimal escaping style: https://wiki.tcl-lang.org/page/Tcl+Minimal+Escaping+Style
+
+.. _developer-certificate-of-origin:
+
+Developer Certificate of Origin (DCO)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In order to ensure that all contributions are properly authorized and in
+compliance with licensing requirements, Modules project follows the `Developer
+Certificate of Origin (DCO)`_ process. The DCO is a lightweight mechanism to
+certify that you, as a contributor, have the right to submit your code and
+agree to the project’s licensing terms.
+
+How to sign off your commits
+""""""""""""""""""""""""""""
+
+Every commit must include a ``Signed-off-by`` line, which certifies that the
+contribution adheres to the DCO. You can do this by adding the following line
+at the end of your commit message::
+
+    Signed-off-by: Your Name <your.email@example.com>
+
+The name and email must match your Git configuration (``git config user.name``
+and ``git config user.email``).
+
+To simplify the process, you can use the ``-s`` flag of ``git`` command when
+committing::
+
+    git commit -s -m "Your commit message"
+
+Verifying DCO Compliance
+""""""""""""""""""""""""
+
+Modules repository automates checks to enforce the DCO. If your contribution
+does not include the proper ``Signed-off-by`` line, the pull request check
+will fail. You will need to amend your commit::
+
+    git commit --amend -s
+
+.. _Developer Certificate of Origin (DCO): https://developercertificate.org/
 
 .. _commit-hooks:
 

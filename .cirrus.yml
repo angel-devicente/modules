@@ -80,7 +80,7 @@ task:
   env:
     MAKE: gmake
   freebsd_instance:
-    image_family: freebsd-14-1
+    image_family: freebsd-14-2
     cpu: 1
     memory: 2G
   reqinstall_script: pkg install -y bash wget gmake dejagnu py311-sphinx gzip tcl86 tcl-wrapper autoconf ksh93 zsh fish perl5 python311 ruby cmake R readline
@@ -97,9 +97,9 @@ task:
     image: ghcr.io/cirruslabs/macos-runner:sonoma
   reqinstall_script:
     - brew update
-    - brew install md5sha1sum expect dejagnu grep fish r tcl-tk gzip
+    - brew install md5sha1sum expect dejagnu grep fish r tcl-tk gzip powershell
   configure_script:
-    - ./configure --prefix=/tmp/modules --with-loadedmodules=null:dot --with-tcl=/opt/homebrew/lib
+    - ./configure --prefix=/tmp/modules --with-loadedmodules=null:dot --with-tcl=/opt/homebrew/lib --with-tclsh=/opt/homebrew/bin/tclsh
   << : *BUILD_INSTALL_TEST_TEMPLATE
   coverage_script:
     - for f in tcl/*.tcl; do script/nglfar2ccov $f; done
@@ -122,7 +122,7 @@ task:
     EXTRATEST_SOURCESH: y
     TESTSUITE_ENABLE_MODULECACHE: 1
   container:
-    image: ubuntu:focal
+    image: ubuntu:noble
     cpu: 1
     memory: 2G
   reqinstall_script: |
@@ -130,13 +130,19 @@ task:
     yes | unminimize || true
     # install requirements
     apt-get update
-    apt-get -y install wget expect-dev dejagnu python3-sphinx gzip man-db bash tcsh ksh zsh fish tcl tcl8.6 perl python ruby cmake r-base-core
+    apt-get -y install curl wget expect-dev dejagnu python3-sphinx gzip man-db bash tcsh ksh zsh fish tcl tcl8.6 perl python3 ruby cmake r-base-core
     # libtclenvmodules build requirements
     apt-get -y install gcc autoconf tcl8.6-dev
     # requirements for source-sh extra tests
     apt-get -y install lsof
+    # install powershell
+    curl -LJO https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+    dpkg -i packages-microsoft-prod.deb
+    rm packages-microsoft-prod.deb
+    apt-get update
+    apt-get install -y powershell
   configure_script:
-    - ./configure --with-tclsh=tclsh8.6 --prefix /tmp/modules --with-tcl=/usr/lib/tcl8.6 --enable-append-manpath --enable-append-binpath --with-bin-search-path=/usr/bin:/bin --enable-silent-shell-debug-support --enable-windows-support --with-loadedmodules=null:dot --enable-quarantine-support --with-quarantine-vars=LD_LIBRARY_PATH --with-dark-background-colors='hi=1:se=2:er=91:wa=93:mp=1;94:di=94:al=96:sy=95' --enable-foo FOO=bar
+    - ./configure --with-tclsh=tclsh8.6 --prefix /tmp/modules --with-tcl=/usr/lib/tcl8.6 --enable-append-manpath --enable-append-binpath --with-bin-search-path=/usr/bin:/bin --enable-silent-shell-debug-support --enable-windows-support --with-loadedmodules=null:dot --enable-quarantine-support --with-quarantine-vars=LD_LIBRARY_PATH --enable-new-features --with-dark-background-colors='hi=1:se=2:er=91:wa=93:mp=1;94:di=94:al=96:sy=95' --enable-foo FOO=bar
   << : *BUILD_INSTALL_TEST_TEMPLATE
   << : *ARTIFACTS_TEMPLATE
 
@@ -156,11 +162,17 @@ task:
     yes | unminimize || true
     # install requirements
     apt-get update
-    apt-get -y install wget expect-dev dejagnu python3-sphinx gzip man-db bash tcsh ksh zsh fish tcl tcl8.6 perl python3 ruby cmake r-base-core lsb-release
+    apt-get -y install curl expect-dev dejagnu python3-sphinx gzip man-db bash tcsh ksh zsh fish tcl tcl8.6 perl python3 ruby cmake r-base-core lsb-release
     # libtclenvmodules build requirements
     apt-get -y install gcc autoconf tcl8.6-dev
     # requirements for source-sh extra tests
     apt-get -y install lsof
+    # install powershell
+    curl -LJO https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+    dpkg -i packages-microsoft-prod.deb
+    rm packages-microsoft-prod.deb
+    apt-get update
+    apt-get install -y powershell
   configure_script:
     - ./configure --with-tclsh=tclsh8.6 --prefix='/tmp/mo ules' --with-tcl=/usr/lib/tcl8.6
   << : *BUILD_INSTALL_TEST_TEMPLATE
@@ -181,7 +193,7 @@ task:
     # another one from EPEL (as dependency for R-core) on recent RockyLinux 8
     yum install -y environment-modules
     yum install -y epel-release
-    yum install -y tcsh zsh ksh tcl perl python36 gzip ruby cmake R-core make wget perl python3-sphinx git dejagnu man-db rpm-build bzip2 autoconf gcc tcl-devel
+    yum install -y tcsh zsh ksh tcl perl python36 gzip ruby cmake R-core make wget perl python3-sphinx git dejagnu man-db rpm-build bzip2 autoconf gcc tcl-devel emacs
     yum install -y which xorg-x11-server-utils xorg-x11-server-Xvfb
     yum install -y fish
   configure_script:
@@ -205,7 +217,7 @@ task:
   reqinstall_script: |
     dnf install -y dnf-plugins-core epel-release
     dnf config-manager --set-enabled crb
-    dnf install -y tcsh zsh ksh fish tcl perl python3 gzip ruby cmake R-core make wget perl python3-sphinx git dejagnu man-db rpm-build bzip2 autoconf gcc tcl-devel procps-ng
+    dnf install -y tcsh zsh ksh fish tcl perl python3 gzip ruby cmake R-core make wget perl python3-sphinx git dejagnu man-db rpm-build bzip2 autoconf gcc tcl-devel procps-ng emacs
   configure_script:
     - ./configure --with-bashcompletiondir=/usr/share/bash-completion/completions --with-fishcompletiondir=/usr/share/fish/vendor_completions.d --with-zshcompletiondir=/usr/share/zsh/site-functions
   # also enable a display on this test case to validate x-resource behavior

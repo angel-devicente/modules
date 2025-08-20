@@ -183,10 +183,27 @@ setenv_var __MODULES_LMCONFLICT "dg&db"
 
 # attempt to load broken/conflicting prereq alternative
 # dependent modules are unloaded prior "da" load but cannot be reloaded as "da" declares a conflict on them
-set tserr [list "unload dg" "unload df" "load da" "load df" \n[msg_load df [err_conlo da]] \n[msg_load da [err_depre df]]]
-testouterr_cmd_re "sh" "load da" ERR [join $tserr "\n"]
-set tserr [list "load db" \n[msg_load db [err_conflict dg]]]
-testouterr_cmd_re "sh" "load db" "ERR" [join $tserr "\n"]
+set ans [list]
+lappend ans [list set __MODULES_LMCONFLICT "da&df"]
+lappend ans [list unset __MODULES_LMPREREQ]
+lappend ans [list set _LMFILES_ $mp/dd:$mp/da]
+lappend ans [list set LOADEDMODULES dd:da]
+lappend ans [list set __MODULES_LMTAG dd&auto-loaded]
+set tserr [list "unload dg" "unload df" "load da" \n[msg_top_load_conun da {dg df} {} {} {} {}]]
+testouterr_cmd_re "sh" "load da" $ans [join $tserr "\n"]
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list set _LMFILES_ $mp/db]
+    lappend ans [list set LOADEDMODULES db]
+    lappend ans [list unset __MODULES_LMTAG]
+    set tserr [join [list {unload dg} {unload df} {load db} {unload dd} \n[msg_top_load_conun db {} dg {df dd} {} {} {}]] \n]
+} else {
+    set ans ERR
+    set tserr [join [list "load db" \n[msg_load db [err_conflict dg]]] \n]
+}
+testouterr_cmd_re "sh" "load db" $ans $tserr
 # dependent modules are unloaded prior "dc" load but as dc breaks everything is restored
 set tserr [list "unload dg" "unload df" "load dc" \n[msg_load dc $err_evalabort]]
 testouterr_cmd_re "sh" "load dc" "ERR" [join $tserr "\n"]
@@ -203,12 +220,22 @@ lappend ans [list set __MODULES_LMCONFLICT "da&df"]
 lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list set _LMFILES_ "$mp/da"]
 lappend ans [list set LOADEDMODULES "da"]
-lappend ans [list ERR]
 # dependent modules are unloaded prior "da" load but cannot be reloaded as "da" declares a conflict on them
-set tserr [list "unload dg" "unload df" "load da" "load df" \n[msg_load df [err_conlo da]] \n[msg_load da [err_depre df]]]
-testouterr_cmd_re "sh" "load da" ERR [join $tserr "\n"]
+set tserr [list "unload dg" "unload df" "load da" \n[msg_top_load_conun da {dg df} {} {} {} {}]]
+testouterr_cmd_re "sh" "load da" $ans [join $tserr "\n"]
 set tserr [list "load db" \n[msg_load db [err_conflict dg]]]
-testouterr_cmd_re "sh" "load db" "ERR" [join $tserr "\n"]
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list set __MODULES_LMPREREQ df&da|db|dc|dd|de]
+    lappend ans [list set _LMFILES_ $mp/db:$mp/df]
+    lappend ans [list set LOADEDMODULES db:df]
+    set tserr [join [list {unload dg} {unload df} {load db} {load df} \n[msg_top_load db {} {} df {Unloading conflict: dg}]] \n]
+} else {
+    set ans ERR
+    set tserr [join [list "load db" \n[msg_load db [err_conflict dg]]] \n]
+}
+testouterr_cmd_re "sh" "load db" $ans $tserr
 # dependent modules are unloaded prior "dc" load but as dc breaks everything is restored
 set tserr [list "unload dg" "unload df" "load dc" \n[msg_load dc $err_evalabort]]
 testouterr_cmd_re "sh" "load dc" "ERR" [join $tserr "\n"]
@@ -280,13 +307,24 @@ lappend ans [list set LOADEDMODULES "g2:g4"]
 testouterr_cmd_re "sh" "unload g1" $ans [msg_top_unload g1 {} {} g4]
 
 # load test that creates a conflict violation
-set ans [list]
-lappend ans [list set FOO "/path/to/g4-g1-g2-g3"]
-lappend ans [list set __MODULES_LMCONFLICT "g3&g2"]
-lappend ans [list set __MODULES_LMPREREQ "g4&g1|g2|g3"]
-lappend ans [list set _LMFILES_ "$mp/g1:$mp/g2:$mp/g3:$mp/g4"]
-lappend ans [list set LOADEDMODULES "g1:g2:g3:g4"]
-testouterr_cmd_re "sh" "load --force g3" $ans [msg_top_load g3 {} {} g4 [err_conlof g2]]
+if {[is_conf_enabled conflictunload]} {
+    set ans [list]
+    lappend ans [list set FOO "/path/to/g4-g1-g3"]
+    lappend ans [list set __MODULES_LMCONFLICT "g3&g2"]
+    lappend ans [list set __MODULES_LMPREREQ "g4&g1|g2|g3"]
+    lappend ans [list set _LMFILES_ "$mp/g1:$mp/g3:$mp/g4"]
+    lappend ans [list set LOADEDMODULES "g1:g3:g4"]
+    set tserr [msg_top_load g3 g2 {} g4]
+} else {
+    set ans [list]
+    lappend ans [list set FOO "/path/to/g4-g1-g2-g3"]
+    lappend ans [list set __MODULES_LMCONFLICT "g3&g2"]
+    lappend ans [list set __MODULES_LMPREREQ "g4&g1|g2|g3"]
+    lappend ans [list set _LMFILES_ "$mp/g1:$mp/g2:$mp/g3:$mp/g4"]
+    lappend ans [list set LOADEDMODULES "g1:g2:g3:g4"]
+    set tserr [msg_top_load g3 {} {} g4 [err_conlof g2]]
+}
+testouterr_cmd_re "sh" "load --force g3" $ans $tserr
 
 # set loaded situation where a conflict violation exists
 setenv_loaded_module [list g1 g2 g3 g4] [list "$mp/g1" "$mp/g2" "$mp/g3" "$mp/g4"]
@@ -413,7 +451,7 @@ lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list set _LMFILES_ "$mp/h33"]
 lappend ans [list set LOADEDMODULES "h33"]
 lappend ans [list unset __MODULES_LMTAG]
-set tserr [list "unload h33" "unload h32" "unload h31" "unload h30" "load h33" \n[msg_top_unload h32 {} [list h31 h30] h33]]
+set tserr [list "unload h32" "unload h33" "unload h31" "unload h30" "load h33" \n[msg_top_unload h32 {} [list h31 h30] h33]]
 testouterr_cmd_re "sh" "unload h32" $ans [join $tserr "\n"]
 
 # unload of two useless requirement modules solves a conflict violation
@@ -425,7 +463,7 @@ lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list set _LMFILES_ "$mp/h38"]
 lappend ans [list set LOADEDMODULES "h38"]
 lappend ans [list unset __MODULES_LMTAG]
-set tserr [list "unload h38" "unload h32" "unload h31" "unload h30" "load h38" \n[msg_top_unload h32 {} [list h31 h30] h38]]
+set tserr [list "unload h32" "unload h38" "unload h31" "unload h30" "load h38" \n[msg_top_unload h32 {} [list h31 h30] h38]]
 testouterr_cmd_re "sh" "unload h32" $ans [join $tserr "\n"]
 
 # unload of a useless requirement module and main module solves a conflict violation (just one reload)
@@ -437,7 +475,7 @@ lappend ans [list unset __MODULES_LMPREREQ]
 lappend ans [list set _LMFILES_ "$mp/h39"]
 lappend ans [list set LOADEDMODULES "h39"]
 lappend ans [list unset __MODULES_LMTAG]
-set tserr [list "unload h39" "unload h32" "unload h31" "unload h30" "load h39" \n[msg_top_unload h32 {} [list h31 h30] h39]]
+set tserr [list "unload h32" "unload h39" "unload h31" "unload h30" "load h39" \n[msg_top_unload h32 {} [list h31 h30] h39]]
 testouterr_cmd_re "sh" "unload h32" $ans [join $tserr "\n"]
 
 # unload of a useless requirement module and main module reduce a conflict violation but one conflicting module is still loaded (no reload)
@@ -522,7 +560,7 @@ set ans [list]
 lappend ans [list set __MODULES_LMPREREQ "h54&h51|h57"]
 lappend ans [list set _LMFILES_ "$mp/h57:$mp/h58:$mp/h54"]
 lappend ans [list set LOADEDMODULES "h57:h58:h54"]
-set tserr [list "unload h54" "unload h56" "unload h55" "unload h53" "unload h52" "unload h51" "unload h50" "load h54" \n[msg_top_unload h50 [list h56 h55 h53 h52 h51] {} h54]]
+set tserr [list "unload h56" "unload h55" "unload h54" "unload h53" "unload h52" "unload h51" "unload h50" "load h54" \n[msg_top_unload h50 [list h56 h55 h54 h53 h52 h51] {} {{} {h54}}]]
 testouterr_cmd_re "sh" "unload h50" $ans [join $tserr "\n"]
 
 
@@ -639,7 +677,7 @@ lappend ans [list set __MODULES_LMPREREQ "h65&h60:h67&h68|h61"]
 lappend ans [list set _LMFILES_ "$mp/h60:$mp/h68:$mp/h65:$mp/h67"]
 lappend ans [list set LOADEDMODULES "h60:h68:h65:h67"]
 lappend ans [list set __MODULES_LMTAG h60&auto-loaded:h68&auto-loaded]
-set tserr [list "unload h67" "unload h65" "unload h69" "unload h62" "unload h61" "unload h70" "load h65" "load h67" \n[msg_top_unload {h61 <aL>} [list h69 h62] h70 [list h65 h67]]]
+set tserr [list "unload h69" "unload h67" "unload h65" "unload h62" "unload h61" "unload h70" "load h65" "load h67" \n[msg_top_unload {h61 <aL>} [list h69 h67 h65 h62] h70 {{} {h65 h67}}]]
 testouterr_cmd_re "sh" "unload h61" $ans [join $tserr "\n"]
 
 
@@ -707,7 +745,12 @@ testouterr_cmd_re sh {unload ia} $ans [join $tserr \n]
 
 # test module evaluation detection when conflict is expressed against bare module name
 testouterr_cmd sh {load con2/2.1} ERR [msg_load con1/1.1 [err_conloi con2/2.1]]\n\n[msg_load con2/2.1 [err_reqlo con1/1.1]]
-testouterr_cmd sh {load con2/2.2} ERR [msg_load con2/2.2 [err_conlo con1/1.1]]
+if {[is_conf_enabled conflictunload]} {
+    set tserr [msg_unload {con1/1.1 <aL>} [err_deploi con2/2.2]]\n\n[msg_load con2/2.2 [err_conun con1/1.1]]
+} else {
+    set tserr [msg_load con2/2.2 [err_conlo con1/1.1]]
+}
+testouterr_cmd sh {load con2/2.2} ERR $tserr
 testouterr_cmd sh {load con2/2.3} ERR [msg_load con1/1.2 [err_conloi con2/2.3]]\n\n[msg_load con2/2.3 [err_reqlo con1/1.2]]
 
 

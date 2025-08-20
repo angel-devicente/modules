@@ -11,10 +11,10 @@ INSTALL_DATA = $(INSTALL) -m 644
 
 SH_LIKE  = sh ksh bash zsh profile.sh
 CSH_LIKE = csh tcsh tcsh_completion profile.csh
-OTHER    = perl.pm python.py ruby.rb lisp tcl fish cmake r.R
+OTHER    = perl.pm python.py ruby.rb lisp tcl fish cmake r.R pwsh.ps1
 
 # example modulefiles to install
-EXAMPLE_MODFILES_SRCDIR := ../contrib/modulefiles
+EXAMPLE_MODFILES_SRCDIR := ../share/modulefiles
 EXAMPLE_MODFILES = dot module-git module-info modules null use.own
 EXAMPLE_WIN_MODFILES = module-git module-info null
 EXAMPLE_TESTCONFIG_MODFILES = null
@@ -118,8 +118,8 @@ quarvarsre += s/@.*RUNENV_VAR.*@//;'
 endif
 
 # define variables for shell completion
-comp_cmds := add add-any apropos aliases avail append-path cachebuild cacheclear clear config del display edit help initadd initclear initlist initprepend initrm is-loaded is-saved is-used is-avail info-loaded keyword lint list load load-any mod-to-sh path paths purge prepend-path refresh reload reset restore rm remove remove-path save savelist saveshow saverm search show sh-to-mod source stash stashclear stashlist stashpop stashrm stashshow state swap switch test try-add try-load unload unuse use whatis
-comp_long_opts := --debug --help --silent --trace --verbose --version --paginate --no-pager --color --color= --width --width= --ignore-cache --ignore-user-rc
+comp_cmds := add add-any apropos aliases avail append-path cachebuild cacheclear clear config del describe disable display edit help initadd initclear initlist initprepend initrm is-loaded is-saved is-used is-avail info-loaded keyword lint list load load-any mod-to-sh path paths purge prepend-path refresh reload reset restore rm remove remove-path save savelist saveshow saverm search show sh-to-mod source spider stash stashclear stashlist stashpop stashrm stashshow state swap switch test try-add try-load unload unuse update use whatis
+comp_long_opts := --debug --dumpname --help --silent --trace --verbose --version --paginate --no-pager --color --color= --width --width= --ignore-cache --ignore-user-rc
 comp_opts := -D -h -s -T -v -V -w $(comp_long_opts)
 comp_load_opts := --auto --no-auto --force -f --icase -i --tag --tag=
 comp_unload_opts := --auto --no-auto --force -f --icase -i
@@ -136,7 +136,7 @@ comp_lint_opts := -a -i --all --icase
 comp_modtosh_opts := --auto --no-auto --force -f --icase -i
 comp_path_opts := -d --delim --duplicates
 comp_rm_path_opts := -d --delim --index
-comp_config_opts := --dump-state --reset abort_on_error advanced_version_spec auto_handling avail_indepth avail_output avail_terse_output cache_buffer_bytes cache_expiry_secs collection_pin_version collection_pin_tag collection_target color colors contact editor extended_default extra_siteconfig hide_auto_loaded home icase ignore_cache ignore_user_rc implicit_default implicit_requirement list_output list_terse_output locked_configs logged_events logger mcookie_check mcookie_version_check ml nearly_forbidden_days pager protected_envvars quarantine_support rcfile redirect_output reset_target_state run_quarantine search_match set_shell_startup shells_with_ksh_fpath silent_shell_debug source_cache sticky_purge tag_abbrev tag_color_name tcl_linter term_background term_width unique_name_loaded unload_match_order variant_shortcut verbosity wa_277
+comp_config_opts := --dump-state --reset abort_on_error advanced_version_spec auto_handling avail_indepth avail_output avail_terse_output cache_buffer_bytes cache_expiry_secs collection_pin_version collection_pin_tag collection_target color colors conflict_unload contact editor extended_default extra_siteconfig hide_auto_loaded home icase ignore_cache ignore_user_rc implicit_default implicit_requirement list_output list_terse_output locked_configs logged_events logger mcookie_check mcookie_version_check ml nearly_forbidden_days pager protected_envvars quarantine_support rcfile redirect_output require_via reset_target_state run_quarantine search_match set_shell_startup shells_with_ksh_fpath silent_shell_debug source_cache spider_indepth spider_output spider_terse_output sticky_purge tag_abbrev tag_color_name tcl_linter term_background term_width unique_name_loaded unload_match_order variant_shortcut verbosity wa_277
 
 define translate-in-script
 $(ECHO_GEN)
@@ -208,9 +208,10 @@ $(EXAMPLE_MODFILES_SRCDIR)/modules: $(EXAMPLE_MODFILES_SRCDIR)/modules.in
 $(EXAMPLE_MODFILES_SRCDIR)/version: $(EXAMPLE_MODFILES_SRCDIR)/version.in
 	$(translate-in-script)
 
-dist-win:
+dist-win: pwsh.ps1
 	$(INSTALL_DIR) '$(DIST_WIN_PREFIX)/init'
 	$(INSTALL_DATA) cmd.cmd '$(DIST_WIN_PREFIX)/init/'
+	$(INSTALL_DATA) pwsh.ps1 '$(DIST_WIN_PREFIX)/init/'
 	$(INSTALL_DIR) '$(DIST_WIN_PREFIX)/modulefiles'
 	$(INSTALL_DATA) $(addprefix $(EXAMPLE_MODFILES_SRCDIR)/,$(EXAMPLE_WIN_MODFILES)) '$(DIST_WIN_PREFIX)/modulefiles/'
 
@@ -326,4 +327,4 @@ endif
 $(V).SILENT: sh ksh bash zsh csh tcsh fish perl.pm python.py ruby.rb lisp tcl \
 	cmake r.R bash_completion tcsh_completion zsh-functions/_module profile.sh \
 	profile.csh modulespath initrc $(EXAMPLE_MODFILES_SRCDIR)/modules \
-	$(EXAMPLE_MODFILES_SRCDIR)/version
+	$(EXAMPLE_MODFILES_SRCDIR)/version pwsh.ps1

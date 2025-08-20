@@ -3,7 +3,7 @@
 # MFCMD.TCL, modulefile command procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -124,13 +124,7 @@ proc module-info {what {more {}}} {
          # refresh mod name version and variant to correctly get all matching
          # tags (in case tags apply to specific module variant)
          set modname [currentState modulename]
-         set vrlist [getVariantList $modname 1]
-         if {[llength $vrlist]} {
-            lassign [parseModuleSpecification 0 0 0 0 $modname {*}$vrlist]\
-               modnamevr
-         } else {
-            set modnamevr $modname
-         }
+         set modnamevr [getAndParseLoadedModuleWithVariant $modname]
          collectModuleTags $modnamevr
 
          if {$more ne {}} {
@@ -532,7 +526,7 @@ proc module-tag {args} {
       knerror {No module specified in argument}
    }
    if {$tag in [list loaded auto-loaded forbidden nearly-forbidden hidden\
-      hidden-loaded]} {
+      hidden-loaded warning]} {
       knerror "'$tag' is a reserved tag name and cannot be set"
    }
 
@@ -1033,6 +1027,9 @@ proc conflict {args} {
    }
    defineModEqProc [isIcase] [getConf extended_default]
 
+   set conflict_unload [expr {[getConf conflict_unload] && [getConf\
+      auto_handling]}]
+
    # parse module version specification
    set args [parseModuleSpecification 0 0 0 0 {*}$args]
 
@@ -1040,6 +1037,7 @@ proc conflict {args} {
 
    foreach mod $args {
       set is_conflict_loading 0
+      set unload_attempt 0
       set loaded_conflict_mod_list [getLoadedMatchingName $mod returnall]
 
       if {![llength $loaded_conflict_mod_list]} {
@@ -1051,14 +1049,29 @@ proc conflict {args} {
             set loaded_conflict_mod_list [getLoadedMatchingName $mod\
                returnall 1]
             if {[llength $loaded_conflict_mod_list]} {
+               # no conflict unload attempt on loading module
                set is_conflict_loading 1
             }
          }
+      } elseif {$conflict_unload} {
+         set still_loaded_conflict_mod_list {}
+         # unload attempt in reverse load order
+         foreach loaded_conflict_mod [lreverse $loaded_conflict_mod_list] {
+            if {[cmdModuleUnload conun match 1 s 0 $loaded_conflict_mod]} {
+               lappend still_loaded_conflict_mod_list $loaded_conflict_mod
+            }
+         }
+         set loaded_conflict_mod_list $still_loaded_conflict_mod_list
+         set unload_attempt 1
       }
 
       if {[llength $loaded_conflict_mod_list]} {
-         reportPresentConflictError $curmodnamevr $loaded_conflict_mod_list\
-            $is_conflict_loading
+         setConflictErrorAsReported {*}$loaded_conflict_mod_list
+
+         # error msg has already been sent if a conflict unload was attempted
+         set msg [expr {$unload_attempt ? {} : [getPresentConflictErrorMsg\
+            $curmodnamevr $loaded_conflict_mod_list $is_conflict_loading]}]
+         knerrorOrWarningIfForced $msg MODULES_ERR_GLOBAL
       }
    }
 
@@ -1130,7 +1143,7 @@ proc parsePrereqCommandArgs {cmd args} {
 
    foreach tag $tag_list {
       if {$tag in [list loaded auto-loaded forbidden nearly-forbidden\
-         hidden]} {
+         hidden warning]} {
          knerror "Tag '$tag' cannot be manually set"
       }
    }
@@ -1164,6 +1177,10 @@ proc prereqAnyModfileCmd {tryload auto args} {
       }
       lappend record_list {*}$args
       setLoadedPrereq $currentModule $record_list
+
+      if {[llength $modulepath_list]} {
+         setLoadedPrereqPath $currentModule $record_list $modulepath_list
+      }
    }
 
    if {$auto} {
@@ -1275,14 +1292,12 @@ proc system {args} {
    }
 
    if {[catch {exec >&@stderr $shell $shellarg [join $args]}]} {
-       # non-zero exit status, get it:
-       set status [lindex $::errorCode 2]
+      # non-zero exit status, get it:
+      return [lindex $::errorCode 2]
    } else {
-       # exit status was 0
-       set status 0
+      # exit status was 0
+      return 0
    }
-
-   return $status
 }
 
 # test at least one of the collections passed as argument exists
@@ -1471,7 +1486,7 @@ proc execShAndGetEnv {elt_ignored_list shell script args} {
             shell $shdesc] 2>&1; or exit \$status; echo '$sep'; set -xgL;\
             echo '$sep'; $getfunc; string split \$funcout; echo '$sep';\
             string split \$funcout; echo '$sep'; complete; echo '$sep'; pwd"
-         set varre {^(\S+?\M) ?'?(.*?)'?$}
+         set varre {^(\S+?\M) ?['"]?(.*?)['"]?$}
          # exclude alias from function list
          set funcre "^function (\\S+?)(?: \[^\\n\]*?--description\
             (?!'?alias)\[^\\n\]+)?\\n(.+?)?\\s*\\nend\\n$subsep\$"
@@ -2287,6 +2302,90 @@ proc lsb-release {what} {
       codename {getState lsb_codename}
       default {knerror "lsb-release $what not supported"}
    }]
+}
+
+proc registerCurrentModuleUse {args} {
+   if {[string length [currentState modulename]]} {
+      setLoadedUse [currentState modulename] {*}$args
+   }
+}
+
+proc module-help {args} {
+   lappend ::g_help_lines [join $args]
+}
+
+proc getModuleHelpLines {} {
+   if {[info exists ::g_help_lines]} {
+      return $::g_help_lines
+   }
+}
+
+# convert property value as module tag (property name is ignored)
+proc add-property {name value} {
+   set tag_list [split $value :]
+   set mod [currentState modulename]
+   foreach tag $tag_list {
+      module-tag $tag $mod
+   }
+}
+
+proc module-warn {args} {
+   # parse application criteria arguments to determine if command apply
+   lassign [parseApplicationCriteriaArgs 1 0 {*}$args] apply isnearly after\
+      otherargs
+
+   # parse remaining argument list, do it even if command does not apply to
+   # raise any command specification error
+   foreach arg $otherargs {
+      if {[info exists nextargisval]} {
+         ##nagelfar vartype nextargisval varName
+         set $nextargisval $arg
+         unset nextargisval
+      } else {
+         switch -glob -- $arg {
+            --message {
+               set nextargisval message
+            }
+            -* {
+               knerror "Invalid option '$arg'"
+            }
+            default {
+               lappend modarglist $arg
+            }
+         }
+         set prevarg $arg
+      }
+   }
+
+   if {[info exists nextargisval]} {
+      knerror "Missing value for '$prevarg' option"
+   }
+   if {![info exists message]} {
+      knerror {No message specified in argument}
+   }
+   if {![info exists modarglist]} {
+      knerror {No module specified in argument}
+   }
+
+   # skip tag record if application criteria are not met
+   if {$apply} {
+      ##nagelfar ignore Found constant
+      set proplist [list message $message]
+      # record each hide spec after parsing them
+      foreach modarg [parseModuleSpecification 0 0 0 0 {*}$modarglist] {
+         setModspecTag $modarg warning $proplist
+      }
+   }
+}
+
+proc provide {args} {
+   if {![llength $args]} {
+      knerror {No module specified in argument}
+   }
+   set current_mod [currentState modulename]
+   foreach alias $args {
+      setLoadedAltname $current_mod [list al $alias]
+   }
 }
 
 # ;;; Local Variables: ***

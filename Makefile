@@ -17,9 +17,9 @@ WGET := wget --retry-connrefused --waitretry=20 --timeout=20 --tries=3
 
 # definitions for code coverage
 NAGELFAR_DLSRC1 := http://downloads.sourceforge.net/nagelfar/
-NAGELFAR_RELEASE := nagelfar133
+NAGELFAR_RELEASE := nagelfar135
 NAGELFAR_DIST := $(NAGELFAR_RELEASE).tar.gz
-NAGELFAR_DISTSUM := ab3451c8ba6b1ec9d9e26dec7e17b954
+NAGELFAR_DISTSUM := 0305ae1617a365626f45fc08909c6f58
 NAGELFAR := $(NAGELFAR_RELEASE)/nagelfar.tcl
 
 # definition for old Tcl interpreter for coverage testing
@@ -38,6 +38,12 @@ OPENFOAM_REPOURL := https://github.com/OpenFOAM/OpenFOAM-dev.git
 
 # specific modulecmd script for test
 MODULECMDTEST := modulecmd-test.tcl
+# if coverage enabled, run tests on instrumented file to create coverage log
+ifeq ($(COVERAGE),y)
+MODULECMD := $(MODULECMDTEST)_i
+else
+MODULECMD := $(MODULECMDTEST)
+endif
 
 # definitions for enhanced diff tool (to review test results)
 ICDIFF_DLSRC := https://raw.githubusercontent.com/jeffkaufman/icdiff/release-2.0.4/
@@ -51,10 +57,9 @@ include Makefile.inc
 
 INSTALL_PREREQ := modulecmd.tcl ChangeLog.gz README script/add.modules \
 	script/modulecmd
+TEST_PREREQ := $(MODULECMD)
 ifeq ($(COVERAGE),y)
-TEST_PREREQ := $(MODULECMDTEST)_i $(NAGELFAR)
-else
-TEST_PREREQ := $(MODULECMDTEST)
+TEST_PREREQ += $(NAGELFAR)
 endif
 
 ifeq ($(libtclenvmodules),y)
@@ -194,7 +199,7 @@ endif
 # determine RPM release
 # use last release if we currently sat on tag, append build number to it elsewhere
 MODULES_LAST_RPM_VERSREL := $(shell sed -n '/^%changelog/ {n;s/^\*.* - //p;q;}' \
-	contrib/rpm/environment-modules.spec.in)
+	share/rpm/environment-modules.spec.in)
 MODULES_LAST_RPM_RELEASE := $(lastword $(subst -, ,$(MODULES_LAST_RPM_VERSREL)))
 MODULES_RPM_RELEASE := $(MODULES_LAST_RPM_RELEASE)$(subst +,.,$(subst -,.,$(MODULES_BUILD)))
 
@@ -305,6 +310,18 @@ else
   setautohandling := 0
 endif
 
+ifeq ($(conflictunload),y)
+  setconflictunload := 1
+else
+  setconflictunload := 0
+endif
+
+ifeq ($(requirevia),y)
+  setrequirevia := 1
+else
+  setrequirevia := 0
+endif
+
 ifeq ($(implicitrequirement),y)
   setimplicitrequirement := 1
 else
@@ -315,6 +332,12 @@ ifeq ($(availindepth),y)
   setavailindepth := 1
 else
   setavailindepth := 0
+endif
+
+ifeq ($(spiderindepth),y)
+  setspiderindepth := 1
+else
+  setspiderindepth := 0
 endif
 
 ifeq ($(implicitdefault),y)
@@ -429,11 +452,16 @@ sed -e 's|@prefix@|$(prefix)|g' \
 	-e 's|@availterseoutput@|$(availterseoutput)|g' \
 	-e 's|@listoutput@|$(listoutput)|g' \
 	-e 's|@listterseoutput@|$(listterseoutput)|g' \
+	-e 's|@spideroutput@|$(spideroutput)|g' \
+	-e 's|@spiderterseoutput@|$(spiderterseoutput)|g' \
 	-e 's|@variantshortcut@|$(variantshortcut)|g' \
 	-e 's|@editor@|$(editor)|g' \
 	-e 's|@autohandling@|$(setautohandling)|g' \
+	-e 's|@conflictunload@|$(setconflictunload)|g' \
+	-e 's|@requirevia@|$(setrequirevia)|g' \
 	-e 's|@implicitrequirement@|$(setimplicitrequirement)|g' \
 	-e 's|@availindepth@|$(setavailindepth)|g' \
+	-e 's|@spiderindepth@|$(setspiderindepth)|g' \
 	-e 's|@silentshdbgsupport@|$(setsilentshdbgsupport)|g' \
 	-e 's|@ml@|$(setml)|g' \
 	-e 's|@setshellstartup@|$(setsetshellstartup)|g' \
@@ -469,7 +497,7 @@ Makefile.inc: ;
 version.inc: version.inc.in $(GIT_REFRESH_PREREQ)
 	$(translate-in-script)
 
-contrib/rpm/environment-modules.spec: contrib/rpm/environment-modules.spec.in $(GIT_REFRESH_PREREQ)
+share/rpm/environment-modules.spec: share/rpm/environment-modules.spec.in $(GIT_REFRESH_PREREQ)
 	$(translate-in-script)
 
 tcl/cache.tcl: tcl/cache.tcl.in version.inc
@@ -517,7 +545,7 @@ tcl/subcmd.tcl_i: tcl/subcmd.tcl $(NAGELFAR)
 	$(ECHO_GEN)
 	rm -f $<_log
 	$(NAGELFAR) -instrument $<
-	sed -i -e 's|$(nagelfardatadir)|contrib/nagelfar|g' $@
+	sed -i -e 's|$(nagelfardatadir)|share/nagelfar|g' $@
 
 # join all tcl/*.tcl files to build modulecmd.tcl
 modulecmd.tcl: tcl/cache.tcl tcl/coll.tcl tcl/envmngt.tcl tcl/init.tcl \
@@ -698,17 +726,23 @@ ifeq ($(vimaddons),y)
 	$(INSTALL_DIR) '$(DESTDIR)$(vimdatadir)/ftdetect'
 	$(INSTALL_DIR) '$(DESTDIR)$(vimdatadir)/ftplugin'
 	$(INSTALL_DIR) '$(DESTDIR)$(vimdatadir)/syntax'
-	$(INSTALL_DATA) contrib/vim/ftdetect/modulefile.vim '$(DESTDIR)$(vimdatadir)/ftdetect'
-	$(INSTALL_DATA) contrib/vim/ftplugin/modulefile.vim '$(DESTDIR)$(vimdatadir)/ftplugin'
-	$(INSTALL_DATA) contrib/vim/syntax/modulefile.vim '$(DESTDIR)$(vimdatadir)/syntax'
+	$(INSTALL_DATA) share/vim/ftdetect/modulefile.vim '$(DESTDIR)$(vimdatadir)/ftdetect'
+	$(INSTALL_DATA) share/vim/ftplugin/modulefile.vim '$(DESTDIR)$(vimdatadir)/ftplugin'
+	$(INSTALL_DATA) share/vim/syntax/modulefile.vim '$(DESTDIR)$(vimdatadir)/syntax'
+endif
+ifeq ($(emacsaddons),y)
+	$(INSTALL_DIR) '$(DESTDIR)$(emacsdatadir)'
+	$(INSTALL_DATA) share/emacs/lisp/modulefile-mode.el* '$(DESTDIR)$(emacsdatadir)'
 endif
 ifeq ($(nagelfaraddons),y)
 	$(INSTALL_DIR) '$(DESTDIR)$(nagelfardatadir)'
-	$(INSTALL_DATA) contrib/nagelfar/plugin_modulefile.tcl  '$(DESTDIR)$(nagelfardatadir)/'
-	$(INSTALL_DATA) contrib/nagelfar/plugin_modulerc.tcl  '$(DESTDIR)$(nagelfardatadir)/'
-	$(INSTALL_DATA) contrib/nagelfar/plugin_globalrc.tcl  '$(DESTDIR)$(nagelfardatadir)/'
-	$(INSTALL_DATA) contrib/nagelfar/syntaxdb_modulefile.tcl  '$(DESTDIR)$(nagelfardatadir)/'
-	$(INSTALL_DATA) contrib/nagelfar/syntaxdb_modulerc.tcl  '$(DESTDIR)$(nagelfardatadir)/'
+	$(INSTALL_DATA) share/nagelfar/plugin_modulecache.tcl  '$(DESTDIR)$(nagelfardatadir)/'
+	$(INSTALL_DATA) share/nagelfar/plugin_modulefile.tcl  '$(DESTDIR)$(nagelfardatadir)/'
+	$(INSTALL_DATA) share/nagelfar/plugin_modulerc.tcl  '$(DESTDIR)$(nagelfardatadir)/'
+	$(INSTALL_DATA) share/nagelfar/plugin_globalrc.tcl  '$(DESTDIR)$(nagelfardatadir)/'
+	$(INSTALL_DATA) share/nagelfar/syntaxdb_modulecache.tcl  '$(DESTDIR)$(nagelfardatadir)/'
+	$(INSTALL_DATA) share/nagelfar/syntaxdb_modulefile.tcl  '$(DESTDIR)$(nagelfardatadir)/'
+	$(INSTALL_DATA) share/nagelfar/syntaxdb_modulerc.tcl  '$(DESTDIR)$(nagelfardatadir)/'
 endif
 	$(MAKE) -C init install DESTDIR='$(DESTDIR)'
 ifneq ($(builddoc),n)
@@ -746,10 +780,17 @@ ifeq ($(vimaddons),y)
 	-rmdir '$(DESTDIR)$(vimdatadir)/syntax'
 	-rmdir -p '$(DESTDIR)$(vimdatadir)'
 endif
+ifeq ($(emacsaddons),y)
+	rm -f '$(DESTDIR)$(emacsdatadir)/modulefile-mode.el'
+	rm -f '$(DESTDIR)$(emacsdatadir)/modulefile-mode.elc'
+	-rmdir -p '$(DESTDIR)$(emacsdatadir)'
+endif
 ifeq ($(nagelfaraddons),y)
+	rm -f '$(DESTDIR)$(nagelfardatadir)/plugin_modulecache.tcl'
 	rm -f '$(DESTDIR)$(nagelfardatadir)/plugin_modulefile.tcl'
 	rm -f '$(DESTDIR)$(nagelfardatadir)/plugin_modulerc.tcl'
 	rm -f '$(DESTDIR)$(nagelfardatadir)/plugin_globalrc.tcl'
+	rm -f '$(DESTDIR)$(nagelfardatadir)/syntaxdb_modulecache.tcl'
 	rm -f '$(DESTDIR)$(nagelfardatadir)/syntaxdb_modulefile.tcl'
 	rm -f '$(DESTDIR)$(nagelfardatadir)/syntaxdb_modulerc.tcl'
 	-rmdir -p '$(DESTDIR)$(nagelfardatadir)'
@@ -782,7 +823,7 @@ endif
 
 # include pre-generated documents not to require documentation build
 # tools when installing from dist tarball
-dist-tar: ChangeLog.gz contrib/rpm/environment-modules.spec pkgdoc
+dist-tar: ChangeLog.gz share/rpm/environment-modules.spec pkgdoc
 	$(ECHO_GEN2) $(DIST_PREFIX).tar
 	git archive --prefix=$(DIST_PREFIX)/ --worktree-attributes \
 		-o $(DIST_PREFIX).tar HEAD
@@ -790,8 +831,8 @@ dist-tar: ChangeLog.gz contrib/rpm/environment-modules.spec pkgdoc
 		lib/configure lib/config.h.in $(DIST_AUTORECONF_EXTRA) ChangeLog.gz \
 		doc/build/MIGRATING.txt doc/build/changes.txt doc/build/INSTALL.txt \
 		doc/build/INSTALL-win.txt doc/build/NEWS.txt doc/build/CONTRIBUTING.txt \
-		doc/build/module.1.in doc/build/ml.1 doc/build/modulefile.5 \
-		contrib/rpm/environment-modules.spec
+		doc/build/module.1.in doc/build/ml.1 doc/build/envml.1 \
+		doc/build/modulefile.5 share/rpm/environment-modules.spec
 
 dist-gzip: dist-tar
 	$(ECHO_GEN2) $(DIST_PREFIX).tar.gz
@@ -822,11 +863,15 @@ dist-win: modulecmd.tcl ChangeLog.gz README pkgdoc
 	$(INSTALL_DATA) doc/build/NEWS.txt $(DIST_WIN_PREFIX)/doc/
 	$(INSTALL_DATA) doc/build/CONTRIBUTING.txt $(DIST_WIN_PREFIX)/doc/
 	$(INSTALL_DATA) doc/build/module.txt $(DIST_WIN_PREFIX)/doc/
+	$(INSTALL_DATA) doc/build/ml.txt $(DIST_WIN_PREFIX)/doc/
+	$(INSTALL_DATA) doc/build/envml.txt $(DIST_WIN_PREFIX)/doc/
 	$(INSTALL_DATA) doc/build/modulefile.txt $(DIST_WIN_PREFIX)/doc/
 	$(MAKE) --no-print-directory -C init dist-win DIST_WIN_PREFIX=../$(DIST_WIN_PREFIX)
 	$(INSTALL_PROGRAM) script/INSTALL.bat $(DIST_WIN_PREFIX)/
 	$(INSTALL_PROGRAM) script/UNINSTALL.bat $(DIST_WIN_PREFIX)/
 	$(INSTALL_PROGRAM) script/TESTINSTALL.bat $(DIST_WIN_PREFIX)/
+	$(INSTALL_PROGRAM) script/INSTALL_PWSH.bat $(DIST_WIN_PREFIX)/
+	$(INSTALL_PROGRAM) script/TESTINSTALL_PWSH.ps1 $(DIST_WIN_PREFIX)/
 	zip -r $(DIST_WIN_PREFIX).zip $(DIST_WIN_PREFIX)
 	rm -rf $(DIST_WIN_PREFIX)
 
@@ -869,7 +914,7 @@ ifneq ($(builddoc),n)
 	$(MAKE) -C doc clean
 endif
 	rm -f version.inc
-	rm -f contrib/rpm/environment-modules.spec
+	rm -f share/rpm/environment-modules.spec
 ifneq ($(wildcard lib/Makefile),)
 	$(MAKE) -C lib clean
 endif
@@ -900,7 +945,7 @@ ifeq ($(multilibsupport),y)
 else
 	sed -e 's|$(libdir)|lib|' $< > $@
 endif
-	sed -i -e 's|$(nagelfardatadir)|contrib/nagelfar|g' $@
+	sed -i -e 's|$(nagelfardatadir)|share/nagelfar|g' $@
 
 tcl/%.tcl_i: tcl/%.tcl $(NAGELFAR)
 	$(ECHO_GEN)
@@ -931,17 +976,13 @@ $(MODULECMDTEST)_i: tcl/cache.tcl_i tcl/coll.tcl_i tcl/envmngt.tcl_i \
 	echo 'source tcl/main.tcl_i' >> $@
 	chmod +x $@
 
-# if coverage enabled, run tests on instrumented file to create coverage log
-ifeq ($(COVERAGE),y)
-export MODULECMD = $(MODULECMDTEST)_i
-endif
-
 # specific target to build test dependencies
 test-deps: $(TEST_PREREQ)
 
 # if coverage enabled create markup file for better read coverage result
 test: $(TEST_PREREQ)
 	TCLSH=$(TCLSH); export TCLSH; \
+	MODULECMD=$(MODULECMD); export MODULECMD; \
 	OBJDIR=`pwd -P`; export OBJDIR; \
 	TESTSUITEDIR=`cd testsuite;pwd -P`; export TESTSUITEDIR; \
 	runtest --srcdir $$TESTSUITEDIR --objdir $$OBJDIR $(RUNTESTFLAGS) --tool modules $(RUNTESTFILES)
@@ -993,9 +1034,10 @@ tclsh83:
 	chmod +x $@
 	rm $(TCL_DIST83)
 
-# fetch spack repository (for source-sh test purpose)
+# fetch spack repository and initialize it (for source-sh test purpose)
 spack:
 	git clone --depth 1 $(SPACK_REPOURL)
+	cd spack && ./bin/spack bootstrap now
 
 # install Conda (for source-sh test purpose)
 miniconda3:
@@ -1068,13 +1110,14 @@ tcl/syntaxdb.tcl: modulecmd.tcl $(NAGELFAR)
 		set tcl_interactive 1;\
 		source $(NAGELFAR_RELEASE)/syntaxbuild.tcl;\
 		set ::syntax(appendNoDupToList) {n x*};\
+		set ::syntax(lprepend) {n x*};\
 		set ::syntax(execute-modulefile) {x x n x x x? x? x?};\
+		set ::syntax(scanExtraMatchSearch) {x x n};\
+		set ::syntax(insertProvidedAliases) {x n};\
 		set ::syntax(filterExtraMatchSearch) {x x n n};\
 		set ::syntax(findModulesFromDirsAndFiles) {x x x x n n? n? n? n?};\
 		set ::syntax(getArrayKey) {n x x};\
 		set ::syntax(getDiffBetweenArray) {n n x? x?};\
-		set ::syntax(reloadModuleListLoadPhase) {n x x x x? x? x?};\
-		set ::syntax(reloadModuleListUnloadPhase) {n x? x? x?};\
 		buildFile $@;" | $(TCLSH)
 
 
@@ -1083,7 +1126,7 @@ ifeq ($(VERBOSE),1)
 V = 1
 endif
 # let verbose by default the install/clean/test and other specific non-build targets
-$(V).SILENT: initdir pkgdoc doc version.inc contrib/rpm/environment-modules.spec \
+$(V).SILENT: initdir pkgdoc doc version.inc share/rpm/environment-modules.spec \
 	modulecmd.tcl tcl/cache.tcl tcl/coll.tcl tcl/envmngt.tcl tcl/init.tcl \
 	tcl/interp.tcl tcl/main.tcl tcl/modfind.tcl tcl/report.tcl tcl/subcmd.tcl \
 	tcl/cache.tcl_i tcl/coll.tcl_i tcl/envmngt.tcl_i tcl/init.tcl_i tcl/interp.tcl_i \

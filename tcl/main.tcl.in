@@ -3,7 +3,7 @@
 # MAIN.TCL, main procedures and code
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 
 # exit in a clean manner by flushing and closing interaction with external
 # components
-proc flushAndExit {code} {
+proc flushAndExit {} {
    # output all shell code generated on stdout
    renderFlush
    # send messages to log if any and enabled
@@ -30,7 +30,7 @@ proc flushAndExit {code} {
    # output last messages on the report file descriptor and close it
    reportFlush
 
-   exit $code
+   exit [expr {[getState error_count] > 0}]
 }
 
 # runs the global RC files if they exist
@@ -64,7 +64,8 @@ proc ongoingCommandName {commandName} {
 # triggered from modulecmd level or (3) during the evaluation of global rc
 # file. (2) and (3) are considered "extended" top evaluation contexts.
 proc isTopEvaluation {{extended 1}} {
-   return [expr {[depthState modulename] == 0 || ($extended && [depthState\
+   return [expr {([depthState modulename] == 0 && [currentState eval_context]\
+      in {{} load unload swload swunload}) || ($extended && [depthState\
       modulename] == 1 && ([aboveCommandName] in {source autoinit} ||\
       [isStateDefined rc_running]))}]
 }
@@ -94,7 +95,9 @@ proc parseModuleCommandName {command defaultcmd} {
             switch display 2 display available 2 avail aliases 2 aliases list\
             2 list whatis 2 whatis purge 2 purge initadd 5 initadd initload 6\
             initadd initprepend 5 initprepend initswitch 6 initswitch\
-            initswap 6 initswitch initunload 8 initrm initlist 5 initlist} {
+            initswap 6 initswitch initunload 8 initrm initlist 5 initlist\
+            spider 3 spider update 2 reload disable 4 saverm describe 3\
+            saveshow} {
             if {$cmdlen >= $minlen && [string equal -length $cmdlen $command\
                $match]} {
                set command $sccmd
@@ -111,7 +114,7 @@ proc parseModuleCommandName {command defaultcmd} {
       append-path remove-path is-loaded is-saved is-used is-avail info-loaded\
       sh-to-mod edit try-load refresh state load-any lint mod-to-sh reset\
       stash stashpop stashrm stashshow stashclear stashlist cachebuild\
-      cacheclear]}]
+      cacheclear spider]}]
 
    reportDebug "(command=$command, cmdvalid=$cmdvalid, cmdempty=$cmdempty)"
    return [list $command $cmdvalid $cmdempty]
@@ -122,7 +125,9 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
    set show_oneperline 0
    set show_mtime 0
    set show_filter {}
-   set search_filter [expr {[getConf avail_indepth] ? {} : {noindepth}}]
+   set indepth_opt [expr {$cmd eq {spider} ? {spider_indepth} :\
+      {avail_indepth}}]
+   set search_filter [expr {[getConf $indepth_opt] ? {} : {noindepth}}]
    set search_match [getConf search_match]
    set dump_state 0
    set addpath_pos prepend
@@ -147,7 +152,7 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
             -j - --json {
                # enable json output only on supported command
                if {$cmd in [list avail savelist stashlist list search\
-                  whatis]} {
+                  whatis spider]} {
                   setState report_format json
                   set show_oneperline 0
                   set show_mtime 0
@@ -165,7 +170,7 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
             }
             -o {
                # option is only valid for specific sub-commands
-               if {$cmd in [list avail list]} {
+               if {$cmd in [list avail list spider]} {
                   set nextargisval asked_output
                   set output_arg -o
                } else {
@@ -177,7 +182,7 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
             }
             --output=* {
                # option is only valid for specific sub-commands
-               if {$cmd in [list avail list]} {
+               if {$cmd in [list avail list spider]} {
                   set asked_output [string range $arg 9 end]
                   set output_arg --output
                } elseif {!$ignerr} {
@@ -215,11 +220,11 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
                   lappend otherargs $arg
                }
             }
-            --all {
+            --all - --show_hidden {
                # include hidden modules only on a limited set of command
                if {$cmd in [list avail aliases search whatis ml list lint\
-                  savelist]} {
-                  setState hiding_threshold 2
+                  savelist spider]} {
+                  set ::asked_hiding_threshold 2
                } else {
                   lappend otherargs $arg
                }
@@ -230,8 +235,8 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
                if {$cmd eq {use}} {
                   set addpath_pos append
                } elseif {$cmd in [list avail aliases search whatis ml list\
-                  lint savelist]} {
-                  setState hiding_threshold 2
+                  lint savelist spider]} {
+                  set ::asked_hiding_threshold 2
                } else {
                   lappend otherargs $arg
                }
@@ -291,7 +296,7 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
 
    foreach tag $tag_list {
       if {$tag in [list loaded auto-loaded forbidden nearly-forbidden\
-         hidden]} {
+         hidden warning]} {
          knerror "Tag '$tag' cannot be manually set"
       }
    }
@@ -310,9 +315,10 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
 
          # check option value is coherent with current sub-command (remove
          # append/subtract operator at the start if any)
-         if {[isDiffBetweenList [split [expr {[string index $asked_output 0]\
-            in {+ -} ? [string range $asked_output 1 end] : $asked_output}]\
-            :] [lindex $::g_config_defs($outputconf) 4]]} {
+         set asked_output_list [split [expr {[string index $asked_output 0]\
+            in {+ -} ? [string range $asked_output 1 end] : $asked_output}] :]
+         if {[isDiffBetweenList $asked_output_list [lindex\
+            $::g_config_defs($outputconf) 4]]} {
             knerror "Invalid element in value list for '$output_arg' option\
                on $cmd sub-command\nAllowed elements are: [lindex\
                $::g_config_defs($outputconf) 4] (separated by ':')"
@@ -360,7 +366,7 @@ proc module {command args} {
    # define states needed by module spec parsing and sub-command processing
    # define if modfile should always be fully read even for validity check
    lappendState always_read_full_file [expr {$command ni [list path paths\
-      list avail aliases edit]}]
+      list avail aliases edit spider]}]
    lappendState commandname $command
 
    # parse options, do that globally to ignore options not related to a given
@@ -373,11 +379,12 @@ proc module {command args} {
    defineParseModuleSpecificationProc [getConf advanced_version_spec]
    if {$command in [list avail paths whatis load unload switch help test\
       display path is-avail edit try-load load-any list lint mod-to-sh\
-      source]} {
+      source spider]} {
       # some cmds allow to express variant without module name
-      set allow_noname_spec [expr {$command in {avail list paths whatis}}]
+      set allow_noname_spec [expr {$command in {avail list paths whatis\
+         spider}}]
       # some cmds allow extra specifier in query
-      set allow_xt_spec [expr {$command in {avail paths whatis}}]
+      set allow_xt_spec [expr {$command in {avail paths whatis spider}}]
       set parsed_args [parseModuleSpecification 0 $allow_noname_spec\
          $allow_xt_spec 0 {*}$parsed_args]
    }
@@ -389,7 +396,7 @@ proc module {command args} {
          remove-path - is-loaded - is-saved - is-used - is-avail -\
          info-loaded - clear - sh-to-mod - edit - refresh - source - state -\
          lint - mod-to-sh - reset - stash - stashpop - stashrm - stashshow -\
-         stashclear - stashlist - cachebuild - cacheclear {
+         stashclear - stashlist - cachebuild - cacheclear - spider {
             knerror "${msgprefix}Command '$command' not supported$tryhelpmsg"
          }
       }
@@ -492,6 +499,10 @@ proc module {command args} {
          set cmdprocsuffix Resurface
          lappend cmdopts module-info loaded
       }
+      whatis {
+         set cmdprocsuffix Search
+         lappend cmdopts {}
+      }
       default {
          set cmdprocsuffix [string toupper $command 0 0]
       }
@@ -518,10 +529,11 @@ proc module {command args} {
       }
       avail {
          lappend cmdopts $show_oneperline $show_mtime $show_filter\
-            $search_filter $search_match
+            $search_filter $search_match [getModulePathList exiterronundef]
       }
-      search {
-         lappend cmdopts {}
+      spider {
+         lappend cmdopts $show_oneperline $show_mtime $show_filter\
+            $search_filter $search_match
       }
       list - savelist {
          lappend cmdopts $show_oneperline $show_mtime $search_match
@@ -638,6 +650,7 @@ if {[catch {
    # made during argument parse to wait for potential paging to be setup
    set show_help 0
    set show_version 0
+   set show_name 0
    setState cmdline "$argv0 $argv"
 
    # Load extension library if enabled
@@ -668,12 +681,12 @@ if {[catch {
    sourceSiteConfig
 
    setState supported_shells {sh bash ksh zsh csh tcsh fish cmd tcl perl\
-      python ruby lisp cmake r}
+      python ruby lisp cmake r pwsh}
 
    # Parse shell
    setState shell [lindex $argv 0]
    if {[getState shell] ni [getState supported_shells]} {
-      reportErrorAndExit "Unknown shell type \'([getState shell])\'"
+      reportErrorAndExit "Unknown shell type '([getState shell])'"
    }
 
    # extract options and command switches from other args
@@ -719,6 +732,9 @@ if {[catch {
             -V - --version {
                set show_version 1
             }
+            --dumpname {
+               set show_name 1
+            }
             --paginate {
                set asked_paginate 1
             }
@@ -726,7 +742,7 @@ if {[catch {
                set asked_paginate 0
             }
             --redirect {
-               if {[getState shelltype] ni {sh fish}} {
+               if {[getState shelltype] ni {sh fish pwsh}} {
                   reportWarning "Unsupported option '--redirect' on [getState\
                      shell] shell"
                } else {
@@ -788,7 +804,7 @@ if {[catch {
             -a - --append - -append - --all - -p - --prepend - -prepend -\
             --delim - -delim - --delim=* - -delim=* - --duplicates - --index\
             - --notuasked - --indepth - --no-indepth - --dump-state -\
-            --reset - --tag - --tag=* - --glob {
+            --reset - --tag - --tag=* - --glob - --show_hidden {
                # command-specific switches interpreted later on
                lappend otherargv $arg
             }
@@ -844,7 +860,8 @@ if {[catch {
                   set accept_minus_arg [expr {$subcmdtest in {ml config} ||\
                      ([getConf advanced_version_spec] && $subcmdtest in\
                      {avail list display help is-avail is-loaded load path\
-                     paths switch test unload whatis mod-to-sh source})}]
+                     paths switch test unload whatis mod-to-sh source\
+                     spider})}]
                }
                # spare argument if minus arg is accepted
                if {[info exists accept_minus_arg] && $accept_minus_arg} {
@@ -924,11 +941,15 @@ if {[catch {
       } else {
          reportUsage
       }
-      flushAndExit 0
+      flushAndExit
    }
    if {$show_version} {
       reportVersion
-      flushAndExit 0
+      flushAndExit
+   }
+   if {$show_name} {
+      reportName
+      flushAndExit
    }
 
    # eval needed to pass otherargv as list to module proc
@@ -941,10 +962,10 @@ if {[catch {
    reportFinalError $errMsg
    # init error report here in case the error raised before the regular init
    initErrorReport
-   flushAndExit 1
+   flushAndExit
 }
 
-flushAndExit 0
+flushAndExit
 
 # ;;; Local Variables: ***
 # ;;; mode:tcl ***

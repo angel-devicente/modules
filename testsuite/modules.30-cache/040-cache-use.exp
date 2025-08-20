@@ -20,6 +20,10 @@
 #
 ##############################################################################
 
+# filesystem on Cygwin platform is responding in an unexpected way
+# skip these tests on this platform for now
+skip_if_os_in cygwin
+
 # ensure avail tests are made using in depth mode
 setenv_var MODULES_AVAIL_INDEPTH 1
 
@@ -143,7 +147,7 @@ file delete $mp1cache
 
 # tests with a cache containing only few elements
 set fid [open $mp1cache w]
-puts $fid "#%Module$::major_minor_rel
+puts $fid "#%Module$::cache_mcookie_version
 modulefile-content bar/1.0 1664035017 #%Module #%Module"
 close $fid
 testouterr_cmd sh {avail -a -t -o } OK bar/1.0
@@ -224,7 +228,7 @@ file delete $mp1cache
 
 # tests with a cache containing element that does not exists anymore in modulepath
 set fid [open $mp1cache w]
-puts $fid "#%Module$::major_minor_rel
+puts $fid "#%Module$::cache_mcookie_version
 modulefile-content bar/5.0 1664035017 #%Module #%Module"
 close $fid
 testouterr_cmd sh {avail -a -t -o } OK bar/5.0
@@ -284,7 +288,7 @@ file delete $mp2
 
 # test over a modulepath containing a space character
 # skip test on MSYS platform or if symlink creation is not supported
-if {$is_symlink_supported && ![regexp {^MSYS_NT.*} $tcl_platform(os)]} {
+if {$is_symlink_supported && $os_name ne {msys}} {
 set mpws "$env(HOME)/mp ws"
 set mpwscache $mpws/.modulecache
 file link -symbolic $mpws $mp1

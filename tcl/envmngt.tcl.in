@@ -3,7 +3,7 @@
 # ENVMNGT.TCL, environment management procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -81,6 +81,10 @@ proc renderFalse {} {
          r {
             lappend ::g_shcode_out {mlstatus <- FALSE}
          }
+         pwsh {
+            lappend ::g_shcode_out {Set-Variable -Name "_mlstatus" -Value\
+               $false -Scope Global}
+         }
       }
    }
 }
@@ -88,8 +92,9 @@ proc renderFalse {} {
 proc renderTrue {} {
    # render a true value most of the time through a variable assignment that
    # will be looked at in the shell module function calling modulecmd.tcl to
-   # return in turns a boolean status. Except for python and cmake, the
-   # value assigned to variable is also returned as the full rendering status
+   # return in turns a boolean status. Except for python, cmake, and pwsh,
+   # the value assigned to variable is also returned as the full rendering
+   # status
    switch -- [getState shelltype] {
       sh - csh - fish {
          # no need to set a variable on real shells as last statement
@@ -119,6 +124,10 @@ proc renderTrue {} {
       }
       r {
          lappend ::g_shcode_out {mlstatus <- TRUE}
+      }
+      pwsh {
+         lappend ::g_shcode_out {Set-Variable -Name "_mlstatus" -Value\
+            $true -Scope Global}
       }
    }
 }
@@ -160,6 +169,10 @@ proc renderText {text} {
       }
       r {
          lappend ::g_shcode_out "mlstatus <- '$text'"
+      }
+      pwsh {
+         lappend ::g_shcode_out "Set-Variable -Name \"_mlstatus\" -Value\
+            '$text' -Scope Global"
       }
    }
 }
@@ -219,7 +232,11 @@ proc renderSettings {} {
          new {
             switch -- [getState shelltype] {
                csh {
-                  set val [charEscaped $::env($var)]
+                  # cannot handle newline character in env var value with csh
+                  # shells: chop newline character in value (as done on
+                  # Modules v3 for all shells)
+                  set val [string map {\n {}} $::env($var)]
+                  set val [charEscaped $val]
                   # csh barfs on long env vars
                   if {[getState shell] eq {csh} && [string length $val] >\
                      [getConf csh_limit]} {
@@ -238,18 +255,18 @@ proc renderSettings {} {
                   lappend g_shcode_out "setenv $var $val;"
                }
                sh {
-                  lappend g_shcode_out "$var=[charEscaped $::env($var)];\
-                     export $var;"
+                  set val [string map {' '\\''} $::env($var)]
+                  lappend g_shcode_out "$var='$val'; export $var;"
                }
                fish {
-                  set val [charEscaped $::env($var)]
+                  set val [charEscaped $::env($var) ']
                   # fish shell has special treatment for PATH variable
                   # so its value should be provided as a list separated
                   # by spaces not by semi-colons
                   if {$var eq {PATH}} {
-                     regsub -all : $val { } val
+                     set val [join [split $val :] {' '}]
                   }
-                  lappend g_shcode_out "set -xg $var $val;"
+                  lappend g_shcode_out "set -xg $var '$val';"
                }
                tcl {
                   set val $::env($var)
@@ -260,15 +277,15 @@ proc renderSettings {} {
                   lappend g_shcode_out "set $var=$val"
                }
                perl {
-                  set val [charEscaped $::env($var) \']
+                  set val [charEscaped $::env($var) ']
                   lappend g_shcode_out "\$ENV{'$var'} = '$val';"
                }
                python {
-                  set val [charEscaped $::env($var) \']
+                  set val [charEscaped $::env($var) ']
                   lappend g_shcode_out "os.environ\['$var'\] = '$val'"
                }
                ruby {
-                  set val [charEscaped $::env($var) \']
+                  set val [charEscaped $::env($var) ']
                   lappend g_shcode_out "ENV\['$var'\] = '$val'"
                }
                lisp {
@@ -282,6 +299,10 @@ proc renderSettings {} {
                r {
                   set val [charEscaped $::env($var) {\\'}]
                   lappend g_shcode_out "Sys.setenv('$var'='$val')"
+               }
+               pwsh {
+                  set val [charEscaped $::env($var) ']
+                  lappend g_shcode_out "\$env:$var = '$val'"
                }
             }
          }
@@ -321,6 +342,10 @@ proc renderSettings {} {
                r {
                   lappend g_shcode_out "Sys.unsetenv('$var')"
                }
+               pwsh {
+                  lappend g_shcode_out "Remove-Item -Path env:$var\
+                     -ErrorAction SilentlyContinue"
+               }
             }
          }
       }
@@ -353,6 +378,9 @@ proc renderSettings {} {
                cmd {
                   lappend g_shcode_out "doskey $var=$val"
                }
+               pwsh {
+                  lappend g_shcode_out "function global:$var { $val }"
+               }
             }
          }
          del {
@@ -368,6 +396,10 @@ proc renderSettings {} {
                }
                cmd {
                   lappend g_shcode_out "doskey $var="
+               }
+               pwsh {
+                  lappend g_shcode_out "Remove-Item -Path function:$var\
+                     -ErrorAction SilentlyContinue"
                }
             }
          }
@@ -389,6 +421,9 @@ proc renderSettings {} {
                fish {
                   lappend g_shcode_out "function $funcname; $val; end;"
                }
+               pwsh {
+                  lappend g_shcode_out "function global:$funcname { $val }"
+               }
             }
          }
          del {
@@ -399,6 +434,10 @@ proc renderSettings {} {
                }
                fish {
                   lappend g_shcode_out "functions -e $funcname;"
+               }
+               pwsh {
+                  lappend g_shcode_out "Remove-Item -Path function:$funcname\
+                     -ErrorAction SilentlyContinue"
                }
             }
          }
@@ -425,6 +464,10 @@ proc renderSettings {} {
                         }
                         lappend g_shcode_out "complete -c $compname $body;"
                      }
+                     pwsh {
+                        lappend g_shcode_out "Register-ArgumentCompleter\
+                           -CommandName $compname -ScriptBlock { $body }"
+                     }
                   }
                }
             }
@@ -439,6 +482,10 @@ proc renderSettings {} {
                }
                fish {
                   lappend g_shcode_out "complete -e -c $compname;"
+               }
+               pwsh {
+                  lappend g_shcode_out "Unregister-ArgumentCompleter\
+                     -CommandName $compname"
                }
             }
          }
@@ -476,12 +523,12 @@ proc renderSettings {} {
                   lappend g_shcode_out "system(\"$xrdb -merge $var\");"
                }
                python {
-                  set var [charEscaped $var \']
+                  set var [charEscaped $var ']
                   lappend g_shcode_out "subprocess.Popen(\['$xrdb',\
                      '-merge', '$var'\])"
                }
                ruby {
-                  set var [charEscaped $var \']
+                  set var [charEscaped $var ']
                   lappend g_shcode_out "Open3.popen2('$xrdb -merge $var')"
                }
                lisp {
@@ -521,16 +568,16 @@ proc renderSettings {} {
                   lappend g_shcode_out {close XRDBPIPE;}
                }
                python {
-                  set var [charEscaped $var \']
-                  set val [charEscaped $val \']
+                  set var [charEscaped $var ']
+                  set val [charEscaped $val ']
                   lappend g_shcode_out "subprocess.Popen(\['$xrdb',\
                      '-merge'\],\
                      stdin=subprocess.PIPE).communicate(input='$var:\
                      $val\\n')"
                }
                ruby {
-                  set var [charEscaped $var \']
-                  set val [charEscaped $val \']
+                  set var [charEscaped $var ']
+                  set val [charEscaped $val ']
                   lappend g_shcode_out "Open3.popen2('$xrdb -merge') {|i,o,t|\
                      i.puts '$var: $val'}"
                }
@@ -600,14 +647,14 @@ proc renderSettings {} {
          }
          python {
             foreach var $xres_to_del {
-               set var [charEscaped $var \']
+               set var [charEscaped $var ']
                lappend g_shcode_out "subprocess.Popen(\['$xrdb', '-merge'\],\
                   stdin=subprocess.PIPE).communicate(input='$var:\\n')"
             }
          }
          ruby {
             foreach var $xres_to_del {
-               set var [charEscaped $var \']
+               set var [charEscaped $var ']
                lappend g_shcode_out "Open3.popen2('$xrdb -merge') {|i,o,t|\
                   i.puts '$var:'}"
             }
@@ -660,6 +707,9 @@ proc renderSettings {} {
          }
          r {
             lappend g_shcode_out "setwd('$::g_changeDir')"
+         }
+         pwsh {
+            lappend g_shcode_out "Set-Location '$::g_changeDir'"
          }
       }
       # cannot change current directory of cmake "shell"
@@ -1236,6 +1286,144 @@ ml <- function(...){
 }}
          }
       }
+      pwsh {
+         if {[getState is_win]} {
+            reportErrorAndExit {No autoinit mode available for 'pwsh' shell\
+               on Windows}
+         }
+
+         set fdef "function global:_envmodule_common {"
+         append fdef {
+   param([Parameter(ValueFromRemainingArguments)] [string[]] $allargs)
+   $global:_mlstatus = $true
+   $cmd_is_query = "$allargs" -match '(is-loaded|is-avail|is-used|is-saved)'}
+         if {[getConf quarantine_support]} {
+            append fdef {
+   $_mlre_set = ''
+   $_mlre_reset = ''
+   if ($env:MODULES_RUN_QUARANTINE) {
+      foreach ($_mlv in $env:MODULES_RUN_QUARANTINE -split ' ') {
+         if ($_mlv -match '^[A-Za-z_][A-Za-z0-9_]*$') {
+            $_mlv_value = [System.Environment]::GetEnvironmentVariable($_mlv)
+            if ($_mlv_value) {
+               $_mlre_set += "`$env:__MODULES_QUAR_${_mlv}='$_mlv_value';"
+               $_mlre_reset = "Remove-Item -Path env:__MODULES_QUAR_${_mlv};"\
+                  + $_mlre_reset
+            }
+            $_mlrv = "MODULES_RUNENV_$_mlv"
+            $_mlrv_value =\
+               [System.Environment]::GetEnvironmentVariable($_mlrv)
+            $_mlre_set += "`$env:$_mlv='$_mlrv_value';"
+            $_mlre_reset = "`$env:$_mlv=`"`$env:__MODULES_QUAR_${_mlv}`";"\
+               + $_mlre_reset
+         }
+      }
+      if ($_mlre_set -ne '') {
+         $_mlre_set += "`$env:__MODULES_QUARANTINE_SET=1"
+         $_mlre_reset += "Remove-Item -Path env:__MODULES_QUARANTINE_SET"
+      }
+   }
+   if ($_mlre_set -ne '') {
+      Invoke-Expression "$_mlre_set"
+      Remove-Variable "_mlre_set"
+   }}
+         }
+         append fdef {
+   $output = }
+         append fdef "& \"$tclshbin\" \"$::argv0\" pwsh \$allargs 2>&1"
+         if {[getConf quarantine_support]} {
+            append fdef {
+   if ($_mlre_reset -ne '') {
+      Invoke-Expression "$_mlre_reset"
+      Remove-Variable "_mlre_reset"
+   }}
+         }
+         append fdef {
+   $outmsg = ($output | ? {$_.gettype().Name -ne "ErrorRecord"}) -join "`n"
+   $errmsg = ($output | ? {$_.gettype().Name -eq "ErrorRecord"}) -join "`n"
+   $errmsg = $errmsg.replace(
+      "System.Management.Automation.RemoteException", ""
+   )
+   if ($outmsg) {
+      Invoke-Expression $outmsg
+   }
+   if (($_mlstatus -eq $false) -and (!$cmd_is_query)) {
+      $global:LastExitCode = 1
+   } else {
+      $global:LastExitCode = 0
+   }}
+         append fdef "\n   \$mlredir = \[bool\][getState is_stderr_tty]"
+         append fdef {
+   if ($env:MODULES_REDIRECT_OUTPUT -ne $null) {
+      if ($env:MODULES_REDIRECT_OUTPUT -eq '0') {
+         $mlredir = $false
+      } elseif ($env:MODULES_REDIRECT_OUTPUT -eq '1') {
+         $mlredir = $true
+      }
+   }
+   if ("$allargs" -match '--no-redirect') {
+      $mlredir = $false
+   } elseif ("$allargs" -match '--redirect') {
+      $mlredir = $true
+   }
+   if ($errmsg) {
+      if ($_mlstatus -eq $false) {
+         $global:LastExitCode = 1
+      } else {
+         if ($mlredir) {
+            [Console]::WriteLine("$errmsg")
+         } else {
+            [Console]::Error.WriteLine("$errmsg")
+         }
+         $errmsg = $null
+      }
+   }
+   if ((($_mlstatus -ne $true) -and ($_mlstatus -ne $false)) -or\
+       ($cmd_is_query)) {
+      return $errmsg,$_mlstatus
+   }
+   return $errmsg,$null}
+         append fdef "\n}\nfunction global:envmodule {"
+         append fdef {
+   param([Parameter(ValueFromRemainingArguments)] [string[]] $allargs)
+   $errmsg,$retmsg = & _envmodule_common $allargs
+   if ("$errmsg" -ne "") {
+      $PSCmdlet.ThrowTerminatingError(
+         [System.Management.Automation.ErrorRecord]::new(
+            ([System.Exception]"$errmsg"),
+            'error while running modulecmd.tcl via envmodule',
+            [System.Management.Automation.ErrorCategory]::FromStdErr,
+            $null
+      ))
+   }
+   if ("$retmsg" -ne "") {
+      return $retmsg
+   }}
+         append fdef "\n}"
+         if {[getConf ml]} {
+            append fdef "\nfunction global:ml {"
+            append fdef {
+   param([Parameter(ValueFromRemainingArguments)] [string[]] $allargs)
+   $mlargs = @('ml')
+   if ($allargs.Length) {
+      $mlargs += $allargs
+   }
+   $errmsg,$retmsg = _envmodule_common $mlargs
+   if ("$errmsg" -ne "") {
+      $PSCmdlet.ThrowTerminatingError(
+         [System.Management.Automation.ErrorRecord]::new(
+            ([System.Exception]"$errmsg"),
+            'error while running modulecmd.tcl via ml',
+            [System.Management.Automation.ErrorCategory]::FromStdErr,
+            $null
+      ))
+   }
+   if ("$retmsg" -ne "") {
+      return $retmsg
+   }}
+            append fdef "\n}"
+         }
+      }
    }
 
    # output function definition
@@ -1417,9 +1605,21 @@ proc getReferenceCountArray {var separator} {
    return $count_list
 }
 
-proc isReferenceCountPathDefined {var path separator} {
+proc getPathReferenceCount {var path separator {resolv 0}} {
    array set ref_count_arr [getReferenceCountArray $var $separator]
-   return [info exists ref_count_arr($path)]
+   if {[info exists ref_count_arr($path)]} {
+      set ref_count $ref_count_arr($path)
+   } else {
+      set ref_count 0
+      if {$resolv} {
+         set matching_path [getStringFromListMatchingResString [array names\
+            ref_count_arr] $path]
+         if {[string length $matching_path]} {
+            set ref_count $ref_count_arr($matching_path)
+         }
+      }
+   }
+   return $ref_count
 }
 
 # generate reference count value to export in user environment
@@ -1645,6 +1845,10 @@ proc add-path {cmd mode dflbhv args} {
       setReferenceCountRecordValue $sharevar [array get countarr]
    }
 
+   if {$var eq {MODULEPATH}} {
+      registerCurrentModuleUse {*}$path_list
+   }
+
    return {}
 }
 
@@ -1814,7 +2018,7 @@ proc parsePathCommandArgs {cmd mode dflbhv args} {
          if {[llength $val_raw_list] > 1 || [get-env $var] ne {}} {
             lappend val_list {}
          # make separator string appear once in resulting value
-         } elseif {[isReferenceCountPathDefined $var {} $delim]} {
+         } elseif {[getPathReferenceCount $var {} $delim]} {
             lappend val_list {}
             set allow_dup 1
          } else {

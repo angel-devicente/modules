@@ -633,5 +633,61 @@ This probably means that Tcl wasn't installed properly.}
 if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTERNALERRORTCLINIT)]} {
     rename tcl::mathfunc::max {}
 }
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTERNALERRORRESSOURCEUNAVAIL)]} {
+    proc reportVersion {} {
+        error {couldn't fork child process: resource temporarily unavailable}
+    }
+}
+
+# specific tests to improve getModuleFromEvalId procs coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETMODULEFROMEVALID)]} {
+    report [string length [getModuleFromEvalId unknown_eval_id]]
+}
+
+# specific tests to improve changeContextOfModuleEval procs coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_CHANGECONTEXTOFMODULEEVAL)]} {
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_CHANGECONTEXTOFMODULEEVAL) {
+        1 {
+            set evalid [topState evalid]
+            set ::g_moduleEval($evalid) [list depun]
+            report [string length [changeContextOfModuleEval foo depre urequn]]
+        }
+        2 {
+            set evalid [topState evalid]
+            set ::g_moduleEval($evalid) [list depre]
+            report [string length [changeContextOfModuleEval foo depre urequn]]
+        }
+    }
+}
+
+# specific tests to improve getLoadedPrereqPath coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETLOADEDPREREQPATH)]} {
+    set ::g_loadedModulePrereqPath(foo) {bar mp}
+    report [string length [getLoadedPrereqPath foo qux]]
+}
+
+# specific tests to improve getModulefileFromLoadingModule coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETMODULEFILEFROMLOADINGMODULE)]} {
+    report [string length [getModulefileFromLoadingModule foo]]
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_VALNOTALIST)]} {
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_VALNOTALIST) {
+        var    {set modulefile_extra_vars [list myvar {"foo"; "bar"}]}
+        rc_var {set modulerc_extra_vars [list myvar {"foo"; "bar"}]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_UNKNOWNSTATE)]} {
+    report [string length [getState unknown_state]]
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_RELEASESTATE)]} {
+    report [getState modules_release]
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETHELPLINES)]} {
+    report [string length [getModuleHelpLines]]
+}
 
 }

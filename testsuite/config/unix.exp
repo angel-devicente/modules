@@ -22,100 +22,28 @@
 ##############################################################################
 
 #
-# default shell is the bourne shell
-#
-
-proc default_shell {} {
-    global shell
-
-    if ![info exists shell] then {
-	set shell "sh"
-    }
-}
-
-#
-# the default for the modulecmd binary is the one in the upper directory
-# if it doesn't exist, look up the search path in order to locate one.
-#
-
-proc default_modulecmd {} {
-    global MODULECMD
-    global verbose
-    global env
-
-    if ![info exists MODULECMD] then {
-    if [info exists env(MODULECMD)] {
-        set MODULECMD $env(MODULECMD)
-	} elseif [file exists ../modulecmd] then {
-	    set MODULECMD "../modulecmd"
-	} elseif [file exists ./modulecmd] then {
-	    set MODULECMD "./modulecmd"
-	# use test-specific modulecmd.tcl script if it exists
-	} elseif [file exists "./modulecmd-test.tcl"] then {
-	  set MODULECMD "./modulecmd-test.tcl"
-	# check for modulecmd.tcl before guessing from path
-	# to give this flavor a chance to be found when modulecmd
-	# binary is also installed in system default paths
-	} elseif [file exists "../modulecmd.tcl"] then {
-	  set MODULECMD "../modulecmd.tcl"
-	} elseif [file exists "./modulecmd.tcl"] then {
-	  set MODULECMD "./modulecmd.tcl"
-	} else {
-	    set MODULECMD [which modulecmd]
-	    if ![file exists $MODULECMD] then {
-		fail "No 'modulecmd' found"
-		exit -1
-	    } elseif { $verbose > 1 } {
-		send_user "using 'modulecmd' from search path"
-	    }
-	}
-    }
-
-}
-
-proc default_tclsh {} {
-   global TCLSH
-   global verbose
-   global env
-
-   if ![info exists TCLSH] then {
-      if [info exists env(TCLSH)] {
-         set TCLSH $env(TCLSH)
-      } else {
-	     set TCLSH [which modulecmd]
-	     if ![file exists $TCLSH] then {
-		    fail "No 'tclsh' found"
-		    exit -1
-	     } elseif { $verbose > 1 } {
-		    send_user "using 'tclsh' from search path"
-	     }
-      }
-   }
-}
-
-
-#
-# modulecmd_exit -- cleanup
-#
-
-proc modulecmd_exit {} {
-#not applicable
-}
-
-#
-# modulecmd_start -- start modulecmd running
-# Since modulecmd writes to both streams, stdout and stderr, a catcher
-# has to be installed in order to scan both 
+# modulecmd_xxx_ -- run modulecmd
 #
 
 # alternative method to collect stdout and stderr from command execution (on
 # Tcl>=8.6): use channel pipe instead of saving these outputs in file
 if {[lindex [lsort -dictionary [list 8.6 [info tclversion]]] 1] eq [info tclversion]} {
 
-proc readpipe {p1 p2 varname} {
+proc readpipe {p1 p2 varname {exit_varname {}}} {
     append ::$varname [read $p1]
     if {[eof $p1]} {
-        close $p1
+        fconfigure $p1 -blocking 1
+        try {
+            close $p1
+        } on ok {output} {
+            if {[string length $exit_varname]} {
+                set ::$exit_varname 0
+            }
+        } trap {CHILDSTATUS} {output options} {
+            if {[string length $exit_varname]} {
+                set ::$exit_varname [lindex [dict get $options -errorcode] end]
+            }
+        }
         if {$p2 ni [chan names]} {
             set ::endpipe ok
         }
@@ -131,7 +59,6 @@ proc modulecmd_xxx_ {command {input noinput}} {
 	global comp_error
 	global comp_exit
 	global errorCode
-	global no_verbose
 
     if {[info exists ::endpipe]} {
         unset ::endpipe
@@ -141,11 +68,7 @@ proc modulecmd_xxx_ {command {input noinput}} {
 	  unresolved "internal testsuite error: no module command specified"
 	}
 
-	default_shell
-	default_modulecmd
-	default_tclsh
-
-    set cmdlist [list exec $TCLSH $MODULECMD $shell]
+    set cmdlist [list $TCLSH $MODULECMD $shell]
     # check if asked not to split passed command line
     if {[string first "NOCMDSPLIT" $command] == 0} {
         lappend cmdlist [string range $command 10 end]
@@ -159,30 +82,23 @@ proc modulecmd_xxx_ {command {input noinput}} {
         lappend cmdlist << $input
     }
 
-	if { ! $no_verbose && $verbose > 1 } {
+	if { $verbose > 1 } {
         send_user "starting [lrange $cmdlist 1 end]\n"
 	}
 
     # create pipes
-    lassign [chan pipe] rdstdout wrstdout
     lassign [chan pipe] rdstderr wrstderr
 
+    # run command in separate thread
+    lappend cmdlist 2>@ $wrstderr
+    set rdstdout [open "|$cmdlist"]
+
     # fetch output asynchronously
-    fileevent $rdstdout readable [list readpipe $rdstdout $rdstderr comp_output]
+    fileevent $rdstdout readable [list readpipe $rdstdout $rdstderr comp_output comp_exit]
     fconfigure $rdstdout -blocking 0
     fileevent $rdstderr readable [list readpipe $rdstderr $rdstdout comp_error]
     fconfigure $rdstderr -blocking 0
 
-    # run command in separate thread
-    lappend cmdlist >@ $wrstdout 2>@ $wrstderr &
-    if [catch {
-        {*}$cmdlist
-    } ] {
-        set comp_exit [lindex $::errorCode 2]
-    } else {
-        set comp_exit 0
-    }
-    close $wrstdout
     close $wrstderr
 
     vwait endpipe
@@ -199,15 +115,10 @@ proc modulecmd_xxx_ {command {input noinput}} {
 	global comp_error
 	global comp_exit
 	global errorCode
-	global no_verbose
 
 	if ![info exists command] then {
 	  unresolved "internal testsuite error: no module command specified"
 	}
-
-	default_shell
-	default_modulecmd
-	default_tclsh
 
     set cmdlist [list exec $TCLSH $MODULECMD $shell]
     # check if asked not to split passed command line
@@ -224,7 +135,7 @@ proc modulecmd_xxx_ {command {input noinput}} {
         lappend cmdlist << $input
     }
 
-	if { ! $no_verbose && $verbose > 1 } {
+	if { $verbose > 1 } {
         send_user "starting [lrange $cmdlist 1 end]\n"
 	}
 
@@ -251,56 +162,6 @@ proc modulecmd_xxx_ {command {input noinput}} {
 	catch { file delete test321.out }
 }
 
-}
-
-proc modulecmd_start {command {input noinput}} {
-	global no_verbose
-
-	set no_verbose 0
-	modulecmd_xxx_ "$command" $input
-	unset no_verbose
-}
-
-#
-# modulecmd__ -- start modulecmd running
-#   (same as above but no verbose output)
-
-proc modulecmd__ {command} {
-	global shell
-	global no_verbose
-
-	set shell "sh"
-	set no_verbose 1
-	modulecmd_xxx_ "$command"
-	unset no_verbose
-}
-
-#
-# modulecmd_version -- extract and print the version number of modulecmd
-#
-
-proc modulecmd_version {} {
-    global MODULECMD
-    global shell
-    global comp_output
-    global comp_error
-
-    set shell "sh"
-    default_modulecmd
-
-    modulecmd_start help
-    regexp {Modules Release (Tcl [0-9a-zA-Z\.]+)(.*)} \
-	$comp_error version rest
-
-    set comp_output "$version"
-}
-
-#
-# modulecmd_load -- loads the program
-#
-
-proc modulecmd_load { arg } {
-#   not applicable
 }
 
 
@@ -402,25 +263,18 @@ proc install_test_xxx_ {command} {
    }
 
    # create pipes
-   lassign [chan pipe] rdstdout wrstdout
    lassign [chan pipe] rdstderr wrstderr
 
+   # run command in separate thread
+   lappend cmd_to_exec 2>@ $wrstderr
+   set rdstdout [open "|$cmd_to_exec"]
+
    # fetch output asynchronously
-   fileevent $rdstdout readable [list readpipe $rdstdout $rdstderr comp_output]
+   fileevent $rdstdout readable [list readpipe $rdstdout $rdstderr comp_output comp_exit]
    fconfigure $rdstdout -blocking 0
    fileevent $rdstderr readable [list readpipe $rdstderr $rdstdout comp_error]
    fconfigure $rdstderr -blocking 0
 
-   # run command in separate thread
-   lappend cmd_to_exec >@ $wrstdout 2>@ $wrstderr
-   if [catch {
-       exec {*}$cmd_to_exec
-   } ] {
-       set comp_exit [lindex $errorCode 2]
-   } else {
-       set comp_exit 0
-   }
-   close $wrstdout
    close $wrstderr
 
    vwait endpipe

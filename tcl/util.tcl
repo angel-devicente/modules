@@ -3,7 +3,7 @@
 # UTIL.TCL, utility procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,11 +20,11 @@
 
 ##########################################################################
 
-proc charEscaped {str {charlist " \\\\\t{}|<>!;#^\$&*?\"'`()"}} {
+proc charEscaped {str {charlist " \\\\\t{}\\\[\\\]|<>!;#^\$&*?\"'`()"}} {
    return [regsub -all "\(\[$charlist\]\)" $str {\\\1}]
 }
 
-proc charUnescaped {str {charlist " \\\\\t{}|<>!;#^\$&*?\"'`()"}} {
+proc charUnescaped {str {charlist " \\\\\t{}\\\[\\\]|<>!;#^\$&*?\"'`()"}} {
    return [regsub -all "\\\\\(\[$charlist\]\)" $str {\1}]
 }
 
@@ -223,6 +223,15 @@ proc replaceFromList {list1 item {item2 {}}} {
    return $list1
 }
 
+proc lprepend {lst_name args} {
+   upvar $lst_name lst
+   if {[info exists lst]} {
+      set lst [list {*}$args {*}$lst]
+   } else {
+      set lst $args
+   }
+}
+
 # test if 2 lists have at least one element in common
 proc isIntBetweenList {list1 list2} {
    foreach elt $list1 {
@@ -340,11 +349,8 @@ proc getDiffBetweenArray {arrname1 arrname2 {notset_equals_empty 0}\
 
 proc getCallingProcName {} {
    if {[info level] > 2} {
-      set caller [lindex [info level -2] 0]
-   } else {
-      set caller {}
+      return [lindex [info level -2] 0]
    }
-   return $caller
 }
 
 # ;;; Local Variables: ***

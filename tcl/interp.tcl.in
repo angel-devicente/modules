@@ -3,7 +3,7 @@
 # INTERP.TCL, sub-interpreter management procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ proc initModfileModeAliases {mode auto aliasesVN aliasesPassArgVN\
          reportCmdTrace reportWarning reportWarning reportError reportError\
          incrErrorCount incrErrorCount report report isWin initStateIsWin\
          puts putsModfileCmd getModuleContent getModuleContent lsb-release\
-         lsb-release]
+         lsb-release getModuleHelpLines getModuleHelpLines]
 
       if {[getConf source_cache]} {
          lappend ::g_modfileBaseAliases source sourceModfileCmd
@@ -100,17 +100,19 @@ proc initModfileModeAliases {mode auto aliasesVN aliasesPassArgVN\
       # the evaluation mode
       set ::g_modfileEvalModes {load unload display help test whatis refresh\
          scan}
-      ##nagelfar ignore #44 Too long line
+      ##nagelfar ignore #49 Too long line
       array set g_modfilePerModeAliases {
-add-property   {nop            nop            nop            nop            nop            nop            nop          nop         }
+add-property   {add-property   nop            reportCmd      nop            nop            nop            nop          nop}
 always-load    {always-load    nop            reportCmd      nop            nop            nop            nop          always-load-sc}
 append-path    {append-path    append-path-un append-path    append-path    append-path    edit-path-wh   nop          edit-path-sc}
 chdir          {chdir          nop            reportCmd      nop            nop            nop            nop          chdir-sc    }
 complete       {complete       complete-un    reportCmd      nop            nop            nop            complete     complete-sc }
 conflict       {conflict       nop            reportCmd      nop            nop            nop            nop          conflict-sc }
 depends-on     {prereqAllModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-all-sc}
-extensions     {nop            nop            nop            nop            nop            nop            nop          nop         }
+depends-on-any {prereqAnyModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-sc   }
+extensions     {provide        nop            reportCmd      nop            nop            nop            nop          provide-sc  }
 family         {family         family-un      reportCmd      nop            nop            nop            nop          family-sc   }
+haveDynamicMPATH {nop          nop            nop            nop            nop            nop            nop          nop         }
 hide-modulefile {hide-modulefile hide-modulefile hide-modulefile hide-modulefile hide-modulefile hide-modulefile nop   nop         }
 hide-version   {hide-modulefile hide-modulefile hide-modulefile hide-modulefile hide-modulefile hide-modulefile nop    nop         }
 module         {module         module         reportCmd      nop            nop            nop            nop          module-sc   }
@@ -122,13 +124,16 @@ module-verbosity {nimp         nimp           reportCmd      nop            nop 
 module-version {module-version module-version module-version module-version module-version module-version nop          nop         }
 module-virtual {module-virtual module-virtual module-virtual module-virtual module-virtual module-virtual nop          nop         }
 module-forbid  {module-forbid  module-forbid  module-forbid  module-forbid  module-forbid  module-forbid  nop          nop         }
+module-help    {nop            nop            reportCmd      module-help    nop            nop            nop          nop         }
 module-hide    {module-hide    module-hide    module-hide    module-hide    module-hide    module-hide    nop          nop         }
 module-tag     {module-tag     module-tag     module-tag     module-tag     module-tag     module-tag     nop          nop         }
+module-warn    {module-warn    module-warn    module-warn    module-warn    module-warn    module-warn    nop          nop         }
 module-whatis  {nop            nop            reportCmd      nop            nop            module-whatis  nop          nop         }
 prepend-path   {prepend-path   prepend-path-un prepend-path  prepend-path   prepend-path   edit-path-wh   nop          edit-path-sc}
 prereq-all     {prereqAllModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-all-sc}
 prereq-any     {prereqAnyModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-sc   }
 prereq         {prereqAnyModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-sc   }
+provide        {provide        nop            reportCmd      nop            nop            nop            nop          provide-sc  }
 pushenv        {pushenv        pushenv-un     pushenv        pushenv        pushenv        pushenv-wh     nop          pushenv-sc  }
 remove-path    {remove-path    remove-path-un remove-path    remove-path    remove-path    edit-path-wh   nop          edit-path-sc}
 remove-property {nop           nop            nop            nop            nop            nop            nop          nop         }
@@ -173,7 +178,7 @@ x-resource     {x-resource     x-resource     reportCmd      nop            nop 
          set aliasesPassArg($alias) [list $alias]
       # prereq commands need auto_handling state as first arg
       } elseif {$mode eq {load} && $alias in {prereq prereq-any prereq-all\
-         depends-on}} {
+         depends-on depends-on-any}} {
          set aliasesPassArg($alias) [list 0 $auto]
       # associate a trace command if per-mode alias command is not reportCmd
       # in display mode (except for source-sh and unique-name-conflict)
@@ -182,50 +187,6 @@ x-resource     {x-resource     x-resource     reportCmd      nop            nop 
          set traces($alias) reportCmdTrace
       }
    }
-}
-
-# Fail unload attempt if module is sticky, unless if forced or reloading
-# Also fail unload if mod is super-sticky even if forced, unless reloading
-proc skipUnloadIfSticky {mode modname modfile} {
-   if {$mode ne {unload}} {
-      return 0
-   }
-
-   # when loaded, tags applies to mod name and version (not with variant)
-   set is_supersticky_not_reloading [expr {[isModuleTagged $modname\
-      super-sticky 1 $modfile] && [currentState reloading_supersticky] ne\
-      $modname}]
-   set is_sticky_not_reloading [expr {[isModuleTagged $modname sticky 1\
-      $modfile] && [currentState reloading_sticky] ne $modname &&\
-      [currentState unloading_sticky] ne $modname}]
-   set sticky_purge [expr {[getState commandname] eq {purge} ? [getConf\
-      sticky_purge] : {}}]
-
-   if {!$is_supersticky_not_reloading && $is_sticky_not_reloading &&\
-      [getState force]} {
-      reportWarning [getStickyForcedUnloadMsg]
-   } elseif {$is_supersticky_not_reloading || $is_sticky_not_reloading} {
-      # restore changed states prior raising error
-      lpopState debug_msg_prefix
-      lpopState modulepath
-      lpopState specifiedname
-      lpopState modulename
-      lpopState modulenamevr
-      lpopState modulefile
-
-      set msg [getStickyUnloadMsg [expr {$is_supersticky_not_reloading ?\
-         {super-sticky} : {sticky}}]]
-      # no message if sticky_purge is set to silent
-      switch -- $sticky_purge {
-         error - {} {knerror $msg}
-         warning {reportWarning $msg}
-      }
-
-      # skip unload without raised error
-      return 1
-   }
-
-   return 0
 }
 
 proc execute-modulefile {modfile modname modnamevrvar modspec requested\
@@ -254,23 +215,13 @@ proc execute-modulefile {modfile modname modnamevrvar modspec requested\
 
    reportTrace "'$modfile' as '$modname'" {Evaluate modulefile}
 
+   # reset modulefile-specific information
+   set ::g_help_lines {}
+
    # gather all tags of evaluated modulefile
    if {$fetch_tags} {
       cacheCurrentModules 0
       collectModuleTags $modnamevr
-   }
-
-   # inform that access to module will be soon denied
-   if {$mode ne {unload} && [isModuleTagged $modnamevr nearly-forbidden 1\
-      $modfile]} {
-      reportWarning [getNearlyForbiddenMsg $modnamevr $modfile]
-      set nearlyforbidwarn 1
-   }
-
-   # fail unload when sticky
-   if {[skipUnloadIfSticky $mode $modname $modfile]} {
-      # skip end of unload upper level process when no error raised
-      return -code continue 0
    }
 
    if {![info exists ::g_modfileUntrackVars]} {
@@ -303,7 +254,7 @@ proc execute-modulefile {modfile modname modnamevrvar modspec requested\
    if {![info exists ::g_modfileBaseVars]} {
       # record module tool properties
       set ::g_modfileBaseVars [list ModuleTool Modules ModuleToolVersion\
-         {@MODULES_RELEASE@}]
+         [getState modules_release]]
 
       if {[info exists ::modulefile_extra_vars]} {
          if {([llength $::modulefile_extra_vars] % 2) != 0} {
@@ -388,9 +339,14 @@ proc execute-modulefile {modfile modname modnamevrvar modspec requested\
       if {[isModuleTagged $modnamevr forbidden 1 $modfile]} {
          set eval_return_code 1
          reportError [getForbiddenMsg $modnamevr $modfile]
-      } elseif {![info exists nearlyforbidwarn] && [isModuleTagged $modnamevr\
-         nearly-forbidden 1 $modfile]} {
+      }
+   }
+   if {$mode ni {unload refresh scan whatis}} {
+      if {[isModuleTagged $modnamevr nearly-forbidden 1 $modfile]} {
          reportWarning [getNearlyForbiddenMsg $modnamevr $modfile]
+      }
+      if {[isModuleTagged $modnamevr warning 1 $modfile]} {
+         reportWarning [getWarningMsg $modnamevr $modfile]
       }
    }
 
@@ -450,9 +406,12 @@ proc evaluateModulefile {itrp mod_file vr_spec_list} {
 
       switch -- [module-info mode] {
          help {
+            foreach help_line [getModuleHelpLines] {
+               report $help_line
+            }
             if {[info procs ModulesHelp] eq {ModulesHelp}} {
                ModulesHelp
-            } else {
+            } elseif {![llength [getModuleHelpLines]]} {
                reportWarning "Unable to find ModulesHelp in\
                   $::ModulesCurrentModulefile."
             }
@@ -556,8 +515,8 @@ proc renderModulefileEvalError {itrp mode mod_file failed_eval error_msg} {
 # Raise an error if a conflict violation is detected. This is done after
 # modulefile eval to give it a chance to solve its conflicts during eval
 proc checkModuleConflict {mod_name mod_name_vr} {
-   lassign [doesModuleConflict $mod_name] does_con mod_con_list
-   if {$does_con} {
+   set mod_con_list [getModuleLoadedConflict $mod_name]
+   if {[llength $mod_con_list]} {
       set is_con_mod_conun [isModuleEvaluated conun $mod_name_vr {}\
          {*}$mod_con_list]
       set is_con_mod_loading [is-loading {*}$mod_con_list]
@@ -602,6 +561,8 @@ proc execute-modulerc {modfile modname modspec} {
          module-tag module-tag module-info module-info modulepath-label\
          modulepath-label modulepath-indent modulepath-indent setModulesVersion setModulesVersion\
          getModuleContent getModuleContent lsb-release lsb-release]
+         getModuleContent getModuleContent lsb-release lsb-release\
+         module-warn module-warn]
 
       if {[getConf source_cache]} {
          set ::g_modrcAliases(source) sourceModfileCmd
@@ -624,7 +585,7 @@ proc execute-modulerc {modfile modname modspec} {
 
       # variable to define in modulerc interp
       set ::g_modrcBaseVars [list ModuleTool Modules ModuleToolVersion\
-         {@MODULES_RELEASE@}]
+         [getState modules_release]]
 
       if {[info exists ::modulerc_extra_vars]} {
          if {([llength $::modulerc_extra_vars] % 2) != 0} {
@@ -897,7 +858,8 @@ proc resetInterpState {itrp fresh dumpVarsVN dumpArrayVarsVN untrackVarsVN\
          } elseif {![info exists dumpArrayVars($var)]} {
             if {$dumpVars($var) ne [$itrp eval set ::$var]} {
                reportDebug "restoring on $itrp var $var"
-               if {[llength $dumpVars($var)] > 1} {
+               if {[string is list $dumpVars($var)] && [llength\
+                  $dumpVars($var)] > 1} {
                   # restore value as list
                   $itrp eval set ::$var [list $dumpVars($var)]
                } else {

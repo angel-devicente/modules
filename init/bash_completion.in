@@ -24,6 +24,14 @@ _module_avail() {
     fi
 }
 
+_module_spider() {
+    local cur="${1:-}"
+    # skip spider call if word currently being completed is an option keyword
+    if [ -z "$cur" ] || [ "${cur:0:1}" != '-' ]; then
+        module spider --color=never -s -t -S --no-indepth -o 'alias:indesym' "$cur" 2>&1
+    fi
+}
+
 _module_savelist() {
     module savelist --color=never -s -t 2>&1 | sed '
         /No named collection\.$/d;
@@ -71,6 +79,7 @@ _module() {
     add|add-any|load|load-any|try-add|try-load)
                     _module_comgen_words_and_files "@comp_load_opts@ $(_module_not_yet_loaded "$cur")" "$cur";;
     avail)          _module_comgen_words_and_files "@comp_avail_opts@ $(_module_avail "$cur")" "$cur";;
+    spider)         _module_comgen_words_and_files "@comp_avail_opts@ $(_module_spider "$cur")" "$cur";;
     edit)           _module_comgen_words_and_files "$(_module_avail "$cur")" "$cur";;
     aliases)  COMPREPLY=( $(compgen -W "@comp_aliases_opts@" -- "$cur") );;
     list|savelist)  COMPREPLY=( $(compgen -W "@comp_list_opts@" -- "$cur") );;
@@ -78,7 +87,7 @@ _module() {
     stashpop|stashshow|stashrm)
                     COMPREPLY=( $(compgen -W "$(_module_stashlist)" -- "$cur") );;
     clear)  COMPREPLY=( $(compgen -W "@comp_clear_opts@" -- "$cur") );;
-    restore|save|saveshow|saverm|is-saved)
+    restore|save|saveshow|describe|saverm|disable|is-saved)
                     COMPREPLY=( $(compgen -W "$(_module_savelist)" -- "$cur") );;
     rm|del|remove|unload)
                     COMPREPLY=( $(compgen -W "@comp_unload_opts@ ${LOADEDMODULES//:/ }" -- "$cur") );;
@@ -98,7 +107,7 @@ _module() {
     apropos|keyword|search)
                     COMPREPLY=( $(compgen -W "@comp_search_opts@" -- "$cur") );;
     config|--reset) COMPREPLY=( $(compgen -W "@comp_config_opts@" -- "$cur") );;
-    -h|--help|-V|--version|purge|refresh|reload|sh-to-mod|source|state|reset|stash|stashclear|cacheclear)
+    -h|--help|-V|--version|--dumpname|purge|refresh|reload|sh-to-mod|source|state|reset|stash|stashclear|cacheclear|update)
                     ;;
     append-path|prepend-path)
                     COMPREPLY=( $(compgen -W "@comp_path_opts@" -- "$cur") );;
@@ -133,6 +142,7 @@ if type -t ml >/dev/null; then
         add|add-any|load|load-any|try-add|try-load)
                         _module_comgen_words_and_files "@comp_load_opts@ $(_module_not_yet_loaded "$cur")" "$cur";;
         avail)          _module_comgen_words_and_files "@comp_avail_opts@ $(_module_avail "$cur")" "$cur";;
+        spider)         _module_comgen_words_and_files "@comp_avail_opts@ $(_module_spider "$cur")" "$cur";;
         edit)           _module_comgen_words_and_files "$(_module_avail "$cur")" "$cur";;
         aliases)  COMPREPLY=( $(compgen -W "@comp_aliases_opts@" -- "$cur") );;
         list|savelist)  COMPREPLY=( $(compgen -W "@comp_list_opts@" -- "$cur") );;
@@ -140,7 +150,7 @@ if type -t ml >/dev/null; then
         stashpop|stashshow|stashrm)
                     COMPREPLY=( $(compgen -W "$(_module_stashlist)" -- "$cur") );;
         clear)  COMPREPLY=( $(compgen -W "@comp_clear_opts@" -- "$cur") );;
-        restore|save|saveshow|saverm|is-saved)
+        restore|save|saveshow|describe|saverm|disable|is-saved)
                         COMPREPLY=( $(compgen -W "$(_module_savelist)" -- "$cur") );;
         rm|del|remove|unload)
                         COMPREPLY=( $(compgen -W "@comp_unload_opts@ ${LOADEDMODULES//:/ }" -- "$cur") );;
@@ -160,7 +170,7 @@ if type -t ml >/dev/null; then
         apropos|keyword|search)
                         COMPREPLY=( $(compgen -W "@comp_search_opts@" -- "$cur") );;
         config|--reset) COMPREPLY=( $(compgen -W "@comp_config_opts@" -- "$cur") );;
-        -h|--help|-V|--version|purge|refresh|reload|sh-to-mod|source|state|reset|stash|stashclear|cacheclear)
+        -h|--help|-V|--version|--dumpname|purge|refresh|reload|sh-to-mod|source|state|reset|stash|stashclear|cacheclear|update)
                         ;;
         append-path|prepend-path)
                         COMPREPLY=( $(compgen -W "@comp_path_opts@" -- "$cur") );;

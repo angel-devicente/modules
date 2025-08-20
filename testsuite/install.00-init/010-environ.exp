@@ -37,25 +37,16 @@ catch {unset env(MODULEPATH)}
 catch {unset env(LOADEDMODULES)}
 catch {unset env(_LMFILES_)}
 
-catch {unset env(__MODULES_LMCONFLICT)}
-catch {unset env(__MODULES_LMPREREQ)}
-catch {unset env(__MODULES_LMALTNAME)}
-catch {unset env(__MODULES_LMTAG)}
-catch {unset env(__MODULES_LMEXTRATAG)}
-catch {unset env(__MODULES_LMVARIANT)}
-catch {unset env(__MODULES_LMINIT)}
-
 catch {unset env(MODULES_RUN_QUARANTINE)}
 unsetenv_var MODULES_QUARANTINE_SUPPORT
 
 foreach var [array names env] {
-   if {[string match __MODULES_SHARE_* $var] \
-      || [string match __MODULES_PUSHENV_* $var] \
-      || [string match __MODULES_QUAR_* $var] \
-      || [string match MODULES_FAMILY_* $var] \
-      || [string match MODULES_RUNENV_* $var]} {
-      catch {unset env($var)}
-   }
+    switch -glob $var {
+        __MODULES_SHARE_* - __MODULES_PUSHENV_* - __MODULES_QUAR_* - \
+        MODULES_FAMILY_* - MODULES_RUNENV_* - __MODULES_LM* {
+            unsetenv_var $var
+        }
+    }
 }
 
 if {[info exists install_quarlist]} {
@@ -65,13 +56,16 @@ if {[info exists install_quarlist]} {
 }
 
 # clean any automated handling mode configuration
-catch {unset env(MODULES_AUTO_HANDLING)}
+unsetenv_var MODULES_AUTO_HANDLING
+unsetenv_var MODULES_CONFLICT_UNLOAD
+unsetenv_var MODULES_REQUIRE_VIA
 
 # ensure tests are run with implicit requirement enabled
 set env(MODULES_IMPLICIT_REQUIREMENT) 1
 
 # clean any in depth mode configuration
-catch {unset env(MODULES_AVAIL_INDEPTH)}
+unsetenv_var MODULES_AVAIL_INDEPTH
+unsetenv_var MODULES_SPIDER_INDEPTH
 
 # clean any unload match order config
 catch {unset env(MODULES_UNLOAD_MATCH_ORDER)}
@@ -147,6 +141,8 @@ setenv_var MODULES_AVAIL_OUTPUT {modulepath:alias:dirwsym:sym:tag:variantifspec:
 setenv_var MODULES_AVAIL_TERSE_OUTPUT {modulepath:alias:dirwsym:sym:tag:variantifspec}
 setenv_var MODULES_LIST_OUTPUT {header:idx:variant:sym:tag:key}
 setenv_var MODULES_LIST_TERSE_OUTPUT {header}
+setenv_var MODULES_SPIDER_OUTPUT {modulepath:alias:dirwsym:sym:tag:variantifspec:via:key}
+setenv_var MODULES_SPIDER_TERSE_OUTPUT {modulepath:alias:dirwsym:sym:tag:variantifspec}
 
 # clean any variant config
 setenv_var MODULES_VARIANT_SHORTCUT {}

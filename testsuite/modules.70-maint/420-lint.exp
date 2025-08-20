@@ -185,7 +185,7 @@ testouterr_cmd sh {lint -i lINt/1.2} ERR [msg_lint $mp/lint/1.2 {*}$lintmsg12]
 
 
 # full linting
-set lintmsgfoo10 [list "$warn_msgs line 19: Unknown command \"unk\""]
+set lintmsgfoo10 [list "$warn_msgs line 21: Unknown command \"unk\""]
 set lintmsgloadany10 "$warn_msgs line 8: Unknown command \"unk\""
 set lintmsglist10 [list "$warn_msgs line 8: Command \"module list\" should not be used in modulefile"\
 "$warn_msgs line 11: Command \"module list\" should not be used in modulefile"\
@@ -198,8 +198,18 @@ set tserr .*[escre [msg_lint $mp/foo/1.0 {*}$lintmsgfoo10]]\n.*[escre [msg_lint 
 testouterr_cmd_re sh {lint} ERR $tserr
 
 # check modulepath and module-specific .modulerc
-set tserr [msg_lint $env(MODULERCFILE)]\n\n[escre [msg_lint $mpre/.modulerc {*}$lintmsgmodrc]]\n\n[msg_lint $mpre/advvers/1.0]\n[msg_lint $mpre/advvers2/.modulerc].*
+set tserr [msg_lint $env(MODULERCFILE)]\n
+if {[file exists $mp/.modulecache]} {
+    append tserr [msg_lint $mpre/.modulecache]\n
+}
+append tserr \n[escre [msg_lint $mpre/.modulerc {*}$lintmsgmodrc]]\n\n[msg_lint $mpre/advvers/1.0]\n[msg_lint $mpre/advvers2/.modulerc].*
 testouterr_cmd_re sh {lint -v} ERR $tserr
+
+# check generated modulecache if any
+if {[file exists $mp/.modulecache]} {
+    testouterr_cmd sh "lint $mp/.modulecache" OK {}
+    testouterr_cmd sh "lint -v $mp/.modulecache" OK [msg_lint $mp/.modulecache]
+}
 
 # check modulepath without error or warning
 setenv_path_var MODULEPATH $modpath.path1
@@ -229,10 +239,7 @@ set tserr [msg_lint $mp/lcompat/.version {*}$lintmsglcompatversion]
 testouterr_cmd sh "lint $mp/lcompat/.version" OK $tserr
 
 # command not implemented
-set lintmsglcompat12 [list {WARNING line 8: Command "extensions" is not implemented}\
-{WARNING line 11: Command "extensions" is not implemented}\
-{WARNING line 14: Command "extensions" is not implemented}\
-{ERROR   line 14: Wrong number of arguments (0) to "extensions"}]
+set lintmsglcompat12 [list {ERROR   line 14: Wrong number of arguments (0) to "extensions"}]
 set tserr [msg_lint $mp/lcompat/1.2 {*}$lintmsglcompat12]
 testouterr_cmd sh {lint lcompat/1.2} ERR $tserr
 
@@ -298,12 +305,27 @@ restore_file_perms $mp/lint/1.0
 # access denied on modulerc
 change_file_perms $mp/.modulerc $hide_perms
 change_file_perms $mp/advvers2/.modulerc $hide_perms
-set tserr [msg_lint $env(MODULERCFILE)]\n[msg_lint $mpre/advvers/1.0]\n[msg_lint $mpre/advvers2/1.0]\n.*
+set tserr [msg_lint $env(MODULERCFILE)]\n
+if {[file exists $mp/.modulecache]} {
+    append tserr [msg_lint $mpre/.modulecache]\n
+}
+append tserr [msg_lint $mpre/advvers/1.0]\n[msg_lint $mpre/advvers2/1.0]\n.*
 testouterr_cmd_re sh {lint -v} ERR $tserr
 restore_file_perms $mp/.modulerc
 restore_file_perms $mp/advvers2/.modulerc
 
 end_ignore_modulecache_if_built
+
+# access denied on modulecache if any
+if {[file exists $mp/.modulecache]} {
+    change_file_perms $mp/.modulecache $hide_perms
+    set tserr [msg_lint $env(MODULERCFILE)]\n\n
+    append tserr [escre [msg_lint $mpre/.modulerc {*}$lintmsgmodrc]]\n\n
+    append tserr [msg_lint $mpre/advvers/1.0]\n
+    append tserr [msg_lint $mpre/advvers2/.modulerc]\n[msg_lint $mpre/advvers2/1.0]\n.*
+    testouterr_cmd_re sh {lint -v} ERR $tserr
+    restore_file_perms $mp/.modulecache
+}
 
 }
 

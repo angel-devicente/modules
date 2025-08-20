@@ -1,0 +1,103 @@
+#%Module
+if {[info exists env(TESTSUITE_PROVIDE)]} {
+    module-whatis [module-info name]
+    switch -- $env(TESTSUITE_PROVIDE) {
+        single {
+            provide foo/1
+        }
+        multiple {
+            provide foo/1 bar/1
+            provide baz/1 qux/1 quux/1
+        }
+        err_arg {
+            provide
+        }
+        variant {
+            provide foo/1 var=val1
+        }
+        duplicate {
+            provide foo/1 foo/1
+        }
+        duplicate2 {
+            provide foo/1 bar/1
+            provide qux/1 foo/1
+        }
+        duplicate_with_ext {
+            provide foo/1
+        }
+        duplicate_with_ext_module {
+            provide bar/1
+        }
+        duplicate_with_family {
+            family foo
+            provide foo
+        }
+        duplicate_with_family2 {
+            provide foo
+            family foo
+        }
+        duplicate_with_family3 {
+            family quux
+            provide quux
+        }
+        duplicate_with_ext_family {
+            provide foo
+        }
+        duplicate_with_ext_family2 {
+            provide quux
+        }
+        duplicate_with_alias {
+            module-alias foo provide/1
+            provide foo
+        }
+        duplicate_with_alias2 {
+            provide foo
+            module-alias foo provide/1
+        }
+        duplicate_with_alias3 {
+            provide quux
+            module-alias quux provide/1
+        }
+        duplicate_with_ext_same_alias - duplicate_with_ext_diff_alias {
+            provide foo
+        }
+        duplicate_with_ext_same_alias2 - duplicate_with_ext_diff_alias2 {
+            provide quux
+        }
+        duplicate_with_version {
+            module-version provide/1 foo
+            provide provide/foo
+        }
+        duplicate_with_version2 {
+            provide provide/foo
+            module-version provide/1 foo
+        }
+        duplicate_with_ext_same_version - duplicate_with_ext_diff_version {
+            provide provide/foo
+        }
+        extensions {
+            extensions foo/1 bar/1
+            extensions baz/1 qux/1 quux/1
+        }
+        multiple_and_forbidden - multiple_and_alias_forbidden -\
+        multiple_and_expired - multiple_and_alias_expired -\
+        multiple_and_hidden - multiple_and_alias_hidden {
+            provide foo/1 bar/1 baz/1 qux/1 quux/1
+            setenv FOO bar
+        }
+        multiple_and_family_forbidden - multiple_and_family_expired -\
+        multiple_and_family_hidden {
+            setenv FOO bar
+            family quux
+        }
+        latest - latest_and_forbidden - latest_and_alias_forbidden -\
+        latest_and_hidden - latest_and_alias_hidden {
+            provide provide/10
+        }
+        explicit_default - explicit_default_and_forbidden -\
+        explicit_default_and_alias_forbidden - explicit_default_and_hidden -\
+        explicit_default_and_alias_hidden {
+            provide provide/0
+        }
+    }
+}

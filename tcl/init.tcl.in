@@ -3,7 +3,7 @@
 # INIT.TCL, configuration and state handing procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,16 +22,17 @@
 
 # Runtime state properties (default value, proc to call to initialize state
 # value?)
-##nagelfar ignore +36 Found constant
+##nagelfar ignore +38 Found constant
 array set g_state_defs [list\
    autoinit {0}\
+   cache_mcookie_version {5.3}\
    clock_seconds {<undef> initStateClockSeconds}\
    domainname {<undef> {runCommand domainname}}\
    error_count {0}\
    extra_siteconfig_loaded {0}\
    false_rendered {0}\
    force {0}\
-   hiding_threshold {0}\
+   hiding_threshold {0 initStateHidingThreshold}\
    inhibit_errreport {0}\
    inhibit_interp {0}\
    init_error_report {0}\
@@ -45,6 +46,7 @@ array set g_state_defs [list\
    lsb_id {<undef> {runCommand lsb_release -s -i}}\
    lsb_release {<undef> {runCommand lsb_release -s -r}}\
    machine [list $::tcl_platform(machine)]\
+   modules_release {@MODULES_RELEASE@}\
    nodename {<undef> {runCommand uname -n}}\
    os [list $::tcl_platform(os)]\
    osversion [list $::tcl_platform(osVersion)]\
@@ -69,7 +71,7 @@ array set g_state_defs [list\
 # value, is configuration lockable to default value, value kind, valid value
 # list?, internal value representation?, proc to call to initialize option
 # value, valid value list kind
-##nagelfar ignore #73 Too long line
+##nagelfar ignore #81 Too long line
 array set g_config_defs [list\
    contact {MODULECONTACT root@localhost 0 s}\
    abort_on_error {MODULES_ABORT_ON_ERROR {@abortonerror@} 0 l {load ml\
@@ -78,10 +80,11 @@ array set g_config_defs [list\
    auto_handling {MODULES_AUTO_HANDLING @autohandling@ 0 b {0 1}}\
    avail_indepth {MODULES_AVAIL_INDEPTH @availindepth@ 0 b {0 1}}\
    avail_output {MODULES_AVAIL_OUTPUT {@availoutput@} 0 l {modulepath alias\
-      dirwsym indesym sym tag key variant variantifspec} {} {} eltlist}\
+      provided-alias dirwsym indesym sym tag key hidden variant variantifspec\
+      via} {} {} eltlist}\
    avail_terse_output {MODULES_AVAIL_TERSE_OUTPUT {@availterseoutput@} 0 l\
-      {modulepath alias dirwsym indesym sym tag key variant variantifspec} {}\
-      {} eltlist}\
+      {modulepath alias provided-alias dirwsym indesym sym tag key hidden\
+      variant variantifspec} {} {} eltlist}\
    cache_buffer_bytes {MODULES_CACHE_BUFFER_BYTES 32768 0 i {4096 1000000} {}\
       {} intbe}\
    cache_expiry_secs {MODULES_CACHE_EXPIRY_SECS 0 0 i {0 31536000} {} {}\
@@ -92,6 +95,7 @@ array set g_config_defs [list\
    color {MODULES_COLOR @color@ 0 s {never auto always} {0 1 2}\
       initConfColor}\
    colors {MODULES_COLORS {} 0 l {} {} initConfColors}\
+   conflict_unload {MODULES_CONFLICT_UNLOAD @conflictunload@ 0 b {0 1}}\
    csh_limit {{} 4000 0 i}\
    extra_siteconfig {MODULES_SITECONFIG <undef> 1 s {}}\
    editor {MODULES_EDITOR {@editor@} 0 s {} {} initConfEditor}\
@@ -104,9 +108,9 @@ array set g_config_defs [list\
    implicit_requirement {MODULES_IMPLICIT_REQUIREMENT @implicitrequirement@ 0\
       b {0 1}}\
    list_output {MODULES_LIST_OUTPUT {@listoutput@} 0 l {header idx variant\
-      alias indesym sym tag key} {} {} eltlist}\
+      alias indesym sym tag hidden key} {} {} eltlist}\
    list_terse_output {MODULES_LIST_TERSE_OUTPUT {@listterseoutput@} 0 l\
-      {header idx variant alias indesym sym tag key} {} {} eltlist}\
+      {header idx variant alias indesym sym tag hidden key} {} {} eltlist}\
    locked_configs {{} {@lockedconfigs@} 0 o}\
    logged_events {MODULES_LOGGED_EVENTS {@loggedevents@} 1 l {auto_eval\
       requested_eval requested_cmd} {} {} eltlist}\
@@ -121,6 +125,7 @@ array set g_config_defs [list\
    protected_envvars {MODULES_PROTECTED_ENVVARS <undef> 0 l}\
    rcfile {MODULERCFILE <undef> 0 l}\
    redirect_output {MODULES_REDIRECT_OUTPUT 1 0 b {0 1}}\
+   require_via {MODULES_REQUIRE_VIA @requirevia@ 0 b {0 1}}\
    reset_target_state {MODULES_RESET_TARGET_STATE __init__ 0 s}\
    quarantine_support {MODULES_QUARANTINE_SUPPORT @quarantinesupport@ 0 b {0\
       1}}\
@@ -130,6 +135,13 @@ array set g_config_defs [list\
    silent_shell_debug {MODULES_SILENT_SHELL_DEBUG @silentshdbgsupport@ 0 b {0\
       1}}\
    siteconfig {{} {@etcdir@/siteconfig.tcl} 0 s}\
+   spider_indepth {MODULES_SPIDER_INDEPTH @spiderindepth@ 0 b {0 1}}\
+   spider_output {MODULES_SPIDER_OUTPUT {@spideroutput@} 0 l {modulepath\
+      alias provided-alias dirwsym indesym sym tag key hidden variant\
+      variantifspec via} {} {} eltlist}\
+   spider_terse_output {MODULES_SPIDER_TERSE_OUTPUT {@spiderterseoutput@} 0 l\
+      {modulepath alias provided-alias dirwsym indesym sym tag key hidden\
+      variant variantifspec} {} {} eltlist}\
    source_cache {MODULES_SOURCE_CACHE @sourcecache@ 0 b {0 1}}\
    sticky_purge {MODULES_STICKY_PURGE {@stickypurge@} 0 s {error warning\
       silent}}\
@@ -432,8 +444,10 @@ proc initStatePaginate {} {
    set pager [getConf pager]
    # empty or 'cat' pager command means no-pager
    set no_cmds [list {} cat]
-   # default pager enablement depends on pager command value
-   set paginate [expr {[file tail [lindex $pager 0]] ni $no_cmds}]
+   set only_shell_types [list sh csh fish cmd pwsh]
+   # default pager enablement depends on pager command value and current shell
+   set paginate [expr {[file tail [lindex $pager 0]] ni $no_cmds && [getState\
+      shelltype] in $only_shell_types}]
 
    # asked enablement could only nullify a previous asked disablement as it
    # requires a valid pager command configuration, which by default enables
@@ -529,16 +543,28 @@ proc initStateTermColumns {} {
 proc initStateShellType {} {
    switch -- [getState shell] {
       sh - bash - ksh - zsh {
-         set shelltype sh
+         return sh
       }
       csh - tcsh {
-         set shelltype csh
+         return csh
       }
       default {
-         set shelltype [getState shell]
+         return [getState shell]
       }
    }
-   return $shelltype
+}
+
+proc initStateHidingThreshold {} {
+   # sets default fallback value
+   lassign $::g_state_defs(hiding_threshold) hiding_threshold
+
+   if {[isEltInReport hidden 0]} {
+      set hiding_threshold 2
+   } elseif {[info exists ::asked_hiding_threshold]} {
+      set hiding_threshold $::asked_hiding_threshold
+   }
+
+   return $hiding_threshold
 }
 
 # Get all groups of user running modulecmd.tcl process
@@ -730,7 +756,8 @@ proc initConfTagAbbrev {envvar value validvallist intvallist} {
             set setabbrevtag [expr {[currentState commandname] eq {list}}]
          }
          hidden {
-            set setabbrevtag [expr {[currentState commandname] eq {avail}}]
+            set setabbrevtag [expr {[currentState commandname] in {avail\
+               spider}}]
          }
          default {
             set setabbrevtag 1
@@ -802,7 +829,7 @@ proc initConfVariantShortcut {envvar value validvallist intvallist} {
    # ignore shortcut if not equal to one character or if set on alphanum char
    # or on char with special meaning
    foreach {vr sc} [split $value {:=}] {
-      if {[string length $sc] == 1 && ![string match {[a-zA-Z0-9+~/@=-]}\
+      if {[string length $sc] == 1 && ![string match {[a-zA-Z0-9+~/@=-,:]}\
          $sc]} {
          # remove duplicate shortcut or variant definition
          if {[info exists ::g_variantShortcut($vr)]} {
@@ -841,7 +868,7 @@ proc isIcase {} {
    # insensitive match enablement
    lappend enabledValList always
    if {[currentState commandname] in [list avail list whatis search paths\
-      savelist]} {
+      savelist spider]} {
       lappend enabledValList search
    }
    return [expr {[getConf icase] in $enabledValList}]

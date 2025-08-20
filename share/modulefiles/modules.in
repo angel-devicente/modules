@@ -1,0 +1,15 @@
+#%Module
+
+module-help {    modules - loads the modules software & application environment}
+module-help {    This adds @prefix@/* to several of the environment variables.}
+module-help {    Version @VERSION@}
+module-help {}
+
+module-whatis {loads the modules environment}
+
+setenv MODULESHOME @prefix@
+prepend-path PATH {@bindir@}
+prepend-path MANPATH {@mandir@}
+
+# enable module versioning modulepath
+@VERSIONING@module use {@baseprefix@/versions}

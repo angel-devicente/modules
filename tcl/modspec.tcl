@@ -1,7 +1,7 @@
 ##########################################################################
 
 # MODSPEC.TCL, module specification procedures
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -214,11 +214,11 @@ proc getEqArrayKeyProc {arrname name} {
    return $name
 }
 
-# Check a module name does match query at expected depth level when indepth
-# search is disabled. Define procedure on the fly to adapt its
-# code to indepth configuration option and querydepth and test mode params.
-proc defineDoesModMatchAtDepthProc {indepth querydepth test} {
-   set procprops $indepth:$querydepth:$test
+# Check a module name does match query at the depth level expressed in query
+# when search mode is not contains. Define procedure on the fly to adapt its
+# code to search configuration option and querydepth and test mode params.
+proc defineDoesModMatchAtDepthProc {contains querydepth test} {
+   set procprops $contains:$querydepth:$test
 
    # define proc if not done yet or if it was defined for another context
    if {[info procs doesModMatchAtDepth] eq {} ||\
@@ -231,7 +231,7 @@ proc defineDoesModMatchAtDepthProc {indepth querydepth test} {
       set ::g_doesModMatchAtDepth_procprops $procprops
 
       # define optimized procedure
-      if {$indepth} {
+      if {$contains} {
          set atdepth {$mod}
       } else {
          set atdepth "\[join \[lrange \[split \$mod /\] 0 $querydepth\] /\]"
@@ -1146,6 +1146,17 @@ proc modEqProcIcaseExtdfl {pattern mod {test equal} {trspec 1} {ismodlo 0}\
    return $ret
 }
 
+proc modEqAny {pattern_list mod {test equal} {trspec 1} {ismodlo 0} {vrcmp 0}\
+   {modvrlist 0} {psuf {}}} {
+   foreach pattern $pattern_list {
+      if {[modEq $pattern $mod $test $trspec $ismodlo $vrcmp $modvrlist\
+         $psuf]} {
+         return 1
+      }
+   }
+   return 0
+}
+
 # analyze module version specified within module specification
 proc parseModuleVersionSpecifier {modspec} {
    set invalidversspec 0
@@ -1300,13 +1311,14 @@ proc parseModuleSpecificationProcAdvVersSpec {mlspec nonamespec xtspec\
    # define extra specifier known list, to raise error if argument does not
    # match
    set xtelt_valid_list [list always-load append-path chdir complete conflict\
-      depends-on envvar family incompat load load-any prepend-path prereq\
-      prereq-all prereq-any pushenv remove-path require set-alias\
-      set-function setenv switch switch-on switch-off tag try-load uncomplete\
-      unload unset-alias unset-function unsetenv variant]
-   set xtelt_modspec_list [list always-load conflict depends-on incompat load\
-      load-any prereq prereq-all prereq-any require switch switch-on\
-      switch-off try-load unload]
+      depends-on depends-on-any envvar family incompat load load-any\
+      prepend-path prereq prereq-all prereq-any provide provided-alias\
+      pushenv remove-path require set-alias set-function setenv switch\
+      switch-on switch-off tag try-load uncomplete unload unset-alias\
+      unset-function unsetenv use variant]
+   set xtelt_modspec_list [list always-load conflict depends-on\
+      depends-on-any incompat load load-any prereq prereq-all prereq-any\
+      require switch switch-on switch-off try-load unload]
 
    set mlunload 0
    set nextmlunload 0
@@ -1672,21 +1684,19 @@ proc unsetModuleVersSpec {modarg} {
 # get module name from module name and version spec if parsed
 proc getModuleNameFromVersSpec {modarg} {
    if {[info exists ::g_moduleVersSpec($modarg)]} {
-      lassign $::g_moduleVersSpec($modarg) mod modname
+      return [lindex $::g_moduleVersSpec($modarg) 1]
    } else {
-      set modname [file dirname $modarg]
+      return [file dirname $modarg]
    }
-   return $modname
 }
 
 # get module root name from module name and version spec if parsed
 proc getModuleRootFromVersSpec {modarg} {
    if {[info exists ::g_moduleVersSpec($modarg)]} {
-      set modroot [lindex $::g_moduleVersSpec($modarg) 6]
+      return [lindex $::g_moduleVersSpec($modarg) 6]
    } else {
-      set modroot [lindex [file split $modarg] 0]
+      return [lindex [file split $modarg] 0]
    }
-   return $modroot
 }
 
 # translate module name version spec to return all modules mentioned
@@ -1737,42 +1747,34 @@ proc getOneModuleFromVersSpec {modarg} {
 # translate module name version spec to return the list of variant mentioned
 proc getVariantListFromVersSpec {modarg} {
    if {[info exists ::g_moduleVersSpec($modarg)]} {
-      set variantlist [lindex $::g_moduleVersSpec($modarg) 7]
-   } else {
-      set variantlist {}
+      return [lindex $::g_moduleVersSpec($modarg) 7]
    }
-   return $variantlist
 }
 
 # get module name and version from version spec if parsed
 proc getModuleNameAndVersFromVersSpec {modarg} {
    if {[info exists ::g_moduleVersSpec($modarg)]} {
-      set modnvspec [lindex $::g_moduleVersSpec($modarg) 8]
+      return [lindex $::g_moduleVersSpec($modarg) 8]
    } else {
-      set modnvspec $modarg
+      return $modarg
    }
-   return $modnvspec
 }
 
 # get raw argument specified from parsed version spec
 proc getRawArgumentFromVersSpec {modarg} {
    if {[info exists ::g_moduleVersSpec($modarg)]} {
-      set rawarg [lindex $::g_moduleVersSpec($modarg) 9]
+      return [lindex $::g_moduleVersSpec($modarg) 9]
    } else {
-      set rawarg $modarg
+      return $modarg
    }
-   return $rawarg
 }
 
 # translate module name version spec to return the list of extra specifier
 # mentioned
 proc getExtraListFromVersSpec {modarg} {
    if {[info exists ::g_moduleVersSpec($modarg)]} {
-      set extralist [lindex $::g_moduleVersSpec($modarg) 10]
-   } else {
-      set extralist {}
+      return [lindex $::g_moduleVersSpec($modarg) 10]
    }
-   return $extralist
 }
 
 # translate module name version spec to return list of tag specifier and list
@@ -1795,11 +1797,8 @@ proc getSplitExtraListFromVersSpec {modarg} {
 # get available modules matching module specification
 proc getAvailListFromVersSpec {modarg} {
    if {[info exists ::g_moduleVersSpec($modarg)]} {
-      set availlist [lindex $::g_moduleVersSpec($modarg) 11]
-   } else {
-      set availlist {}
+      return [lindex $::g_moduleVersSpec($modarg) 11]
    }
-   return $availlist
 }
 
 # is mod spec containing variant but no module name and version

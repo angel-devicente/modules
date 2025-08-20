@@ -26,8 +26,17 @@
 
 send_user "\tInitializing the testsuite ...\n"
 
+# excepted information to run the testsuite
+set TCLSH $env(TCLSH)
+send_user "\tTCLSH is '$TCLSH'\n"
+set MODULECMD $env(MODULECMD)
+send_user "\tMODULECMD is '$MODULECMD'\n"
+
+
 # Modules release number
 set major_minor_rel [join [lrange [split $install_version .] 0 1] .]
+
+set cache_mcookie_version 5.3
 
 # test kind of sh-shell we have
 if {[file type /bin/sh] eq {link}} {
@@ -36,12 +45,15 @@ if {[file type /bin/sh] eq {link}} {
    set sh_kind sh
 }
 
+# extract and format os name
+set os_name [string tolower [lindex [split $tcl_platform(os) _] 0]]
+
 # get current terminal width
 proc getTtyCols {} {
     set nbcols {}
 
-    switch -- $::tcl_platform(os) {
-        {SunOS} {
+    switch -- $::os_name {
+        {sunos} {
             catch {regexp {columns = (\d+);} [exec stty] match nbcols} errMsg
         }
         default {
@@ -85,7 +97,7 @@ proc find_bin {name} {
 }
 
 # check SIP is enabled or not on OS X
-if {$tcl_platform(os) eq "Darwin"} {
+if {$os_name eq "darwin"} {
     catch {
         regexp {System Integrity Protection status: enabled.} [exec csrutil status] csrutil_enabled
     } errMsg
@@ -102,6 +114,7 @@ if {[set fishbin [lindex [auto_execok fish] 0]] ne {}} {
    regexp {version (.+)$} [exec $fishbin --version] match fish_version
    set fish_version_ge31 [expr {[lindex [lsort -dictionary [list $fish_version 3.1.0]] 0] eq {3.1.0}}]
    set fish_version_ge32 [expr {[lindex [lsort -dictionary [list $fish_version 3.2.0]] 0] eq {3.2.0}}]
+   set fish_version_ge40 [expr {[lindex [lsort -dictionary [list $fish_version 4.0.0]] 0] eq {4.0.0}}]
 }
 
 # find ksh flavor
@@ -162,7 +175,7 @@ if {$install_libtclenvmodules eq {y}} {
 set test_perms_dir "$env(TESTSUITEDIR)/etc"
 set test_perms_file "$test_perms_dir/modulerc"
 set orig_perms [file attributes $test_perms_dir -permissions]
-file attributes $test_perms_dir -permissions "ugo-rx"
+catch {file attributes $test_perms_dir -permissions "ugo-rx"}
 set new_perms [file attributes $test_perms_dir -permissions]
 if {$new_perms eq $orig_perms} {
     set is_file_perms_editable 0
@@ -293,7 +306,8 @@ proc cmpversion {str1 str2} {
 
 # report current system information
 send_user "\tMachine hardware name is '$tcl_platform(machine)'\n"
-send_user "\tOS name is '$tcl_platform(os)'\n"
+send_user "\tOS code name is '$tcl_platform(os)'\n"
+send_user "\tOS cleaned name is '$os_name'\n"
 send_user "\tOS version is '$tcl_platform(osVersion)'\n"
 send_user "\tPlatform name is '$tcl_platform(platform)'\n"
 
@@ -314,7 +328,6 @@ if {![string length $lsb_cmd]} {
 }
 
 # fetch tclsh version used to adapt tests producing different output depending on this version
-default_tclsh
 catch {set tclsh_version [exec $TCLSH << {puts [info tclversion]}]} errMsg
 if {[info exists tclsh_version]} {
     send_user "\ttclsh version is $tclsh_version\n"
@@ -323,7 +336,8 @@ if {[info exists tclsh_version]} {
     send_user "\tFail to detect tclsh version. Fallback to $tclsh_version version\n$errMsg"
 }
 
-default_modulecmd
+# does configured pager tool allow for pagination
+set pager_dfl_use [expr {[file tail $install_pager] ni {{} cat}}]
 
 
 #
@@ -349,7 +363,7 @@ set sep_line [string repeat - 67]
 set sh_shells [list sh bash ksh zsh]
 set csh_shells [list csh tcsh]
 set real_shells [concat $sh_shells $csh_shells [list fish]]
-set other_shells [list tcl cmd perl python ruby lisp cmake r]
+set other_shells [list tcl cmd perl python ruby lisp cmake r pwsh]
 set supported_shells [concat $real_shells $other_shells]
 
 # Common messages
@@ -395,7 +409,7 @@ set err_emptymodname "$error_msgs: Invalid empty module name"
 set err_emptycollname "$error_msgs: $msg_collnameempty"
 set err_emptydirname "$error_msgs: Invalid empty directory name"
 set err_emptyfilename "$error_msgs: $msg_filenameempty"
-set err_unsatreload "$error_msgs: Cannot reload modules, some of their constraints are not satistied"
+set err_unsatreload "$error_msgs: Cannot reload modules, some of their constraints are not satisfied"
 set err_nodefault "$error_msgs: No default version defined for "
 set err_evalabort "$error_msgs: Module evaluation aborted"
 set warn_evalabort "$warn_msgs: Module evaluation aborted"
@@ -411,7 +425,7 @@ set err_reqfull "$::error_msgs: Module version must be specified to load module"
 set err_nomodloaded "$error_msgs: $msg_nomodloaded"
 set err_modfromdiffpathloaded "$error_msgs: Module already loaded from a different modulepath"
 set err_save_emptyenv "$::error_msgs: Nothing to save in a collection"
-set err_save_unsat "$::error_msgs: Cannot save collection, some module constraints are not satistied"
+set err_save_unsat "$::error_msgs: Cannot save collection, some module constraints are not satisfied"
 set warn_nostash "$::warn_msgs: No specific environment to save"
 set warn_cache_nowritable "$::warn_msgs: Cannot remove cache file, directory is not writable"
 set warn_cache_build_nowritable "$::warn_msgs: Cannot build cache file, directory is not writable"
@@ -490,9 +504,19 @@ proc err_deplo {args} {
     return "$::error_msgs: Dependent [join $args { and }] $is loaded"
 }
 
+proc err_deploi {args} {
+    set is [expr {[llength $args] > 1 ? {are} : {is}}]
+    return "$::error_msgs: Dependent [join $args { and }] $is loading"
+}
+
 proc err_deplof {args} {
     set is [expr {[llength $args] > 1 ? {are} : {is}}]
     return "$::warn_msgs: Dependent [join $args { and }] $is loaded"
+}
+
+proc err_deploif {args} {
+    set is [expr {[llength $args] > 1 ? {are} : {is}}]
+    return "$::warn_msgs: Dependent [join $args { and }] $is loading"
 }
 
 proc err_reqlo {args} {
@@ -706,7 +730,7 @@ proc info_notloaded {mod} {
     return "$::info_msgs: Module '$mod' is not loaded"
 }
 
-proc err_othervariantloaded {vrlist {setsgr 0}} {
+proc err_othervariantloaded {vrlist {setsgr 0} {is_loading 0}} {
     if {$setsgr} {
         set vrdesiglist {}
         foreach vr $vrlist {
@@ -716,7 +740,8 @@ proc err_othervariantloaded {vrlist {setsgr 0}} {
     } else {
         set vrdesig "{[join $vrlist :]}"
     }
-    return "$::error_msgs: Variant $vrdesig is already loaded"
+    set state [expr {$is_loading ? {loading} : {loaded}}]
+    return "$::error_msgs: Variant $vrdesig is already $state"
 }
 
 proc err_extraspec {xtspec} {
@@ -726,10 +751,11 @@ proc err_extraspec {xtspec} {
 proc err_extraspecifier {xtspec} {
     return "$::error_msgs: Invalid extra specifier '$xtspec'\n  Valid extra\
         specifiers are: always-load append-path chdir complete conflict\
-        depends-on envvar family incompat load load-any prepend-path prereq\
-        prereq-all prereq-any pushenv remove-path require set-alias\
-        set-function setenv switch switch-on switch-off tag try-load\
-        uncomplete unload unset-alias unset-function unsetenv variant"
+        depends-on depends-on-any envvar family incompat load load-any\
+        prepend-path prereq prereq-all prereq-any provide provided-alias\
+        pushenv remove-path require set-alias set-function setenv switch\
+        switch-on switch-off tag try-load uncomplete unload unset-alias\
+        unset-function unsetenv use variant"
 }
 
 proc err_xtspec_notallowed {} {
@@ -995,6 +1021,48 @@ proc msg_top_load {mod unlist reqlolist deprelist args} {
     return [eval msg_load "{$mod}" $args]
 }
 
+proc msg_top_load_conun_noauto {mod depunlist unlist urequnlist reqlolist deprelist args} {
+    lassign [mix_depre_depun_list $deprelist $depunlist] deprelist depunlist
+
+    if {[llength $depunlist]} {
+        lappend args "Unloading dependent: [join $depunlist]"
+    }
+    if {[llength $unlist]} {
+        lappend args "Unloading conflict: [join $unlist]"
+    }
+    if {[llength $urequnlist]} {
+        lappend args "Unloading useless requirement: [join $urequnlist]"
+    }
+    if {[llength $reqlolist]} {
+        lappend args "Loading requirement: [join $reqlolist]"
+    }
+    if {[llength $deprelist]} {
+        lappend args "Reloading dependent: [join $deprelist]"
+    }
+    return [eval msg_load "{$mod}" $args]
+}
+
+proc msg_top_load_conun {mod depunlist unlist urequnlist reqlolist deprelist args} {
+    lassign [mix_depre_depun_list $deprelist $depunlist] deprelist depunlist
+
+    if {[llength $depunlist]} {
+        lappend args "Unloading dependent: [join $depunlist]"
+    }
+    if {[llength $unlist]} {
+        lappend args "Unloading conflict: [join $unlist]"
+    }
+    if {[llength $reqlolist]} {
+        lappend args "Loading requirement: [join $reqlolist]"
+    }
+    if {[llength $urequnlist]} {
+        lappend args "Unloading useless requirement: [join $urequnlist]"
+    }
+    if {[llength $deprelist]} {
+        lappend args "Reloading dependent: [join $deprelist]"
+    }
+    return [eval msg_load "{$mod}" $args]
+}
+
 proc msg_top_unload {mod depunlist urequnlist deprelist args} {
     lassign [mix_depre_depun_list $deprelist $depunlist] deprelist depunlist
     if {[llength $depunlist]} {
@@ -1009,17 +1077,59 @@ proc msg_top_unload {mod depunlist urequnlist deprelist args} {
     return [eval msg_unload "{$mod}" $args]
 }
 
+proc msg_top_switch_noauto {old new depunlist urequnlist unlist reqlolist deprelist args} {
+    lassign [mix_depre_depun_list $deprelist $depunlist] deprelist depunlist
+
+    if {[llength $depunlist]} {
+        lappend args "Unloading dependent: [join $depunlist]"
+    }
+    if {[llength $unlist]} {
+        lappend args "Unloading conflict: [join $unlist]"
+    }
+    if {[llength $urequnlist]} {
+        lappend args "Unloading useless requirement: [join $urequnlist]"
+    }
+    if {[llength $reqlolist]} {
+        lappend args "Loading requirement: [join $reqlolist]"
+    }
+    if {[llength $deprelist]} {
+        lappend args "Reloading dependent: [join $deprelist]"
+    }
+    return [eval msg_switch "{$old}" "{$new}" $args]
+}
+
 proc msg_top_switch {old new depunlist urequnlist unlist reqlolist deprelist args} {
     lassign [mix_depre_depun_list $deprelist $depunlist] deprelist depunlist
 
     if {[llength $depunlist]} {
         lappend args "Unloading dependent: [join $depunlist]"
     }
+    if {[llength $unlist]} {
+        lappend args "Unloading conflict: [join $unlist]"
+    }
+    if {[llength $reqlolist]} {
+        lappend args "Loading requirement: [join $reqlolist]"
+    }
     if {[llength $urequnlist]} {
         lappend args "Unloading useless requirement: [join $urequnlist]"
     }
+    if {[llength $deprelist]} {
+        lappend args "Reloading dependent: [join $deprelist]"
+    }
+    return [eval msg_switch "{$old}" "{$new}" $args]
+}
+
+proc msg_top_switch_conun {old new depunlist urequnlist unlist reqlolist deprelist args} {
+    lassign [mix_depre_depun_list $deprelist $depunlist] deprelist depunlist
+
+    if {[llength $depunlist]} {
+        lappend args "Unloading dependent: [join $depunlist]"
+    }
     if {[llength $unlist]} {
         lappend args "Unloading conflict: [join $unlist]"
+    }
+    if {[llength $urequnlist]} {
+        lappend args "Unloading useless requirement: [join $urequnlist]"
     }
     if {[llength $reqlolist]} {
         lappend args "Loading requirement: [join $reqlolist]"
@@ -1086,7 +1196,7 @@ proc create_dummy_cachefile {mp} {
     set cachefile $mp/.modulecache
     send_user "\tCreating dummy cache file $cachefile\n"
     set fid [open $cachefile w]
-    puts $fid "#%Module$::major_minor_rel"
+    puts $fid "#%Module$::cache_mcookie_version"
     close $fid
 }
 

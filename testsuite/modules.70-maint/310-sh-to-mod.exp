@@ -55,7 +55,7 @@ foreach sh $shtomod_supported_shells {
     set shbin [lindex [auto_execok $sh] 0]
     # mksh flavor of ksh is not supported
     # sh from FreeBSD is not supported too
-    if {$shbin ne {} && ($sh ne {ksh} || !$ksh_is_mksh) && ($sh ne {sh} || $tcl_platform(os) ne {FreeBSD})} {
+    if {$shbin ne {} && ($sh ne {ksh} || !$ksh_is_mksh) && ($sh ne {sh} || $os_name ne {freebsd})} {
         lappend shtomod_avail_shells $sh
         set shell_pathname($sh) $shbin
     }
@@ -226,9 +226,15 @@ set tscomp_tcsh "complete\ttcsh cmd {'n/-h/n/' 'n/--help/n/' 'n/-V/n/' 'n/--vers
 complete\ttcsh mycmd {'n/help/`_module_avail`/' 'n/add/`_module_not_yet_loaded; echo \"--auto --no-auto --force -f --icase -i --tag --tag=\"`/'}
 complete\ttcsh othercmd 'n/--help/n/'"
 if {[info exists fish_version_ge31] && $fish_version_ge31} {
+    if {[info exists fish_version_ge40] && $fish_version_ge40} {
+set tscomp_alias_fish "complete\tfish alcb --wraps\\ 'echo\\ f\\\\\\\\\\\{o'
+complete\tfish alfoo {--wraps 'echo (grep \"report .Modules \" ../../modulecmd.tcl | tr -d \\\\\\\\ 2>/dev/null | awk \\'{print \$3}\\')'}
+complete\tfish alsp {--wraps 'echo f\\\\\"o; echo b\\\\\\\\\\\\\"r; echo f\\\\\\'o'}"
+    } else {
 set tscomp_alias_fish "complete\tfish alcb {--wraps echo\\ f\\\\\\\{o}
 complete\tfish alfoo {--wraps echo\\ \\(grep\\ \\\"report\\ .Modules\\ \\\"\\ ../../modulecmd.tcl\\ \\|\\ tr\\ -d\\ \\\\\\\\\\ 2\\>/dev/null\\ \\|\\ awk\\ \\'\\{print\\ \\\$3\\}\\'\\)}
 complete\tfish alsp {--wraps echo\\ f\\\\\\\"o\\;\\ echo\\ b\\\\\\\\\\\\\\\"r\\;\\ echo\\ f\\\\\\'o}"
+    }
 set tscomp_fish "complete\tfish cmd {-l help -d 'Command help'}
 complete\tfish cmd {-l version -d 'Command version'}
 complete\tfish cmd {-s h -d 'Command help'}
@@ -791,7 +797,6 @@ setenv_var TESTSUITE_SHTOMOD_MODULE 1
 # changes made by the script
 setenv_var MODULES_SET_SHELL_STARTUP 0
 setenv_var MODULES_CMD [file normalize $env(TESTSUITEDIR)/../modulecmd.tcl]
-setenv_var TCLSH $TCLSH
 
 # if module was defined in environment prior test, the result of the source-sh evaluation
 # will be the unset of the module functions
@@ -803,7 +808,7 @@ if {$is_modules_defined} {
 } else {
     set extratserr {}
 }
-if {$is_modules_defined_fish && ![string match "CYGWIN*" $tcl_platform(os)]} {
+if {$is_modules_defined_fish && $os_name ne {cygwin}} {
     set extratserr_fish "\nunset-function\tml\nunset-function\tmodule"
     if {$is_mogui_defined} {
         append extratserr_fish "\nunset-function\tmogui"

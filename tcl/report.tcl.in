@@ -3,7 +3,7 @@
 # REPORT.TCL, output handling procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2024 Xavier Delaruelle
+# Copyright (C) 2016-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -656,6 +656,10 @@ proc reportVersion {} {
       (@MODULES_BUILD_DATE@)}
 }
 
+proc reportName {} {
+   report Modules
+}
+
 # disable error reporting (non-critical report only) unless debug enabled
 proc inhibitErrorReport {} {
    if {![isVerbosityLevel trace]} {
@@ -752,6 +756,35 @@ proc releaseHeldReport {args} {
             }
          }
          unset ::g_holdReport($holdid)
+      }
+      # also drop reported tag of conflict error
+      if {[info exists ::g_holdReportConflict($holdid)]} {
+         if {$action eq {drop}} {
+            foreach {evalid drop_mod_list} $::g_holdReportConflict($holdid) {
+               lassign [getDiffBetweenList $::report_conflict($evalid)\
+                  $drop_mod_list] ::report_conflict($evalid)
+            }
+         }
+         unset ::g_holdReportConflict($holdid)
+      }
+      # also drop failed module evaluation to get their failure information
+      # if later retried
+      if {[info exists ::g_holdModuleFailedEval($holdid)]} {
+         if {$action eq {drop}} {
+            foreach {evalid failed_context failed_mod}\
+               $::g_holdModuleFailedEval($holdid) {
+               set failed_eval_list $::g_moduleFailedEval($evalid)
+               for {set i 0} {$i < [llength $failed_eval_list]} {incr i} {
+                  if {[lindex $failed_eval_list $i] eq $failed_context &&\
+                     [lindex $failed_eval_list $i+1] eq $failed_mod} {
+                     set failed_eval_list [lreplace $failed_eval_list $i $i+1]
+                     break
+                  }
+               }
+               set ::g_moduleFailedEval($evalid) $failed_eval_list
+            }
+         }
+         unset ::g_holdModuleFailedEval($holdid)
       }
    }
 }
@@ -850,18 +883,22 @@ proc isEltInReport {elt {retifnotdef 1}} {
 
       # check if elt is marked to be included in output
       ##nagelfar ignore Suspicious variable name
-      set ret [info exists ${arrname}($elt)]
+      return [info exists ${arrname}($elt)]
    } else {
       # return $retifnotdef (ok by default) in case no config option
       # corresponds to the current module sub-command and output format
-      set ret $retifnotdef
+      return $retifnotdef
    }
-
-   return $ret
 }
 
 proc registerModuleDesignation {evalid mod vrlist taglist} {
    set ::g_moduleDesgination($evalid) [list $mod $vrlist $taglist]
+}
+
+proc getModuleFromEvalId {evalid} {
+   if {[info exists ::g_moduleDesgination($evalid)]} {
+      return [lindex $::g_moduleDesgination($evalid) 0]
+   }
 }
 
 proc getModuleDesignation {from {mod {}} {sgr 1}} {
@@ -951,15 +988,15 @@ proc getErrPrereqMsg {prelist {load 1} {is_path_specific 0}} {
       foreach pre $prelist {
          lappend predesiglist [getModuleDesignation spec $pre]
       }
-      lassign [list {} missing [getHintLoFirstMsg $predesiglist]] un mis\
+      lassign [list {} missing [getHintLoFirstMsg $predesiglist]] un miss\
          hintmsg
    } else {
       ##nagelfar ignore Found constant
-      lassign [list un a [getHintUnFirstMsg $prelist]] un mis hintmsg
+      lassign [list un a [getHintUnFirstMsg $prelist]] un miss hintmsg
    }
    set path_specific_msg [expr {$is_path_specific ? [getSpecificPathMsg] :\
       {}}]
-   return "Module cannot be ${un}loaded due to $mis\
+   return "Module cannot be ${un}loaded due to $miss\
       prereq$path_specific_msg.\n$hintmsg"
 }
 
@@ -987,12 +1024,20 @@ proc getSpecificPathMsg {} {
    return { (specific path)}
 }
 
-proc getDepLoadedMsg {prelist} {
-   set is [expr {[llength $prelist] > 1 ? {are} : {is}}]
-   foreach pre $prelist {
-      lappend predesiglist [getModuleDesignation loaded $pre]
+proc getKindModuleBeStateMsg {kind mod_list state} {
+   set is [expr {[llength $mod_list] > 1 ? {are} : {is}}]
+   foreach mod $mod_list {
+      lappend mod_desig_list [getModuleDesignation loaded $mod]
    }
-   return "Dependent [join $predesiglist { and }] $is loaded"
+   return "$kind [join $mod_desig_list { and }] $is $state"
+}
+
+proc getDepLoadedMsg {pre_mod_list} {
+   return [getKindModuleBeStateMsg Dependent $pre_mod_list loaded]
+}
+
+proc getDepLoadingMsg {pre_mod_list} {
+   return [getKindModuleBeStateMsg Dependent $pre_mod_list loading]
 }
 
 proc getErrConUnMsg {conlist} {
@@ -1003,24 +1048,22 @@ proc getErrConUnMsg {conlist} {
    return "Unload of conflicting [join $condesiglist { and }] failed"
 }
 
-proc getConIsLoadedMsg {con_mod_list {is_loading 0}} {
-   set is [expr {[llength $con_mod_list] > 1 ? {are} : {is}}]
-   set loading [expr {$is_loading ? {loading} : {loaded}}]
-   set con_desig_list {}
-   foreach con_mod $con_mod_list {
-      lappend con_desig_list [getModuleDesignation loaded $con_mod]
-   }
-   return "Conflicting [join $con_desig_list { and }] $is $loading"
+proc getConLoadedMsg {con_mod_list} {
+   return [getKindModuleBeStateMsg Conflicting $con_mod_list loaded]
+}
+
+proc getConLoadingMsg {con_mod_list} {
+   return [getKindModuleBeStateMsg Conflicting $con_mod_list loading]
 }
 
 proc getPresentConflictErrorMsg {curmodnamevr con_mod_list is_loading} {
    if {[isModuleEvaluated any $curmodnamevr {} {*}$con_mod_list] || [getState\
       force]} {
-      set msg [getConIsLoadedMsg $con_mod_list $is_loading]
+      return [expr {$is_loading ? [getConLoadingMsg $con_mod_list] :\
+         [getConLoadedMsg $con_mod_list]}]
    } else {
-      set msg [getErrConflictMsg $con_mod_list]
+      return [getErrConflictMsg $con_mod_list]
    }
-   return $msg
 }
 
 proc getForbiddenMsg {mod fpmod} {
@@ -1042,6 +1085,10 @@ proc getNearlyForbiddenMsg {mod fpmod} {
    return $msg
 }
 
+proc getWarningMsg {mod fpmod} {
+   return [getModuleTagProp $mod $fpmod warning message]
+}
+
 proc getStickyUnloadMsg {{tag sticky}} {
    return "Unload of $tag module skipped"
 }
@@ -1050,13 +1097,14 @@ proc getStickyForcedUnloadMsg {} {
    return {Unload of sticky module forced}
 }
 
-proc getModWithAltVrIsLoadedMsg {mod} {
+proc getModWithAltVrIsLoadedMsg {mod is_loading} {
    set vrdesiglist {}
    foreach vr [getVariantList $mod 1] {
       lappend vrdesiglist [sgr va $vr]
    }
+   set state [expr {$is_loading ? {loading} : {loaded}}]
    return "Variant [sgr se "\{"][join $vrdesiglist [sgr se :]][sgr se "\}"]\
-      is already loaded"
+      is already $state"
 }
 
 proc getModFromDiffPathIsLoadedMsg {} {
@@ -1400,15 +1448,16 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
       set report_sym [isEltInReport sym]
    }
    set report_tag [isEltInReport tag]
-   set report_alias [isEltInReport alias]
+   set report_alias [expr {[isEltInReport alias] || [isEltInReport\
+      provided-alias]}]
    # enable variant report if variantifspec configured and some variant is
    # specified in query or variant configured for report or list sub-command
    # json output
    set report_variant [expr {($variant_spec_in_query && [isEltInReport\
       variantifspec 0]) || [isEltInReport variant [expr {[currentState\
       commandname] eq {list} && $json}]]}]
-   set collect_variant_from [expr {[currentState commandname] eq {avail} ?\
-      {2} : {0}}]
+   set collect_variant_from [expr {[currentState commandname] in {avail\
+      spider} ? {2} : {0}}]
 
    # prepare list of tag abbreviations that can be substituted and list of
    # tags whose name should be colored
@@ -1423,6 +1472,8 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
       himatcharrvrmap himatcharrvrvalmap
    set clean_list {}
    set vr_list {}
+   set via [expr {[isEltInReport via] ? [getViaModuleForModulepath $header] :\
+      {}}]
 
    # treat elements in specified order if any
    ##nagelfar ignore #2 Badly formed if statement
@@ -1446,8 +1497,9 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
       switch -- [lindex $mod_list($elt) 0] {
          directory {
             if {$json} {
+               ##nagelfar ignore +2 Found constant
                set dispsgr [formatListEltToJsonDisplay $elt type s directory\
-                  1 symbols a $sym_list 1]
+                  1 symbols a $sym_list 1 via s $via 1]
             } elseif {$show_mtime} {
                # append / char after name to clearly indicate this is a dir
                lassign [formatListEltToLongDisplay $elt di / $sym_list sy {}\
@@ -1460,9 +1512,11 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
          }
          modulefile - virtual {
             if {$json} {
+               ##nagelfar ignore +4 Found constant
                set dispsgr [formatListEltToJsonDisplay $elt type s modulefile\
                   1 variants o $vr_list $report_variant symbols a $sym_list 1\
-                  tags a $tag_list 1 pathname s [lindex $mod_list($elt) 2] 1]
+                  tags a $tag_list 1 pathname s [lindex $mod_list($elt) 2] 1\
+                  via s $via 1]
             } elseif {$show_mtime} {
                set clock_mtime [expr {[lindex $mod_list($elt) 1] ne {} ?\
                   [clock format [lindex $mod_list($elt) 1] -format {%Y/%m/%d\
@@ -1481,9 +1535,10 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
          }
          alias {
             if {$json} {
+               ##nagelfar ignore +3 Found constant
                set dispsgr [formatListEltToJsonDisplay $elt type s alias 1\
                   symbols a $sym_list 1 tags a $tag_list 1 target s [lindex\
-                  $mod_list($elt) 1] 1]
+                  $mod_list($elt) 1] 1 via s $via 1]
             } elseif {$show_mtime} {
                lassign [formatListEltToLongDisplay $elt al " -> [lindex\
                   $mod_list($elt) 1]" $sym_list sy {} $default_colored\
@@ -1525,6 +1580,10 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
 
    set len_list {}
    set max_len 0
+   # dictionary-sort results unless if output order is specified
+   if {![llength $mod_list_order]} {
+      set clean_list [lsort -dictionary $clean_list]
+   }
    if {$json} {
       ##nagelfar ignore Found constant
       upvar 0 clean_list display_list
@@ -1533,10 +1592,6 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
       }
    } else {
       set display_list {}
-      # dictionary-sort results unless if output order is specified
-      if {![llength $mod_list_order]} {
-         set clean_list [lsort -dictionary $clean_list]
-      }
       foreach disp $clean_list {
          # compute display element length list on sorted result
          lappend display_list $sgrmap($disp)
@@ -1557,10 +1612,10 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
    # output formatted elements
    if {$search_queries == "*"} {
        displayElementList $header $hsgrkey $hstyle $one_per_line $show_idx 1\
-           $display_list $len_list $max_len $indent
+           $display_list $len_list $max_len $via $indent
    } else {
        displayElementList $header $hsgrkey $hstyle $one_per_line $show_idx 1\
-           $display_list $len_list $max_len $indent 1
+           $display_list $len_list $max_len $via $indent 1
    }
 }
 
@@ -1587,7 +1642,7 @@ proc displayTableHeader {sgrkey args} {
    report [join $col_list .]
 }
 
-proc displaySeparatorLine {{title {}} {sgrkey {}} {indent 0}} {
+proc displaySeparatorLine {{title {}} {sgrkey {}} {extra {}} {indent 0}} {
    set tty_cols [getState term_columns]
    if {$title eq {}} {
       # adapt length if screen width is very small
@@ -1596,13 +1651,13 @@ proc displaySeparatorLine {{title {}} {sgrkey {}} {indent 0}} {
       report [string repeat - $rep]
    } else {
        set len [expr [string length $title] + [string length [string repeat " " $indent]]]
-      set lrep [tcl::mathfunc::max [expr {($tty_cols - $len - 2)/2}] 1]
+       set lrep [tcl::mathfunc::max [expr {($tty_cols - $len - 2)/2}] 1]
        set rrep [tcl::mathfunc::max [expr {$tty_cols - $len - 2 - $lrep}] 1]
        if {$indent > 0} {
-           report "[string repeat " " $indent][string repeat "." $lrep] [sgr er $title] [string repeat "."\
+           report "[string repeat " " $indent][string repeat "." $lrep] [sgr er $title]$extra [string repeat "."\
          $rrep]"
        } else {
-           report "[string repeat " " $indent][string repeat = $lrep] [sgr $sgrkey $title] [string repeat =\
+           report "[string repeat " " $indent][string repeat = $lrep] [sgr $sgrkey $title]$extra [string repeat =\
          $rrep]"
        }
    }
@@ -1611,11 +1666,11 @@ proc displaySeparatorLine {{title {}} {sgrkey {}} {indent 0}} {
 # get a list of elements and print them in a column or in a
 # one-per-line fashion
 proc displayElementList {header sgrkey hstyle one_per_line display_idx\
-                             start_idx display_list {len_list {}} {max_len 0} {indent 0} {terse 0}} {
+   start_idx display_list {len_list {}} {max_len 0} {via {}} {indent 0} {terse 0}} {
    set elt_cnt [llength $display_list]
    reportDebug "header=$header, sgrkey=$sgrkey, hstyle=$hstyle,\
       elt_cnt=$elt_cnt, max_len=$max_len, one_per_line=$one_per_line,\
-      display_idx=$display_idx, start_idx=$start_idx"
+      display_idx=$display_idx, start_idx=$start_idx, via=$via"
 
    # end proc if no element are to print
     if {$elt_cnt == 0} {
@@ -1632,10 +1687,12 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
 
    # display header if any provided
    if {$header ne {noheader}} {
+      set header [getModulepathLabel $header]
       if {$json} {
          report "\"$header\": \{"
       } elseif {$hstyle eq {sepline}} {
-         displaySeparatorLine $header $sgrkey $indent
+         set extra [expr {[string length $via] ? " (via $via)" : {}}]
+         displaySeparatorLine $header $sgrkey $extra $indent
       } else {
          report [sgr $sgrkey $header]:
       }
@@ -1758,7 +1815,6 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
       reportDebug list=$display_list
       reportDebug "rows/cols=$rows/$cols,\
          lastcol_item_cnt=[expr {int($elt_cnt % $rows)}]"
-
 
       for {set row 0} {$row < $rows} {incr row} {
           append displist [string repeat " " $indent] 
@@ -2017,7 +2073,7 @@ Loading / Unloading commands:
   add-any | load-any modfile [...]  Load first available modulefile in list
   rm | unload     modulefile [...]  Remove modulefile(s)
   purge                             Unload all loaded modulefiles
-  reload                            Unload then load all loaded modulefiles
+  reload | update                   Unload then load all loaded modulefiles
   switch | swap   [mod1] mod2       Unload mod1 and load mod2
   refresh                           Refresh loaded module volatile components
   reset                             Restore initial environment
@@ -2031,6 +2087,9 @@ Listing / Searching commands:
   whatis [-a] [-j] [modulefile ...] Print whatis information of modulefile(s)
   apropos | keyword | search [-a] [-j] str
                                     Search all name and whatis containing str
+  spider [-a] [-t|-l|-j] [-S|-C] [-d|-L] [--indepth|--no-indepth] [mod ...]
+                                    Scan all modulepaths and list all or
+                                    matching available modules
   is-loaded       [modulefile ...]  Test if any of the modulefile(s) are loaded
   is-avail        modulefile [...]  Is any of the modulefile(s) available
   info-loaded     modulefile        Get full name of matching loaded module(s)
@@ -2038,8 +2097,8 @@ Listing / Searching commands:
 Collection of modules handling commands:
   save            [collection|file] Save current module list to collection
   restore         [collection|file] Restore module list from collection or file
-  saverm          [collection]      Remove saved collection
-  saveshow        [collection|file] Display information about collection
+  saverm | disable     [collection] Remove saved collection
+  saveshow | describe   [coll|file] Display information about collection
   savelist  [-a] [-t|-l|-j] [-S|-C] [collection ...]
                                     List all or matching saved collections
   is-saved        [collection ...]  Test if any of the collection(s) exists
@@ -2084,9 +2143,9 @@ Switches:
   -l | --long     Display output in long format
   -j | --json     Display output in JSON format
   -o LIST | --output=LIST
-                  Define elements to output on 'avail' or 'list' sub-commands
-                  in addition to module names (LIST is made of items like
-                  'sym', 'tag', 'variant' or 'key' separated by ':')
+                  Define elements to output on 'avail', 'spider' or 'list'
+                  sub-cmds in addition to module names (LIST is made of items
+                  like 'sym', 'tag', 'variant' or 'key' separated by ':')
   -a | --all      Include hidden modules in search
   -d | --default  Only show default versions available
   -L | --latest   Only show latest versions available
@@ -2110,6 +2169,7 @@ Switches:
 Options:
   -h | --help     This usage info
   -V | --version  Module version
+  --dumpname      Module implementation name
   -D | --debug    Enable debug messages
   -T | --trace    Enable trace messages
   -v | --verbose  Enable verbose messages
@@ -2143,14 +2203,13 @@ proc reportMissingPrereqError {curmodnamevr modulepath_list args} {
    knerrorOrWarningIfForced $msg MODULES_ERR_GLOBAL
 }
 
-# create appropriate message and kind of report when a conflict is detected
-proc reportPresentConflictError {curmodnamevr con_mod_list is_loading} {
-   # indicate message has already been reported
-   lappend ::report_conflict([currentState evalid]) {*}$con_mod_list
-
-   set msg [getPresentConflictErrorMsg $curmodnamevr $con_mod_list\
-      $is_loading]
-   knerrorOrWarningIfForced $msg MODULES_ERR_GLOBAL
+proc setConflictErrorAsReported {args} {
+   appendNoDupToList ::report_conflict([currentState evalid]) {*}$args
+   # save content added to remove it later if evaluation is withdrawn
+   if {[depthState reportholdid]} {
+      lappend ::g_holdReportConflict([currentState reportholdid]) \
+         [currentState evalid] $args
+   }
 }
 
 proc isConflictErrorAlreadyReported {msgrecid mod_con_list} {
@@ -2175,6 +2234,7 @@ proc reportFinalError {error_msg} {
          {Can't find a usable init.tcl in the following directories}\
          {interpreter uses an incompatible stubs mechanism}\
          {dlopen(}\
+         {couldn't fork child process: resource temporarily unavailable}\
          {invalid command name "tcl::mathfunc::max"}]
       set add_report_link 1
       foreach external_error $external_error_list {
@@ -2190,7 +2250,7 @@ proc reportFinalError {error_msg} {
 
       if {$add_report_link} {
          append error_msg \n[sgr hi {Please report this issue at\
-            https://github.com/cea-hpc/modules/issues}]
+            https://github.com/envmodules/modules/issues}]
       }
    }
 

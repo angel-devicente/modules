@@ -70,3 +70,31 @@ if {[info exists env(TESTSUITE_ABORT_ON_ERROR)]} {
         }
     }
 }
+
+if {[info exists env(TESTSUITE_CONFLICT_UNLOAD)]} {
+    switch -- $env(TESTSUITE_CONFLICT_UNLOAD) {
+        dep_alias_variant_loading1 {
+            module-alias allconun lconun/1
+        }
+        multi_alias_conflict1 - multi_alias_unload1 {
+            module-alias alfoo foo/1.0
+        }
+    }
+}
+
+if {[info exists env(TESTSUITE_PROVIDE)]} {
+    switch -- $env(TESTSUITE_PROVIDE) {
+        duplicate_with_ext_same_alias {
+            module-alias foo provide/1
+        }
+        duplicate_with_ext_diff_alias {
+            module-alias foo bar/1
+        }
+        duplicate_with_ext_same_alias2 {
+            module-alias quux provide/1
+        }
+        duplicate_with_ext_diff_alias2 {
+            module-alias quux bar/1
+        }
+    }
+}

@@ -24,3 +24,50 @@ if {[info exists env(TESTSUITE_LOGGER)]} {
         }
     }
 }
+if {[info exists env(TESTSUITE_CONFLICT_UNLOAD)]} {
+    switch -- $env(TESTSUITE_CONFLICT_UNLOAD) {
+        urequn_of_conun_is_direct_reqlo1 - urequn_of_conun_is_direct_reqlo2 -\
+        urequn_of_conun_is_indirect_reqlo1 {
+            module load foo/1.0
+        }
+        depun_of_conun_is_reqlo1 - depun_of_conun_is_reqlo2 {
+            module load conun/1
+        }
+        depre_of_conun_is_reqlo1 - depre_of_conun_is_reqlo2 -\
+        depre_of_conun_is_conflict_of_reqlo1 {
+            conflict conun/1
+        }
+        depre_of_conun_is_reqlo_unload_break1 {
+            conflict conun/1
+            if {[module-info mode unload]} {
+                break
+            }
+        }
+        depun_of_conun_is_sticky1 - depun_of_conun_is_super_sticky1 {
+            conflict bar
+            module load conun
+        }
+    }
+}
+if {[info exists env(TESTSUITE_LOADABLE_DEPRE)]} {
+    switch -- $env(TESTSUITE_LOADABLE_DEPRE) {
+        conflict_with_variant - prereq_with_variant_or_and -\
+        sticky_as_extra_tag {
+            variant --default val1 var val1 val2 val3
+            conflict bar
+        }
+    }
+}
+if {[info exists env(TESTSUITE_PROVIDE)]} {
+    switch -- $env(TESTSUITE_PROVIDE) {
+        duplicate_with_ext {
+            provide foo/1
+        }
+        duplicate_with_ext_family {
+            family foo
+        }
+        duplicate_with_ext_family2 {
+            family quux
+        }
+    }
+}

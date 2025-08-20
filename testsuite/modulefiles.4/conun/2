@@ -1,0 +1,25 @@
+#%Module
+if {[info exists env(TESTSUITE_CONFLICT_UNLOAD)]} {
+    switch -- $env(TESTSUITE_CONFLICT_UNLOAD) {
+        depun_of_conun_is_reqlo1 - depre_of_conun_is_reqlo1 -\
+        depre_of_conun_is_reqlo_unload_break1 {
+            conflict conun
+            prereq bar/1
+        }
+        depun_of_conun_is_reqlo2 - depre_of_conun_is_reqlo2 {
+            prereq bar/1
+            conflict conun
+        }
+        depre_of_conun_is_conflict_of_reqlo1 {
+            prereq foo/1.0
+            conflict conun
+        }
+        implicit_default_off1 - depun_of_conun_is_sticky1 -\
+        depun_of_conun_is_super_sticky1 {
+            conflict conun
+        }
+        implicit_default_off2 {
+            module unload conun
+        }
+    }
+}

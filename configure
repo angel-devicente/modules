@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # CONFIGURE, check requirements then set variables and create Makefiles
-# Copyright (C) 2017-2024 Xavier Delaruelle
+# Copyright (C) 2017-2025 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,7 +40,8 @@ tagcolorname mcookieversioncheck availoutput availterseoutput listoutput \
 listterseoutput editor variantshortcut bashcompletiondir fishcompletiondir \
 zshcompletiondir tcllinter tcllinteropts nagelfardatadir nagelfaraddons \
 stickypurge uniquenameloaded abortonerror sourcecache logger loggeropts \
-loggedevents"
+loggedevents conflictunload spideroutput spiderterseoutput spiderindepth \
+emacsdatadir emacsaddons requirevia"
 libarglist=()
 
 # flags to know if argument has been specified on command-line
@@ -56,6 +57,7 @@ appendbinpath=n
 setmodulespath=n
 docinstall=y
 vimaddons=y
+emacsaddons=y
 examplemodulefiles=y
 libtclenvmodules=y
 SHLIB_SUFFIX='.so'
@@ -67,8 +69,11 @@ silentshdbgsupport=n
 setshellstartup=n
 quarantinesupport=n
 autohandling=y
+conflictunload=n
+requirevia=n
 implicitrequirement=y
 availindepth=y
+spiderindepth=y
 implicitdefault=y
 extendeddefault=y
 advversspec=y
@@ -97,8 +102,8 @@ pager=less
 pageropts='-eFKRX'
 verbosity=normal
 color=y
-darkbgcolors='hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=43:S=46:sS=44:kL=30;48;5;109'
-lightbgcolors='hi=1:db=2:tr=2:se=2:er=31:wa=33:me=35:in=34:mp=1;34:di=34:al=36:va=33:sy=35:de=4:cm=32:aL=107:L=47:H=2:F=101:nF=103:S=106:sS=104:kL=48;5;109'
+darkbgcolors='hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=31;43:S=46:sS=44:kL=30;48;5;109:W=30;43'
+lightbgcolors='hi=1:db=2:tr=2:se=2:er=31:wa=33:me=35:in=34:mp=1;34:di=34:al=36:va=33:sy=35:de=4:cm=32:aL=107:L=47:H=2:F=101:nF=91;103:S=106:sS=104:kL=48;5;109:W=103'
 termbg=dark
 lockedconfigs=
 uniquenameloaded=n
@@ -117,13 +122,14 @@ datarootdir=
 mandir=
 docdir=
 vimdatadir=
+emacsdatadir=
 nagelfardatadir=
 modulefilesdir=
 moduleshome=
 modulepath=
 windowssupport=n
 nearlyforbiddendays=14
-tagabbrev='auto-loaded=aL:loaded=L:hidden=H:hidden-loaded=H:forbidden=F:nearly-forbidden=nF:sticky=S:super-sticky=sS:keep-loaded=kL'
+tagabbrev='auto-loaded=aL:loaded=L:hidden=H:hidden-loaded=H:forbidden=F:nearly-forbidden=nF:sticky=S:super-sticky=sS:keep-loaded=kL:warning=W'
 tagcolorname=
 stickypurge=error
 abortonerror='ml:reload:switch_unload'
@@ -132,6 +138,8 @@ availoutput='modulepath:alias:dirwsym:sym:tag:variantifspec:key'
 availterseoutput='modulepath:alias:dirwsym:sym:tag:variantifspec'
 listoutput='header:idx:variant:sym:tag:key'
 listterseoutput='header'
+spideroutput='modulepath:alias:dirwsym:sym:tag:variantifspec:via:key'
+spiderterseoutput=$availterseoutput
 editor='vi'
 variantshortcut=
 bashcompletiondir=
@@ -220,6 +228,7 @@ Fine tuning of the installation directories:
   --mandir=DIR            man documentation [DATAROOTDIR/man]
   --docdir=DIR            documentation root [DATAROOTDIR/doc]
   --vimdatadir=DIR        Vim addons directory [DATAROOTDIR/vim/vimfiles]
+  --emacsdatadir=DIR      Emacs addons directory [DATAROOTDIR/emacs/lisp]
   --nagelfardatadir=DIR   Nagelfar addons directory [DATAROOTDIR/nagelfar]
   --modulefilesdir=DIR    system modulefiles [PREFIX/modulefiles]
 
@@ -240,6 +249,8 @@ Optional Features:
                           man pages installation) [yes]
   --enable-vim-addons     install Vim addon files in the directory defined
                           with \'vimdatadir' [yes]
+  --enable-emacs-addons   install Emacs addon files in the directory defined
+                          with \'emacsdatadir' [yes]
   --enable-nagelfar-addons
                           install Nagelfar addon files in the directory
                           defined with \'nagelfardatadir' [yes]
@@ -273,11 +284,21 @@ Optional Features:
                           modulefiles handling actions, like loading the
                           pre-requisites of a modulefile when loading this
                           modulefile [yes]
+  --enable-conflict-unload
+                          set modulecmd.tcl to automatically unload modules
+                          that conflict with modules to load and the dependent
+                          of these conflicting modules [no]
+  --enable-require-via    set modulecmd.tcl to consider that a module enabling
+                          a modulepath is a requirement for the loaded modules
+                          stored in this modulepath [no]
   --enable-implicit-requirement
                           implicitly define a requirement toward modules
                           specified on ``module load`` or ``module unload``
                           commands in modulefile [yes]
   --enable-avail-indepth  control whether \`avail' search results should
+                          recursively include or not modulefiles from
+                          directories matching search query [yes]
+  --enable-spider-indepth control whether \`spider' search results should
                           recursively include or not modulefiles from
                           directories matching search query [yes]
   --enable-implicit-default
@@ -411,29 +432,47 @@ Optional Packages:
   --with-avail-output=LIST
                           specify content to report on avail sub-command
                           regular output. elements accepted in LIST are:
-                          \`modulepath', \`alias', \`dirwsym', \`indesym',
-                          \`sym', \`tag', \`key', \`variant' and
-                          \`variantifspec' (elements in LIST are separated by
-                          \`:') [$availoutput]
+                          \`modulepath', \`alias', \`provided-alias',
+                          \`dirwsym', \`indesym', \`sym', \`tag', \`key',
+                          \`hidden', \`variant', \`variantifspec' and \`via'
+                          (elements in LIST are separated by \`:')
+                          [$availoutput]
   --with-avail-terse-output=LIST
                           specify content to report on avail sub-command
                           terse output. elements accepted in LIST are:
-                          \`modulepath', \`alias', \`dirwsym', \`indesym',
-                          \`sym', \`tag', \`key', \`variant' and
-                          \`variantifspec' (elements in LIST are separated by
-                          \`:') [$availterseoutput]
+                          \`modulepath', \`alias', \`provided-alias',
+                          \`dirwsym', \`indesym', \`sym', \`tag', \`key',
+                          \`hidden', \`variant' and \`variantifspec' (elements
+                          in LIST are separated by \`:')
+                          [$availterseoutput]
   --with-list-output=LIST
                           specify content to report on list sub-command
                           regular output. elements accepted in LIST are:
                           \`header', \`idx', \`variant', \`alias', \`indesym',
-                          \`sym', \`tag' and \`key' (elements in LIST are
-                          separated by \`:') [$listoutput]
+                          \`sym', \`tag', \`hidden' and \`key' (elements in
+                          LIST are separated by \`:') [$listoutput]
   --with-list-terse-output=LIST
                           specify content to report on list sub-command terse
                           output. elements accepted in LIST are: \`header',
                           \`idx', \`variant', \`alias', \`indesym', \`sym',
-                          \`tag' and \`key' (elements in LIST are separated by
-                          \`:') [$listterseoutput]
+                          \`tag', \`hidden' and \`key' (elements in LIST are
+                          separated by \`:') [$listterseoutput]
+  --with-spider-output=LIST
+                          specify content to report on spider sub-command
+                          regular output. elements accepted in LIST are:
+                          \`modulepath', \`alias', \`provided-alias',
+                          \`dirwsym', \`indesym', \`sym', \`tag', \`key',
+                          \`hidden', \`variant', \`variantifspec' and \`via'
+                          (elements in LIST are separated by \`:')
+                          [$spideroutput]
+  --with-spider-terse-output=LIST
+                          specify content to report on spider sub-command
+                          terse output. elements accepted in LIST are:
+                          \`modulepath', \`alias', \`provided-alias',
+                          \`dirwsym', \`indesym', \`sym', \`tag', \`key',
+                          \`hidden', \`variant' and \`variantifspec' (elements
+                          in LIST are separated by \`:')
+                          [$spiderterseoutput]
   --with-variant-shortcut=SHORTCUTLIST
                           define shortcut characters to specify variant names.
                           Each element in SHORTCUTLIST is a variant name
@@ -483,6 +522,8 @@ placed in the following directory structure:
     libexec/
     share/
       doc/
+      emacs/
+        lisp/
       man/
         man1/
         man5/
@@ -661,6 +702,10 @@ for arg in "$@"; do
       vimdatadir="${arg#*=}" ;;
    --vimdatadir)
       nextargisval=vimdatadir ;;
+   --emacsdatadir=*)
+      emacsdatadir="${arg#*=}" ;;
+   --emacsdatadir)
+      nextargisval=emacsdatadir ;;
    --nagelfardatadir=*)
       nagelfardatadir="${arg#*=}" ;;
    --nagelfardatadir)
@@ -689,6 +734,9 @@ for arg in "$@"; do
    --enable-vim-addons*|--disable-vim-addons)
       # shellcheck disable=SC2034
       vimaddons=$(get_feature_value "$arg") ;;
+   --enable-emacs-addons*|--disable-emacs-addons)
+      # shellcheck disable=SC2034
+      emacsaddons=$(get_feature_value "$arg") ;;
    --enable-nagelfar-addons*|--disable-nagelfar-addons)
       # shellcheck disable=SC2034
       nagelfaraddons=$(get_feature_value "$arg") ;;
@@ -713,12 +761,21 @@ for arg in "$@"; do
    --enable-auto-handling*|--disable-auto-handling)
       # shellcheck disable=SC2034
       autohandling=$(get_feature_value "$arg") ;;
+   --enable-conflict-unload*|--disable-conflict-unload)
+      # shellcheck disable=SC2034
+      conflictunload=$(get_feature_value "$arg") ;;
+   --enable-require-via*|--disable-require-via)
+      # shellcheck disable=SC2034
+      requirevia=$(get_feature_value "$arg") ;;
    --enable-implicit-requirement*|--disable-implicit-requirement)
       # shellcheck disable=SC2034
       implicitrequirement=$(get_feature_value "$arg") ;;
    --enable-avail-indepth*|--disable-avail-indepth)
       # shellcheck disable=SC2034
       availindepth=$(get_feature_value "$arg") ;;
+   --enable-spider-indepth*|--disable-spider-indepth)
+      # shellcheck disable=SC2034
+      spiderindepth=$(get_feature_value "$arg") ;;
    --enable-implicit-default*|--disable-implicit-default)
       # shellcheck disable=SC2034
       implicitdefault=$(get_feature_value "$arg") ;;
@@ -778,6 +835,10 @@ for arg in "$@"; do
       val=$(get_feature_value "$arg") ;
       if [ "$val" = 'y' ]; then
          abortonerror='load:ml:reload:switch' ;
+         # shellcheck disable=SC2034
+         conflictunload=y ;
+         # shellcheck disable=SC2034
+         requirevia=y ;
       fi ;;
    --with-dark-background-colors=*|--without-dark-background-colors)
       darkbgcolors=$(get_package_value "$arg" "") ;;
@@ -822,17 +883,23 @@ for arg in "$@"; do
       allowedval=" load ml mod-to-sh purge reload switch switch_unload try-load unload " ;
       check_and_get_package_value_list "abortonerror" "$arg" "$allowedval" "" ;;
    --with-avail-output=*|--without-avail-output)
-      allowedval=" modulepath alias dirwsym indesym sym tag key variant variantifspec " ;
+      allowedval=" modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec via " ;
       check_and_get_package_value_list "availoutput" "$arg" "$allowedval" "" ;;
    --with-avail-terse-output=*|--without-avail-terse-output)
-      allowedval=" modulepath alias dirwsym indesym sym tag key variant variantifspec " ;
+      allowedval=" modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec " ;
       check_and_get_package_value_list "availterseoutput" "$arg" "$allowedval" "" ;;
    --with-list-output=*|--without-list-output)
-      allowedval=" header idx variant alias indesym sym tag key " ;
+      allowedval=" header idx variant alias indesym sym tag hidden key " ;
       check_and_get_package_value_list listoutput "$arg" "$allowedval" "" ;;
    --with-list-terse-output=*|--without-list-terse-output)
-      allowedval=" header idx variant alias indesym sym tag key " ;
+      allowedval=" header idx variant alias indesym sym tag hidden key " ;
       check_and_get_package_value_list "listterseoutput" "$arg" "$allowedval" "" ;;
+   --with-spider-output=*|--without-spider-output)
+      allowedval=" modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec via " ;
+      check_and_get_package_value_list "spideroutput" "$arg" "$allowedval" "" ;;
+   --with-spider-terse-output=*|--without-spider-terse-output)
+      allowedval=" modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec " ;
+      check_and_get_package_value_list "spiderterseoutput" "$arg" "$allowedval" "" ;;
    --with-variant-shortcut=*|--without-variant-shortcut)
       variantshortcut=$(get_package_value "$arg" "") ;;
    --with-editor=*|--without-editor)
@@ -940,19 +1007,27 @@ if [ "$(echo foo | $SED_ERE 's|foo|bar|' 2>/dev/null)" != 'bar' ]; then
    SED_ERE='sed -r'
 fi
 
+export GIT_DIR="${progdir}/.git"
+export GIT_WORK_TREE="${progdir}"
+
+test -e "${GIT_DIR}"
+work_from_git_repo=$?
+
 # if we install from git repository, must have git to fetch current release number
-if [ -e '.git' ]; then
+if [ $work_from_git_repo -eq 0 ]; then
    check_requirement git
 fi
 
 # if pre-built docs are available (but not from a previous make run), no doc
 # build but install pre-built files
+builddocdir="${progdir}/doc/build"
 oldbuilddoc=$(sed -n '/^builddoc/{s/.*:= //p;q;}' Makefile.inc 2>/dev/null)
-if [ -e 'doc/build/changes.txt' ] && [ -e 'doc/build/MIGRATING.txt' ] \
-   && [ -e 'doc/build/INSTALL.txt' ] && [ -e 'doc/build/INSTALL-win.txt' ] \
-   && [ -e 'doc/build/NEWS.txt' ] && [ -e 'doc/build/CONTRIBUTING.txt' ] \
-   && [ -e 'doc/build/module.1.in' ] && [ -e 'doc/build/ml.1' ] \
-   && [ -e 'doc/build/modulefile.5' ] && [ "$oldbuilddoc" != 'y' ]; then
+if [ -e "${builddocdir}/changes.txt" ] && [ -e "${builddocdir}/MIGRATING.txt" ] \
+   && [ -e "${builddocdir}/INSTALL.txt" ] && [ -e "${builddocdir}/INSTALL-win.txt" ] \
+   && [ -e "${builddocdir}/NEWS.txt" ] && [ -e "${builddocdir}/CONTRIBUTING.txt" ] \
+   && [ -e "${builddocdir}/module.1.in" ] && [ -e "${builddocdir}/ml.1" ] \
+   && [ -e "${builddocdir}/envml.1" ] && [ -e "${builddocdir}/modulefile.5" ] \
+   && [ "$oldbuilddoc" != 'y' ]; then
    builddoc=p
 # test sphinx availability otherwise
 else
@@ -976,7 +1051,7 @@ fi
 TCLSH=$reqpath
 
 # python is mandatory if installing from git repository to build ChangeLog
-if [ -e '.git' ]; then
+if [ $work_from_git_repo -eq 0 ]; then
    missmsg=''
 elif [ -n "$pythonbin" ]; then
    missmsg="Specified Python command \`$pythonbin' cannot be found"
@@ -1004,7 +1079,7 @@ else
 fi
 
 # gzip is mandatory if installing from git repository to build ChangeLog.gz
-if [ -e '.git' ]; then
+if [ $work_from_git_repo -eq 0 ]; then
    check_requirement gzip
 fi
 
@@ -1064,7 +1139,7 @@ fi
 
 # refine build number if working from git repository
 # shellcheck disable=SC2016
-if [ -e '.git' ]; then
+if [ $work_from_git_repo -eq 0 ]; then
   gitcurtag=$(git describe --tags --abbrev=0)
   gitcurdesc=$(git describe --tags)
   gitcurbranch=$(git rev-parse --abbrev-ref HEAD)
@@ -1122,6 +1197,7 @@ fi
 [ -z "$mandir" ] && mandir=$datarootdir/man
 [ -z "$docdir" ] && docdir=$datarootdir/doc
 [ -z "$vimdatadir" ] && vimdatadir=$datarootdir/vim/vimfiles
+[ -z "$emacsdatadir" ] && emacsdatadir=$datarootdir/emacs/lisp
 [ -z "$nagelfardatadir" ] && nagelfardatadir=$datarootdir/nagelfar
 [ -z "$modulefilesdir" ] && modulefilesdir=$prefix/modulefiles
 [ -z "$moduleshome" ] && moduleshome=$prefix
@@ -1154,10 +1230,10 @@ fi
 
 # prepare extension library sources if not yet done whether libtclenvmodules
 # is enabled or not to create consistent dist in any cases.
-if [ ! -e 'lib/configure' ]; then
+if [ ! -e "${progdir}/lib/configure" ]; then
    check_requirement autoreconf
    echo "--- preparing extension library sources ----------"
-   pushd lib || exit 1
+   pushd "${progdir}/lib" || exit 1
    autoreconf -i || exit 1
    popd || exit 1
    echo "--------------------------------------------------"
@@ -1175,7 +1251,7 @@ done
 if [ "$libtclenvmodules" = 'y' ]; then
    echo "--- configuring extension library sources --------"
    echo "libarglist = ${libarglist[*]}"
-   pushd lib || exit 1
+   pushd "${progdir}/lib" || exit 1
    ./configure "${libarglist[@]}" || exit 1
    popd || exit 1
    echo "--------------------------------------------------"

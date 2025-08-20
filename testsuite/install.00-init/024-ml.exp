@@ -24,6 +24,7 @@ if {$install_ml ne {y}} {
     send_user "\tSkipping ml command tests, as it is disabled\n"
 } else {
 set bad_cmd "$error_msgs: Unable to locate a modulefile for 'foo'"
+set bad_cmd_re "(ml: )?$bad_cmd"
 
 #
 # The tests
@@ -36,12 +37,12 @@ if {$verbose} {
 foreach shell $shell_list {
    testall_cmd_re "$shell" "ml --version" {} "Modules Release \\S+ (\\S+)" 0
    testall_cmd "$shell" "ml foo" "" "$bad_cmd" 1
-   testall_cmd "$shell" "ml use $contrib_modpath\; ml purge\; ml null\; ml list -t" "" "$cur_loaded\nnull" 0
-   testall_cmd "$shell" "ml use $contrib_modpath\; ml purge\; ml null\; ml -null\; ml" "" "$no_loaded" 0
+   testall_cmd "$shell" "ml use $share_modpath\; ml purge\; ml null\; ml list -t" "" "$cur_loaded\nnull" 0
+   testall_cmd "$shell" "ml use $share_modpath\; ml purge\; ml null\; ml -null\; ml" "" "$no_loaded" 0
    testall_cmd "$shell" "ml is-loaded unk" "" "" 1
-   testall_cmd "$shell" "ml use $contrib_modpath\; ml null\; ml is-loaded null" "" "" 0
+   testall_cmd "$shell" "ml use $share_modpath\; ml null\; ml is-loaded null" "" "" 0
    testall_cmd "$shell" "ml info-loaded unk" "" "" 0
-   testall_cmd "$shell" "ml use $contrib_modpath\; ml load null\; ml info-loaded null" "null" "" 0
+   testall_cmd "$shell" "ml use $share_modpath\; ml load null\; ml info-loaded null" "null" "" 0
 }
 
 # ensure tools used in complex shell alias definition are available
@@ -49,9 +50,9 @@ if {[find_bin grep] ne "" && [find_bin tr] ne "" && [find_bin awk] ne ""} {
    foreach shell $shell_list {
       if {$shell eq {csh} || $shell eq {tcsh}} {
          # alias evaluation leads to a syntax error if wa_277 is enabled
-         testall_cmd_re "$shell" "ml $testsuite_modpath/alias/3.0\; testsuite; ts2" [expr {$install_wa277 eq {y} ? {} : "Release\nhttp://an.example.web\\?&param=one"}] ".*" [expr {$install_wa277 eq {y} ? 1 : 0}]
+         testall_cmd_re "$shell" "ml $testsuite_modpath/alias/3.0\; testsuite; ts2; ts3" [expr {$install_wa277 eq {y} ? {} : "Release\nhttp://an.example.web\\?&param=one\nselect\\\[type==BAR && osrel==FOO\\\] myapp"}] ".*" [expr {$install_wa277 eq {y} ? 1 : 0}]
       } else {
-         testall_cmd_re "$shell" "ml $testsuite_modpath/alias/3.0\; testsuite; ts2" "Release\nhttp://an.example.web\\?&param=one" ".*" 0
+         testall_cmd_re "$shell" "ml $testsuite_modpath/alias/3.0\; testsuite; ts2; ts3" "Release\nhttp://an.example.web\\?&param=one\nselect\\\[type==BAR && osrel==FOO\\\] myapp" ".*" 0
       }
    }
 } elseif {$verbose} {
@@ -60,9 +61,9 @@ if {[find_bin grep] ne "" && [find_bin tr] ne "" && [find_bin awk] ne ""} {
 
 foreach shell $othlang_list {
    testall_cmd_re "$shell" "ml:--version" {} "Modules Release \\S+ (\\S+)" 0
-   testall_cmd_re "$shell" "ml:foo" {} "$bad_cmd.*" 1
-   testall_cmd "$shell" "ml:use,$contrib_modpath:purge:null:list,-t" "" "$cur_loaded\nnull" 0
-   testall_cmd "$shell" "ml:use,$contrib_modpath:purge:null:-null:list,-t" "" "$no_loaded" 0
+   testall_cmd_re "$shell" "ml:foo" {} "$bad_cmd_re.*" 1
+   testall_cmd "$shell" "ml:use,$share_modpath:purge:null:list,-t" "" "$cur_loaded\nnull" 0
+   testall_cmd "$shell" "ml:use,$share_modpath:purge:null:-null:list,-t" "" "$no_loaded" 0
    switch -- $shell {
       cmake - r {
          testall_cmd_re "$shell" "ml:is-loaded,unk" "" ".*" 1
@@ -71,7 +72,7 @@ foreach shell $othlang_list {
          testall_cmd_re "$shell" "ml:is-loaded,unk" "" "" 1
       }
    }
-   testall_cmd "$shell" "ml:use,$contrib_modpath:load,null:is-loaded,null" "" "" 0
+   testall_cmd "$shell" "ml:use,$share_modpath:load,null:is-loaded,null" "" "" 0
    switch -- $shell {
       r {
          testall_cmd "$shell" "ml:info-loaded,unk" "\[1\] \"\"" {} 0
@@ -95,24 +96,24 @@ foreach shell $othlang_list {
          set anstxt "null"
       }
    }
-   testall_cmd "$shell" "ml:use,$contrib_modpath:load,null:info-loaded,null" $anstxt "" 0
+   testall_cmd "$shell" "ml:use,$share_modpath:load,null:info-loaded,null" $anstxt "" 0
 }
 
 
 # test unload of previously loaded modulefile
 if {$verbose} {
     send_user "\tSetup LOADEDMODULES = 'null'\n"
-    send_user "\tSetup _LMFILES_ = '$contrib_modpath/null'\n"
+    send_user "\tSetup _LMFILES_ = '$share_modpath/null'\n"
 }
 set env(LOADEDMODULES) "null"
-set env(_LMFILES_) "$contrib_modpath/null"
+set env(_LMFILES_) "$share_modpath/null"
 
 foreach shell $shell_list {
-   testall_cmd "$shell" "ml use $contrib_modpath\; ml -null\; ml" "" "$no_loaded" 0
+   testall_cmd "$shell" "ml use $share_modpath\; ml -null\; ml" "" "$no_loaded" 0
 }
 
 foreach shell $othlang_list {
-   testall_cmd "$shell" "ml:use,$contrib_modpath:unload,null:list" "" "$no_loaded" 0
+   testall_cmd "$shell" "ml:use,$share_modpath:unload,null:list" "" "$no_loaded" 0
 }
 
 # ensure advanced_version_spec is efficient on all shells

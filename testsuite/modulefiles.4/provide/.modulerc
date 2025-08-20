@@ -1,0 +1,70 @@
+#%Module
+if {[info exists env(TESTSUITE_PROVIDE)]} {
+    switch -- $env(TESTSUITE_PROVIDE) {
+        duplicate_with_ext_same_version {
+            module-version provide/1 foo
+        }
+        duplicate_with_ext_diff_version {
+            module-version provide/2 foo
+        }
+        multiple_and_forbidden {
+            module-forbid provide/1
+        }
+        multiple_and_alias_forbidden {
+            module-forbid quux/1
+        }
+        multiple_and_family_forbidden {
+            module-forbid quux
+        }
+        multiple_and_expired {
+            module-forbid --after 2025-07-15 provide/1
+        }
+        multiple_and_alias_expired {
+            module-forbid --after 2025-07-15 quux/1
+        }
+        multiple_and_family_expired {
+            module-forbid --after 2025-07-15 quux
+        }
+        multiple_and_hidden {
+            module-hide provide/1
+        }
+        multiple_and_alias_hidden {
+            module-hide quux/1
+        }
+        multiple_and_family_hidden {
+            module-hide quux
+        }
+        explicit_default {
+            module-version provide/0 default
+        }
+        explicit_default_and_forbidden {
+            module-version provide/0 default
+            module-forbid provide/1
+        }
+        explicit_default_and_alias_forbidden {
+            module-version provide/0 default
+            module-forbid provide/0
+        }
+        explicit_default_and_hidden {
+            module-version provide/0 default
+            module-hide provide/1
+        }
+        explicit_default_and_alias_hidden {
+            module-version provide/0 default
+            module-hide provide/0
+        }
+        latest_and_forbidden {
+            module-forbid provide/1
+        }
+        latest_and_alias_forbidden {
+            module-forbid provide/0
+        }
+        latest_and_hidden {
+            module-hide provide/1
+        }
+        latest_and_alias_hidden {
+            module-version provide/0 default
+            module-hide provide/0
+        }
+    }
+}

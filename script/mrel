@@ -105,7 +105,7 @@ set exitcode 0
 set rpmbuilddir $env(HOME)/rpmbuild
 set srpmdir $rpmbuilddir/SRPMS
 set rpmdir $rpmbuilddir/RPMS/$tcl_platform(machine)
-set dlurl https://github.com/cea-hpc/modules/releases/download
+set dlurl https://github.com/envmodules/modules/releases/download
 set cwd [pwd]
 
 # define and open log file
@@ -194,6 +194,10 @@ foreach oldrpm [glob -nocomplain $rpmdir/environment-modules-*.rpm] {
 catch {runcmd 2>@$logfid sudo rpm -e --nodeps scl-utils}
 catch {runcmd 2>@$logfid sudo rpm -e --nodeps environment-modules}
 catch {runcmd 2>@$logfid sudo rpm -e --nodeps environment-modules-compat}
+catch {runcmd 2>@$logfid sudo rpm -e --nodeps Lmod}
+runcmd sudo rm -f /usr/share/zsh/site-functions/_ml\
+   /usr/share/zsh/site-functions/_module /usr/share/zsh/site-functions/ml\
+   /usr/share/zsh/site-functions/module
 runcmd sudo rm -rf /usr/local/Modules
 
 
@@ -272,8 +276,8 @@ file delete log-gz log-bz log-win $prevdistgz distfiles distfiles-win\
    log-prev-gz distfiles-prev $prevdistwin log-prev-win distfiles-win-prev
 
 # check generated RPM spec file
-runcmd >@stdout rpmlint -r contrib/rpm/environment-modules.rpmlintrc\
-   contrib/rpm/environment-modules.spec
+runcmd >@stdout rpmlint -r share/rpm/environment-modules.rpmlintrc\
+   share/rpm/environment-modules.spec
 quitorcont
 
 

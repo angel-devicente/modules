@@ -1,0 +1,68 @@
+#%Module
+if {[info exists env(TESTSUITE_SPIDER_MODPATH1)]} {
+    module-whatis {module description}
+    switch -- $env(TESTSUITE_SPIDER_MODPATH1) {
+        use_modpath2 {
+            module use $env(TESTSUITEDIR)/modulefiles.spider2
+        }
+        use_append_modpath2 {
+            module use -a $env(TESTSUITEDIR)/modulefiles.spider2
+        }
+        append_modpath2 {
+            append-path MODULEPATH $env(TESTSUITEDIR)/modulefiles.spider2
+        }
+        prepend_modpath2 {
+            prepend-path MODULEPATH $env(TESTSUITEDIR)/modulefiles.spider2
+        }
+        unuse_modpath2 {
+            module unuse $env(TESTSUITEDIR)/modulefiles.spider2
+        }
+        remove_modpath2 {
+            remove-path MODULEPATH $env(TESTSUITEDIR)/modulefiles.spider2
+        }
+        use_append_modpath_extref1 {
+            module use -a $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_EXTREF
+        }
+        use_append_modpath_inref1 {
+            setenv TESTSUITE_SPIDER_INREF unk
+            module use -a $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_INREF
+        }
+        use_append_modpath_inref2 {
+            setenv TESTSUITE_SPIDER_INREF er2
+            module use -a $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_INREF
+        }
+        prepend_modpath_extref1 {
+            prepend-path MODULEPATH $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_EXTREF
+        }
+        prepend_modpath_inref1 {
+            setenv TESTSUITE_SPIDER_INREF unk
+            prepend-path MODULEPATH $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_INREF
+        }
+        prepend_modpath_inref2 {
+            setenv TESTSUITE_SPIDER_INREF er2
+            prepend-path MODULEPATH $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_INREF
+        }
+        prepend_modpath_inref3 {
+            if {[module-info mode load]} {
+                setenv TESTSUITE_SPIDER_INREF er2
+            }
+            prepend-path MODULEPATH $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_INREF
+        }
+        use_refvar {
+            module use $env(TESTSUITEDIR)/modulefiles.spid\$TESTSUITE_SPIDER_INREF
+        }
+    }
+}
+if {[info exists env(TESTSUITE_REQUIRE_VIA)]} {
+    switch -- $env(TESTSUITE_REQUIRE_VIA) {
+        opt_req1 {
+            prereq --optional reqa/1
+        }
+        req1 - indirect_req1 - indirect_opt_req1 - indirect_conflict1 {
+            prereq reqa/1
+        }
+        conflict1 {
+            conflict reqa/1
+        }
+    }
+}

@@ -30,6 +30,7 @@ if {[info exists env(TESTSUITE_COMPLETE)]} {
             complete fish cmd {other arg list for fish}
             complete zsh cmd {some arg list for zsh}
             complete unksh cmd {some arg list for unksh}
+            complete pwsh cmd {some arg list for pwsh}
         }
         comp2 {
             complete [module-info shell] cmd {some arg list for shell}
@@ -56,6 +57,10 @@ complete tcsh cmd {'n/-h/n/' 'n/--help/n/' \
 set-function cmd {echo cmd}
 complete fish cmd {-s V -l version --description 'Command version'}
 complete fish cmd {-s h -l help --description 'Command help'}
+                }
+                pwsh {
+set-function cmd {echo cmd}
+#FIXME: should be improved with completion of --version/--help options
                 }
             }
         }

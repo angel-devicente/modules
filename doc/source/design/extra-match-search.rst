@@ -37,9 +37,9 @@ by default on Modules v5 and enabled by default on v6.
 What triggers an extra match search?
 ------------------------------------
 
-* module variants should be reported
-* variant is specified in query on :subcmd:`avail`, :subcmd:`paths` or
-  :subcmd:`whatis`
+* module variants or provided module aliases should be reported
+* variant is specified in query on :subcmd:`avail`, :subcmd:`paths`,
+  :subcmd:`spider` or :subcmd:`whatis`
 * an extra specifier is specified in query
 
 Extra match search process
@@ -49,8 +49,13 @@ Extra match search is performed from ``getModules`` procedure. All subsequent
 procedures relying on ``getModules`` will then benefit from this extra process
 without a change.
 
-Extra match search is done right after *phase 3: elaborate directory content
-with default element selection*. At this stage:
+Modulefile scan for Extra match search is done after *phase 2: early filtering
+of non-matching elements*. Right after this scan, collected provided
+aliases will be included into the search result list, if enabled, to apply
+them phase 4 and phase 5 filtering stages.
+
+Module filtering for Extra match search is done right after *phase 5:
+elaborate directory content with default element selection*. At this stage:
 
 * symbolic versions, aliases and virtual modules are known
 * dynamically hidden or expired elements have been filtered
@@ -61,14 +66,15 @@ This way the subsequent phases that filters result based on name and version
 search query, adjusts directory content and no-indepth mode does not need to be
 updated and will apply on the extra match search result.
 
-As extra match search is performed after *phase 3*, search operation will only
-applies on result obtained from traditional lookup.
-
 In case no-indepth mode is asked and extra match search should be performed,
 traditional file lookup (by ``findModules``) is made to return all existing
 files. Not only those matching depth level. As extra match filtering process
 may eliminate some entries, all of them should be tested to obtain accurate
 result.
+
+If provided aliases should be reported, all modulefiles should be scanned to
+fetch all aliases they defined. Thus ``findModules`` is asked to get all
+modulefiles and *phase 2* early filtering is skipped.
 
 Extra match search will only be performed if search query requires it. It will
 be determined by ``isExtraMatchSearchRequired`` procedure. See `What triggers
@@ -82,17 +88,21 @@ If search query is a traditional one, no extra match search is performed. It
 saves this way substantial processing time as no evaluation of modulefile is
 performed.
 
-``getModules`` will call a dedicated procedure named
-``filterExtraMatchSearch`` to handle the extra match search process. It will
-obtain the name of result array as argument and will bind to this array
-variable (to change it without copy). Search module specification is also set
-as argument to help to know the extra match query to filter modules on.
+``getModules`` will call dedicated procedures:
 
-``filterExtraMatchSearch`` evaluates all entries in obtained result array that
-are of modulefile or virtual types. See `Modulefile evaluation mode for extra
-match search`_ section. With the consolidated information gathered by these
-evaluations, procedure filters entries in result array that do not match the
-extra match query.
+* ``scanExtraMatchSearch`` evaluates all entries in obtained result array that
+  are of modulefile or virtual types. See `Modulefile evaluation mode for
+  extra match search`_ section.
+* ``insertProvidedAliases`` adds provided aliases found during scan to the
+  result array.
+* ``filterExtraMatchSearch`` filters entries from result array with the
+  consolidated information gathered from scan evaluations. Entries that do not
+  match the extra match query are withdrawn.
+
+These 3 procedures obtains the name of result array as argument and will bind
+to this array variable (to change it without copy). Search module
+specification is also set as argument to help to know the extra match query to
+filter modules on.
 
 Symbolic versions
 ^^^^^^^^^^^^^^^^^
@@ -173,9 +183,11 @@ specifiers and their associated modulefile command.
 +--------------------+-----------------------------------------+
 | pushenv            | pushenv, envvar                         |
 +--------------------+-----------------------------------------+
-| append-path        | append-path, envvar                     |
+| append-path        | append-path, envvar,                    |
+|                    | use (if envvar is MODULEPATH)           |
 +--------------------+-----------------------------------------+
-| prepend-path       | prepend-path, envvar                    |
+| prepend-path       | prepend-path, envvar,                   |
+|                    | use (if envvar is MODULEPATH)           |
 +--------------------+-----------------------------------------+
 | remove-path        | remove-path, envvar                     |
 +--------------------+-----------------------------------------+
@@ -193,15 +205,21 @@ specifiers and their associated modulefile command.
 +--------------------+-----------------------------------------+
 | chdir              | chdir                                   |
 +--------------------+-----------------------------------------+
-| family             | family                                  |
+| family             | family, provided-alias                  |
++--------------------+-----------------------------------------+
+| provide            | provide, provided-alias                 |
 +--------------------+-----------------------------------------+
 | prereq             | prereq, prereq-any, require             |
 +--------------------+-----------------------------------------+
-| prereq-any         | prereq-any, prereq, require             |
+| prereq-any         | prereq-any, depends-on-any, prereq,     |
+|                    | require                                 |
 +--------------------+-----------------------------------------+
 | prereq-all         | prereq-all, depends-on, require         |
 +--------------------+-----------------------------------------+
 | depends-on         | depends-on, prereq-all, require         |
++--------------------+-----------------------------------------+
+| depends-on-any     | depends-on-any, prereq-any, prereq,     |
+|                    | require                                 |
 +--------------------+-----------------------------------------+
 | always-load        | always-load, require                    |
 +--------------------+-----------------------------------------+
@@ -218,6 +236,8 @@ specifiers and their associated modulefile command.
 | module switch      | switch, switch-on, require, switch-off, |
 |                    | incompat                                |
 +--------------------+-----------------------------------------+
+| module use         | use                                     |
++--------------------+-----------------------------------------+
 
 +--------------------+-----------------------------------------+
 | Modulerc command   | Extra specifier(s)                      |
@@ -227,6 +247,8 @@ specifiers and their associated modulefile command.
 | module-hide        | tag                                     |
 +--------------------+-----------------------------------------+
 | module-forbid      | tag                                     |
++--------------------+-----------------------------------------+
+| module-warn        | tag                                     |
 +--------------------+-----------------------------------------+
 
 Extra specifier are only valid on *return all matching modules* context. An
@@ -244,6 +266,12 @@ Switched-on module can be queried via ``switch``, ``switch-on`` and
 ``require`` specifiers. Switched-off module can be queried via ``switch``,
 ``switch-off`` and ``incompat`` specifiers. On its one-arg form, no
 switched-off module is added to relative specifiers.
+
+Change on the ``MODULEPATH`` environment variable either through
+``module use``, ``append-path`` or ``prepend-path`` may be queried with
+``use`` extra specifier. Modulepath are translated to their absolute path form
+to be recorded. Variable reference are resolved at record time. Symbolic links
+are recorded as is (they are not translated into their target)
 
 Recording extra specifier specification
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -484,5 +512,10 @@ Specific impact
   evaluated in scan mode.
 
   - FUTURE: there may have room for optimization here
+
+* As environment variable defined by modulefile commands like ``setenv`` are
+  set to an empty value during scan evaluation, if a modulepath entry contains
+  a reference to such environment variable, it will not match its expecting
+  value.
 
 .. vim:set tabstop=2 shiftwidth=2 expandtab autoindent:

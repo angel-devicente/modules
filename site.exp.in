@@ -63,10 +63,13 @@ set install_lightbgcolors "@lightbgcolors@"
 set install_termbg "@termbg@"
 
 set install_autohandling "@autohandling@"
+set install_conflictunload "@conflictunload@"
+set install_requirevia "@requirevia@"
 
 set install_implicitrequirement "@implicitrequirement@"
 
 set install_availindepth "@availindepth@"
+set install_spiderindepth "@spiderindepth@"
 
 set install_lockedconfigs "@lockedconfigs@"
 
@@ -107,6 +110,8 @@ set install_availoutput "@availoutput@"
 set install_availterseoutput "@availterseoutput@"
 set install_listoutput "@listoutput@"
 set install_listterseoutput "@listterseoutput@"
+set install_spideroutput "@spideroutput@"
+set install_spiderterseoutput "@spiderterseoutput@"
 
 set install_variantshortcut "@variantshortcut@"
 

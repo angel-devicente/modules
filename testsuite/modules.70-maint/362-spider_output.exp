@@ -1,0 +1,1011 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.70-maint/%M%
+#   Revision:		%I%
+#   First Edition:	2024/12/21
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:
+#   Modulefiles:    foo
+#   Sub-Command:    spider
+#
+#   Comment:	%C{
+#           Test output customization on spider sub-command
+#		}C%
+#
+##############################################################################
+
+set mp $modpath.3
+set mpre [regsub -all "\(\[.+?\]\)" $mp {\\\1}]
+
+# setup specific environment
+setenv_path_var MODULEPATH $mp
+
+# ensure advanced version specifiers are enabled
+setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+
+# ensure regular spider search match is set for these tests
+setenv_var MODULES_SEARCH_MATCH starts_with
+
+# ensure spider tests are made using in depth mode
+setenv_var MODULES_SPIDER_INDEPTH 1
+
+
+# enable a symbolic version for foo/1.0 module
+setenv_var TESTSUITE_AVAIL_OUTPUT_FOO_SYM 1
+
+
+#
+# -o/--output options test
+#
+
+set tserr_spider_foo "foo/1.0\\(bar\\)  "
+set tserr_spider_terse_foo "foo/1.0\\(bar\\)"
+testouterr_cmd_re sh {spider -o sym foo/1.0} OK $tserr_spider_foo
+
+skip_if_quick_mode
+
+testouterr_cmd sh {spider foo -o} ERR "$error_msgs: Missing value for '-o' option\n$err_typehelp"
+testouterr_cmd_re sh {spider --output=sym foo/1.0} OK $tserr_spider_foo
+testouterr_cmd sh {spider --output foo} ERR "$error_msgs: Missing value for '--output' option\n$err_typehelp"
+testouterr_cmd sh {--output spider foo} ERR "$error_msgs: Missing value for '--output' option\n$err_typehelp"
+
+# mix with --terse/--long/--json
+testouterr_cmd_re sh {spider -o sym --terse foo/1.0} OK $tserr_spider_terse_foo
+testouterr_cmd_re sh {spider -t --output=sym foo/1.0} OK $tserr_spider_terse_foo
+testouterr_cmd sh {spider -j --output=sym foo/1.0} ERR "{\"errors\": \[\n{ \"severity\": \"ERROR\", \"message\": \[ \"Unsupported option '--output' on json output mode\" \] } \]\n}"
+testouterr_cmd sh {spider -o sym -l foo/1.0} ERR "$error_msgs: Unsupported option '-o' on long output mode"
+testouterr_cmd sh {spider --long --output=sym foo/1.0} ERR "$error_msgs: Unsupported option '--output' on long output mode"
+testouterr_cmd sh {spider -j --output=sym foo/1.0} ERR "{\"errors\": \[\n{ \"severity\": \"ERROR\", \"message\": \[ \"Unsupported option '--output' on json output mode\" \] } \]\n}"
+testouterr_cmd sh {spider -o sym --json foo/1.0} ERR "{\"errors\": \[\n{ \"severity\": \"ERROR\", \"message\": \[ \"Unsupported option '-o' on json output mode\" \] } \]\n}"
+testouterr_cmd sh {spider -o sym --long -j foo/1.0} ERR "{\"errors\": \[\n{ \"severity\": \"ERROR\", \"message\": \[ \"Unsupported option '-o' on json output mode\" \] } \]\n}"
+
+# test with ml shortcut command
+testouterr_cmd_re sh {ml spi -o sym foo/1.0} OK $tserr_spider_foo
+testouterr_cmd sh {ml spi -o} ERR "$error_msgs: Missing value for '-o' option\n$err_typehelp"
+testouterr_cmd_re sh {ml --output=sym spi foo/1.0} OK $tserr_spider_foo
+testouterr_cmd sh {--output ml spi foo} ERR "$error_msgs: Missing value for '--output' option\n$err_typehelp"
+testouterr_cmd sh {ml spi --long --output=sym foo/1.0} ERR "$error_msgs: Unsupported option '--output' on long output mode"
+testouterr_cmd sh {--json ml spi -o sym foo/1.0} ERR "{\"errors\": \[\n{ \"severity\": \"ERROR\", \"message\": \[ \"Unsupported option '-o' on json output mode\" \] } \]\n}"
+
+# invalid value set
+set tserr_invalid_output_val "$error_msgs: Invalid element in value list for '--output' option on spider sub-command
+  Allowed elements are: modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec via (separated by ':')"
+set tserr_invalid_o_val "$error_msgs: Invalid element in value list for '-o' option on spider sub-command
+  Allowed elements are: modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec via (separated by ':')"
+testouterr_cmd sh {spider --output=foo foo} ERR $tserr_invalid_output_val
+testouterr_cmd sh {spider --output=sym,alias foo} ERR $tserr_invalid_output_val
+testouterr_cmd sh {spider --output="sym alias" foo} ERR $tserr_invalid_output_val
+testouterr_cmd sh {spider -o foo foo} ERR $tserr_invalid_o_val
+testouterr_cmd sh {spider -o sym,alias foo} ERR $tserr_invalid_o_val
+testouterr_cmd sh {spider -o "sym alias" foo} ERR $tserr_invalid_o_val
+testouterr_cmd sh {spider -o foo -l foo/1.0} ERR "$error_msgs: Unsupported option '-o' on long output mode"
+testouterr_cmd sh {ml -o foo spi foo} ERR $tserr_invalid_o_val
+
+# test value accepted on 'list' but not on spider
+testouterr_cmd sh {spider -o header foo} ERR $tserr_invalid_o_val
+testouterr_cmd sh {spider --output=idx foo} ERR $tserr_invalid_output_val
+testouterr_cmd sh {spider --output=header:key foo} ERR $tserr_invalid_output_val
+
+
+#
+# MODULES_SPIDER_OUTPUT/MODULES_SPIDER_TERSE_OUTPUT tests
+#
+
+setenv_var MODULES_SPIDER_OUTPUT modulepath
+setenv_var MODULES_SPIDER_TERSE_OUTPUT modulepath
+
+testouterr_cmd_re sh {spider foo/1.0} OK "$modlin $mpre $modlin\nfoo/1.0  "
+testouterr_cmd_re sh {spider -t foo/1.0} OK "$mpre:\nfoo/1.0"
+
+# no impact on -l/-j
+set tserr_spider_long "- Package/Alias $modlin.- Versions $modlin.- Last mod. $modlin\n$mpre:\nfoo/1.0\\s+bar\\s+\[0-9:\/ ]*"
+testouterr_cmd_re sh {spider -l foo/1.0} OK $tserr_spider_long
+set tserr_spider_json "{\"$mp\": {
+\"foo/1.0\": { \"name\": \"foo/1.0\", \"type\": \"modulefile\", \"symbols\": \[ \"bar\" \], \"tags\": \[\], \"pathname\": \"$mp/foo/1.0\", \"via\": \"\"}
+}}"
+testouterr_cmd sh {spider -j foo/1.0} OK $tserr_spider_json
+
+# invalid value set (ignored)
+setenv_var MODULES_SPIDER_OUTPUT foo
+setenv_var MODULES_SPIDER_TERSE_OUTPUT foo
+
+testouterr_cmd_re sh {spider foo/1.0} OK "$modlin $mpre $modlin\n$tserr_spider_foo\n\nKey:\n\\(symbolic-version\\)  "
+testouterr_cmd_re sh {spider -t foo/1.0} OK $mpre:\n$tserr_spider_terse_foo
+testouterr_cmd_re sh {spider -o sym foo/1.0} OK $tserr_spider_foo
+testouterr_cmd_re sh {spider -t --output=sym foo/1.0} OK $tserr_spider_terse_foo
+testouterr_cmd sh {spider -o foo foo/1.0} ERR $tserr_invalid_o_val
+
+
+#
+# key test
+#
+
+testouterr_cmd_re sh {spider -o modulepath:key:sym foo/1.0} OK "$modlin $mpre $modlin\n$tserr_spider_foo\n\nKey:\n\\(symbolic-version\\)  "
+testouterr_cmd_re sh {spider -t --output=modulepath:sym:key foo/1.0} OK "$mpre:\n$tserr_spider_terse_foo\n\nKey:\n\\(symbolic-version\\)  "
+setenv_var MODULES_SPIDER_OUTPUT modulepath:key:sym
+testouterr_cmd_re sh {spider foo/1.0} OK "$modlin $mpre $modlin\n$tserr_spider_foo\n\nKey:\n\\(symbolic-version\\)  "
+unsetenv_var MODULES_SPIDER_OUTPUT
+
+
+#
+# sym test
+#
+
+testouterr_cmd_re sh {spider -o modulepath:key foo/1.0} OK "$modlin $mpre $modlin\nfoo/1.0  "
+testouterr_cmd_re sh {spider -t --output=modulepath:key foo/1.0} OK "$mpre:\nfoo/1.0"
+setenv_var MODULES_SPIDER_OUTPUT modulepath
+testouterr_cmd_re sh {spider foo/1.0} OK "$modlin $mpre $modlin\nfoo/1.0  "
+unsetenv_var MODULES_SPIDER_OUTPUT
+
+
+#
+# indesym test
+#
+
+set tserr_spider_foo "foo/1.0\\(bar\\)  "
+testouterr_cmd_re sh {spider -o modulepath:key:indesym foo/1.0} OK "$modlin $mpre $modlin\nfoo/1.0  "
+testouterr_cmd_re sh {spider -o modulepath:key:sym:indesym foo/1.0} OK "$modlin $mpre $modlin\nfoo/1.0  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym foo} OK "$modlin $mpre $modlin\nfoo/0.2  foo/0.err  foo/0.load  foo/0.prereq  foo/1.0  foo/2.0  foo/bar  foo/sym  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym foo/bar} OK "$modlin $mpre $modlin\nfoo/bar  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym:sym foo/bar} OK "$modlin $mpre $modlin\nfoo/bar  "
+setenv_var MODULES_SPIDER_TERSE_OUTPUT key:indesym
+testouterr_cmd sh {spider -t foo/bar} OK "foo/bar"
+testouterr_cmd sh {spider -t foo/1.0} OK "foo/1.0"
+unsetenv_var MODULES_SPIDER_TERSE_OUTPUT
+setenv_path_var MODULEPATH $modpath.2
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:dirwsym:indesym hide3/sub2} OK "$modlin $modpathre.2 $modlin\nhide3/sub2/4.0  hide3/sub2/5.0  hide3/sub2/default  hide3/sub2/new  hide3/sub2/sym  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym hide3/sub2} OK "$modlin $modpathre.2 $modlin\nhide3/sub2/4.0  hide3/sub2/5.0  hide3/sub2/default  hide3/sub2/new  hide3/sub2/sym  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:dirwsym:indesym hide3/sym} OK "$modlin $modpathre.2 $modlin\nhide3/sym  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym hide3/sym} OK "$modlin $modpathre.2 $modlin\nhide3/sym  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym hide3/sub2/default} OK "$modlin $modpathre.2 $modlin\nhide3/sub2/default  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym hide3/sub2/4.0} OK "$modlin $modpathre.2 $modlin\nhide3/sub2/4.0  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:sym:indesym hide3/sub2/default} OK "$modlin $modpathre.2 $modlin\nhide3/sub2/default  "
+testouterr_cmd_re sh {spider -w 120 -o modulepath:key:indesym:sym hide3/sub2/4.0} OK "$modlin $modpathre.2 $modlin\nhide3/sub2/4.0  "
+setenv_var MODULES_SPIDER_TERSE_OUTPUT key:indesym:dirwsym
+testouterr_cmd sh {spider -t hide3/sym} OK "hide3/sym"
+testouterr_cmd sh {spider -t -o key:indesym hide3/sym} OK "hide3/sym"
+testouterr_cmd sh {spider -t hide3/sub2/default} OK "hide3/sub2/default"
+testouterr_cmd sh {spider -t hide3/sub2/4.0} OK "hide3/sub2/4.0"
+unsetenv_var MODULES_SPIDER_TERSE_OUTPUT
+setenv_path_var MODULEPATH $mp
+
+
+#
+# tag test
+#
+
+setenv_var TESTSUITE_AVAIL_OUTPUT_FOO_TAG 1
+testouterr_cmd_re sh {spider -o modulepath:key:tag foo/1.0} OK "$modlin $mpre $modlin\nfoo/1.0 <baz>  \n\nKey:\n<module-tag>  "
+testouterr_cmd_re sh {spider -t --output=tag:modulepath foo/1.0} OK "$mpre:\nfoo/1.0 <baz>"
+setenv_var MODULES_SPIDER_OUTPUT modulepath:tag:sym:key
+testouterr_cmd_re sh {spider foo/1.0} OK "$modlin $mpre $modlin\nfoo/1.0\\(bar\\) <baz>  \n\nKey:\n\\(symbolic-version\\)  <module-tag>  "
+unsetenv_var MODULES_SPIDER_OUTPUT
+unsetenv_var TESTSUITE_AVAIL_OUTPUT_FOO_TAG
+
+
+#
+# alias test
+#
+
+set mp $modpath.2
+set mpre [regsub -all "\(\[.+?\]\)" $mp {\\\1}]
+setenv_path_var MODULEPATH $mp
+
+testouterr_cmd_re sh {spider -t --output=tag:modulepath hide2} OK "$mpre:\nhide2/1.0\nhide2/1.5"
+testouterr_cmd_re sh {spider -t --output=tag:modulepath hide2/1.1} OK {}
+testouterr_cmd_re sh {spider -o tag:modulepath hide2/1.1} OK {}
+setenv_var MODULES_SPIDER_OUTPUT modulepath:alias
+testouterr_cmd_re sh {spider hide2} OK "$modlin $mpre $modlin\nhide2/1.0  hide2/1.1  hide2/1.5  "
+unsetenv_var MODULES_SPIDER_OUTPUT
+setenv_var MODULES_SPIDER_TERSE_OUTPUT modulepath:alias
+testouterr_cmd_re sh {spider -t hide2} OK "$mpre:\nhide2/1.0\nhide2/1.1\nhide2/1.5"
+testouterr_cmd_re sh {spider -t hide2@1.1:1.2} OK {}
+unsetenv_var MODULES_SPIDER_TERSE_OUTPUT
+
+
+#
+# dirwsym test
+#
+
+testouterr_cmd_re sh {spider -o modulepath hide3/sub2} OK "$modlin $mpre $modlin\nhide3/sub2/4.0  hide3/sub2/5.0  "
+testouterr_cmd_re sh {spider --output=sym:modulepath hide3/sub2} OK "$modlin $mpre $modlin\nhide3/sub2/4.0\\(default:sym\\)  hide3/sub2/5.0\\(new\\)  "
+testouterr_cmd_re sh {spider -t -o modulepath:dirwsym hide3/sub2} OK "$mpre:\nhide3/sub2/\nhide3/sub2/4.0\nhide3/sub2/5.0"
+testouterr_cmd_re sh {spider -t --output=modulepath:sym:dirwsym hide3/sub2} OK "$mpre:\nhide3/sub2/\\(sym\\)\nhide3/sub2/4.0\\(default:sym\\)\nhide3/sub2/5.0\\(new\\)"
+setenv_var MODULES_SPIDER_TERSE_OUTPUT modulepath:dirwsym:sym
+testouterr_cmd_re sh {spider -t hide3/sub2} OK "$mpre:\nhide3/sub2/\\(sym\\)\nhide3/sub2/4.0\\(default:sym\\)\nhide3/sub2/5.0\\(new\\)"
+unsetenv_var MODULES_SPIDER_TERSE_OUTPUT
+
+
+#
+# modulepath test
+#
+
+setenv_path_var MODULEPATH $modpath.path1:$modpath.path2
+
+set test_cols 100
+if {![info exists term_cols]} {
+    # skip tests if current terminal width is unknown
+    send_user "\tskipping terminal width-specific tests\n"
+# set a specific terminal width
+} elseif {[catch {exec stty cols $test_cols}] || [getTtyCols] ne $test_cols} {
+    send_user "\tskipping terminal width-specific tests, cannot set width\n"
+} else {
+    testouterr_cmd sh {spider -o sym:tag} OK "cross/1.0             dcross/dir2/1.0(craft)   lcross/1   lcross/11          vcross/4.0  
+cross/3.0(bef)        dvcross/4.0              lcross/2   loc_dv10/1.1       vcross/6.0  
+cross/4.0             dvcross/dir1/1.0(bef)    lcross/4   loc_dv10/1.2       
+cross/6.0             dvcross/dir1/2.0         lcross/5   novercross         
+dcross/4.0            dvcross/dir2/1.0(craft)  lcross/6   othcross/1.0(bef)  
+dcross/dir1/1.0(bef)  fodcross/2.7.13          lcross/7   vcross/1.0         
+dcross/dir1/2.0       fodcross/2.7.13/sub-13   lcross/10  vcross/3.0(bef)    "
+
+    testouterr_cmd sh {spider -t -o sym:tag} OK "cross/1.0
+cross/3.0(bef)
+cross/4.0
+cross/6.0
+dcross/4.0
+dcross/dir1/1.0(bef)
+dcross/dir1/2.0
+dcross/dir2/1.0(craft)
+dvcross/4.0
+dvcross/dir1/1.0(bef)
+dvcross/dir1/2.0
+dvcross/dir2/1.0(craft)
+fodcross/2.7.13
+fodcross/2.7.13/sub-13
+lcross/1
+lcross/2
+lcross/4
+lcross/5
+lcross/6
+lcross/7
+lcross/10
+lcross/11
+loc_dv10/1.1
+loc_dv10/1.2
+novercross
+othcross/1.0(bef)
+vcross/1.0
+vcross/3.0(bef)
+vcross/4.0
+vcross/6.0"
+
+    # restore terminal width
+    exec stty cols $term_cols
+}
+
+# tags or symbols applying to a lower priority module with same name are still reported
+setenv_path_var MODULEPATH $modpath.2:$modpath.3
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:tag
+testouterr_cmd sh {spider foo/0} OK "foo/0.1  foo/0.2(sym) <tag>  foo/0.err  foo/0.load  foo/0.prereq  "
+testouterr_cmd sh {spider -t foo/0} OK "foo/0.1
+foo/0.2(sym) <tag>
+foo/0.err
+foo/0.load
+foo/0.prereq"
+
+setenv_path_var MODULEPATH $modpath.3:$modpath.2
+testouterr_cmd sh {spider foo/0} OK "foo/0.1  foo/0.2(sym) <tag>  foo/0.err  foo/0.load  foo/0.prereq  "
+testouterr_cmd sh {spider -t foo/0} OK "foo/0.1
+foo/0.2(sym) <tag>
+foo/0.err
+foo/0.load
+foo/0.prereq"
+
+
+#
+# via test
+#
+
+setenv_var TESTSUITE_SPIDER_MODPATH1 use_modpath2
+setenv_var TESTSUITE_SPIDER_MODPATH2 use_modpath3
+setenv_path_var MODULEPATH $modpath.spider1
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:modulepath:via
+testouterr_cmd_re sh {spider mod} OK "$modlin $modpathre.spider1 $modlin
+moda/1  moda/2  
+
+$modlin $modpathre.spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# no modulepath label set, no using module loaded
+setenv_path_var MODULEPATH $modpath.spider2:$modpath.spider1
+testouterr_cmd_re sh {spider mod} OK "$modlin $modpathre.spider2 $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider1 $modlin
+moda/1  moda/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# modulepath label set, no using module loaded
+setenv_var TESTSUITE_VIA modulepath_label1
+testouterr_cmd_re sh {spider mod} OK "$modlin My label spider2 $modlin
+modb/1  modb/2  
+
+$modlin My label spider1 $modlin
+moda/1  moda/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# no modulepath label set, using module loaded
+unsetenv_var TESTSUITE_VIA
+setenv_loaded_module [list moda/1] [list $modpath.spider1/moda/1]
+setenv_var __MODULES_LMUSE moda/1&$modpath.spider2
+testouterr_cmd_re sh {spider mod} OK "$modlin $modpathre.spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider1 $modlin
+moda/1 <L>  moda/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# no modulepath label set, using module loaded, used path was there before
+setenv_var __MODULES_SHARE_MODULEPATH $modpath.spider2:2
+testouterr_cmd_re sh {spider mod} OK "$modlin $modpathre.spider2 $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider1 $modlin
+moda/1 <L>  moda/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+unsetenv_var __MODULES_SHARE_MODULEPATH
+
+# modulepath label set, using module loaded
+setenv_var TESTSUITE_VIA modulepath_label1
+testouterr_cmd_re sh {spider mod} OK "$modlin My label spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin My label spider1 $modlin
+moda/1 <L>  moda/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# modulepath label set, using module loaded, used path was there before
+setenv_var __MODULES_SHARE_MODULEPATH $modpath.spider2:2
+testouterr_cmd_re sh {spider mod} OK "$modlin My label spider2 $modlin
+modb/1  modb/2  
+
+$modlin My label spider1 $modlin
+moda/1 <L>  moda/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+unsetenv_var __MODULES_SHARE_MODULEPATH
+
+# no modulepath label set, using module loaded, but added modulepath unused
+unsetenv_var TESTSUITE_VIA
+setenv_path_var MODULEPATH $modpath.spider1
+testouterr_cmd_re sh {spider mod} OK "$modlin $modpathre.spider1 $modlin
+moda/1 <L>  moda/2  
+
+$modlin $modpathre.spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# modulepath label set, using module loaded, but added modulepath unused
+setenv_var TESTSUITE_VIA modulepath_label1
+testouterr_cmd_re sh {spider mod} OK "$modlin My label spider1 $modlin
+moda/1 <L>  moda/2  
+
+$modlin My label spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# no modulepath label set, using module loaded, but primary modulepath unused
+unsetenv_var TESTSUITE_VIA
+setenv_path_var MODULEPATH $modpath.spider2
+testouterr_cmd_re sh {spider mod} OK "$modlin $modpathre.spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# modulepath label set, using module loaded, but primary modulepath unused
+setenv_var TESTSUITE_VIA modulepath_label1
+testouterr_cmd_re sh {spider mod} OK "$modlin My label spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# several loaded modules using same modulepath
+unsetenv_var TESTSUITE_VIA
+setenv_path_var MODULEPATH $modpath.spider2:$modpath.spider1
+setenv_loaded_module [list moda/1 moda/2] [list $modpath.spider1/moda/1 $modpath.spider2/moda/2]
+setenv_var __MODULES_LMUSE moda/1&$modpath.spider2:moda/2&$modpath.spider2
+set tserr "$modlin $modpathre.spider2 \\(via moda/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider1 $modlin
+moda/1 <L>  moda/2 <L>  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+setenv_var __MODULES_SHARE_MODULEPATH $modpath.spider2:2
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+setenv_var __MODULES_SHARE_MODULEPATH $modpath.spider2:3
+set tserr "$modlin $modpathre.spider2 $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider1 $modlin
+moda/1 <L>  moda/2 <L>  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+testouterr_cmd_re sh {spider mod} OK $tserr
+unsetenv_var __MODULES_SHARE_MODULEPATH
+
+# one loaded module, from a different path, using same modulepath than available module
+unsetenv_var TESTSUITE_VIA
+setenv_path_var MODULEPATH $modpath.spider2:$modpath.spider1
+setenv_loaded_module [list foo/1] [list $modpath.other/foo/1]
+setenv_var __MODULES_LMUSE foo/1&$modpath.spider2
+testouterr_cmd_re sh {spider mod} OK "$modlin $modpathre.spider2 \\(via foo/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider1 $modlin
+moda/1  moda/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+
+# no modulepath reported but via set
+setenv_loaded_module [list moda/1] [list $modpath.spider1/moda/1]
+setenv_var __MODULES_LMUSE moda/1&$modpath.spider2
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:via
+testouterr_cmd sh {spider mod} OK "moda/1 <L>  moda/2  modb/1  modb/2  modc/1  modc/2  "
+
+# via not supported on terse output mode
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:tag:modulepath:via
+set tserr "$modpath.spider2:
+modb/1
+modb/2
+
+$modpath.spider1:
+moda/1 <L>
+moda/2
+
+$modpath.spider3:
+modc/1
+modc/2"
+testouterr_cmd sh {spider -t mod} OK $tserr
+testouterr_cmd sh {spider -t -o +via mod} ERR "$error_msgs: Invalid element in value list for '-o' option on spider sub-command\n  Allowed elements are: modulepath alias provided-alias dirwsym indesym sym tag key hidden variant variantifspec (separated by ':')"
+
+# same module in different modulepath, one of them loaded
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:modulepath:via
+setenv_loaded_module [list foo/0.2] [list $modpath.2/foo/0.2]
+setenv_var __MODULES_LMUSE foo/0.2&$modpath.3
+setenv_path_var MODULEPATH $modpath.3:$modpath.2
+# FIXME: only foo/0.2 from modpath.2 should appear with L tag
+testouterr_cmd_re sh {spider foo/0} OK "$modlin $modpathre.3 \\(via foo/0.2\\) $modlin
+foo/0.2\\(sym\\) <L:tag>  foo/0.err  foo/0.load  foo/0.prereq  
+
+$modlin $modpathre.2 $modlin
+foo/0.1  foo/0.2\\(sym\\) <L:tag>  "
+
+
+# variable reference in modulepath
+setenv_loaded_module [list modulepath/1] [list $modpath.4/modulepath/1]
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:modulepath:via
+setenv_var __MODULES_LMUSE modulepath/1&$modpath.spider\$FOO_VAR_REF
+setenv_var MODULEPATH $modpath.spider\$FOO_VAR_REF:$modpath.4
+
+setenv_var FOO_VAR_REF 3
+set tserr "$modlin $modpathre.spider3 \\(via modulepath/1\\) $modlin
+modc/1  modc/2  
+
+$modlin $modpathre.4 $modlin
+modulepath-opt/1  modulepath-opt/2  modulepath/1 <L>  modulepath/2  "
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH append_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_no_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+setenv_var FOO_VAR_REF 2
+set tserr "$modlin $modpathre.spider2 \\(via modulepath/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.4 $modlin
+modulepath-opt/1  modulepath-opt/2  modulepath/1 <L>  modulepath/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH append_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_no_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+unsetenv_var FOO_VAR_REF
+set tserr "$modlin $modpathre.4 $modlin
+modulepath-opt/1  modulepath-opt/2  modulepath/1 <L>  modulepath/2  "
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH append_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_no_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMUSE
+setenv_var MODULEPATH $modpath.4
+setenv_var FOO_VAR_REF 2
+set tserr "$modlin $modpathre.4 $modlin
+modulepath-opt/1  modulepath-opt/2  modulepath/1  modulepath/2  
+
+$modlin $modpathre.spider2 \\(via modulepath/1\\) $modlin
+modb/1  modb/2  
+
+$modlin $modpathre.spider3 \\(via modb/1\\) $modlin
+modc/1  modc/2  "
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH append_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_no_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+unsetenv_var FOO_VAR_REF
+set tserr "$modlin $modpathre.4 $modlin
+modulepath-opt/1  modulepath-opt/2  modulepath/1  modulepath/2  "
+# variable are not set to their value during spider (scan) evaluation
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+# variable are not set to their value during spider (scan) evaluation
+setenv_var TESTSUITE_USE_MODULEPATH append_with_var_ref_and_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+setenv_var TESTSUITE_USE_MODULEPATH use_with_var_ref_no_setenv
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+
+# relative path in modulepath
+setenv_loaded_module [list modulepath/1] [list $modpath.4/modulepath/1]
+setenv_var TESTSUITE_USE_MODULEPATH use_rel_path
+setenv_var __MODULES_LMUSE modulepath/1&$modpath.spider3
+setenv_var MODULEPATH $modpath.spider3:$modpath.4
+set tserr "$modlin $modpathre.spider3 \\(via modulepath/1\\) $modlin
+modc/1  modc/2  
+
+$modlin $modpathre.4 $modlin
+modulepath-opt/1  modulepath-opt/2  modulepath/1 <L>  modulepath/2  "
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+setenv_var TESTSUITE_USE_MODULEPATH prepend_rel_path
+setenv_var __MODULES_LMUSE modulepath/1&../../../testsuite/modulefiles.spider3
+setenv_var MODULEPATH ../../../testsuite/modulefiles.spider3:$modpath.4
+# relative path in MODULEPATH is not found, but when spider evaluates modulepath/1
+# relative path is successfully resolved from there
+set tserr "$modlin $modpathre.4 $modlin
+modulepath-opt/1  modulepath-opt/2  modulepath/1 <L>  modulepath/2  
+
+$modlin $modpathre.spider3 \\(via modulepath/1\\) $modlin
+modc/1  modc/2  "
+testouterr_cmd_re sh {spider mod} OK $tserr
+
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMUSE
+unsetenv_var TESTSUITE_SPIDER_MODPATH1
+unsetenv_var TESTSUITE_SPIDER_MODPATH2
+
+
+#
+# provided-alias test
+#
+
+# skip test on MSYS platform or if symlink creation is not supported
+if {$is_symlink_supported && $os_name ne {msys}} {
+
+setenv_var MODULES_TERM_WIDTH 200
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+set mp $modpath.provide
+
+file mkdir $mp
+file link -symbolic $mp/foo ../modulefiles.4/foo
+file link -symbolic $mp/bar ../modulefiles.4/bar
+file link -symbolic $mp/provide ../modulefiles.4/provide
+file link -symbolic $mp/.modulerc ../modulefiles.4/.modulerc
+
+setenv_path_var MODULEPATH $mp
+
+setenv_var TESTSUITE_PROVIDE multiple
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:tag:alias
+
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+testouterr_cmd sh {spider foo/1} OK {foo/1.0  }
+testouterr_cmd sh {spider quux} OK {}
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2  provide/3  }
+
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:tag:alias
+
+testouterr_cmd sh {spider -t foo} OK "foo/1.0\nfoo/2.0\nfoo/9.0"
+testouterr_cmd sh {spider -t foo/1} OK "foo/1.0"
+testouterr_cmd sh {spider -t quux} OK {}
+testouterr_cmd sh {spider -t} OK "bar/1\nbar/2\nfoo/1.0\nfoo/2.0\nfoo/9.0\nprovide/1\nprovide/2\nprovide/3"
+testouterr_cmd sh {spider -t provide} OK "provide/1\nprovide/2\nprovide/3"
+
+# Extra Match Search enabled with variant in output, but it does not trigger provided-alias insertion
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias:variant
+
+testouterr_cmd sh {spider -t foo} OK "foo/1.0\nfoo/2.0\nfoo/9.0"
+testouterr_cmd sh {spider -t foo/1} OK "foo/1.0"
+testouterr_cmd sh {spider -t quux} OK {}
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider -t provide} OK "provide/1\nprovide/2\nprovide/3"
+
+# Extra Match Search enabled with extra specifier set, but it does not trigger provided-alias insertion
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias
+
+testouterr_cmd sh {spider -t foo not:tag:loaded} OK "foo/1.0\nfoo/2.0\nfoo/9.0"
+testouterr_cmd sh {spider -t foo/1 not:tag:loaded} OK "foo/1.0"
+testouterr_cmd sh {spider -t quux not:tag:loaded} OK {}
+testouterr_cmd sh {spider * not:tag:loaded} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider -t provide not:tag:loaded} OK "provide/1\nprovide/2\nprovide/3"
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias:provided-alias
+
+testouterr_cmd sh {spider foo} OK {foo/1(@)  foo/1.0  foo/2.0  foo/9.0  }
+testouterr_cmd sh {spider foo/1} OK {foo/1(@)  foo/1.0  }
+testouterr_cmd sh {spider quux} OK {quux/1(@)  }
+testouterr_cmd sh {spider} OK {bar/1  bar/2  baz/1(@)  foo/1(@)  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux/1(@)  qux/1(@)  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2  provide/3  }
+
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:tag:alias:provided-alias
+
+testouterr_cmd sh {spider -t foo} OK "foo/1(@)\nfoo/1.0\nfoo/2.0\nfoo/9.0"
+testouterr_cmd sh {spider -t foo/1} OK "foo/1(@)\nfoo/1.0"
+testouterr_cmd sh {spider -t quux} OK {quux/1(@)}
+testouterr_cmd sh {spider -t} OK "bar/1\nbar/2\nbaz/1(@)\nfoo/1(@)\nfoo/1.0\nfoo/2.0\nfoo/9.0\nprovide/1\nprovide/2\nprovide/3\nquux/1(@)\nqux/1(@)"
+testouterr_cmd sh {spider -t provide} OK "provide/1\nprovide/2\nprovide/3"
+
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:tag:alias:variant
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_family
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_ext_family
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_family3
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@)  }
+testouterr_cmd sh {spider quux} OK {quux(@)  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_ext_family2
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@)  }
+testouterr_cmd sh {spider quux} OK {quux(@)  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider quux} OK {}
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider quux} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_alias
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_ext_same_alias
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo(@)  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo(@)  foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_ext_diff_alias
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider foo} OK {foo/1.0  foo/2.0  foo/9.0  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_alias3
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@)  }
+testouterr_cmd sh {spider quux} OK {quux(@)  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_ext_same_alias2
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@)  }
+testouterr_cmd sh {spider quux} OK {quux(@)  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@)  }
+testouterr_cmd sh {spider quux} OK {quux(@)  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider quux} OK {}
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_ext_diff_alias2
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@)  }
+testouterr_cmd sh {spider quux} OK {quux(@)  }
+
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_version
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  provide/foo(@)  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2  provide/3  provide/foo(@)  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2  provide/3  }
+
+setenv_var TESTSUITE_PROVIDE duplicate_with_ext_diff_version
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2(foo)  provide/3  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2(foo)  provide/3  }
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2(foo)  provide/3  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2(foo)  provide/3  }
+
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag:provided-alias
+
+setenv_var TESTSUITE_PROVIDE multiple_and_forbidden
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1 <F>  provide/2  provide/3  }
+testouterr_cmd sh {spider provide} OK {provide/1 <F>  provide/2  provide/3  }
+testouterr_cmd sh {spider provide/1} OK {provide/1 <F>  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux/1} OK {}
+
+testouterr_cmd sh {spider envvar:FOO} OK {}
+testouterr_cmd sh {spider provide envvar:FOO} OK {}
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux/1 envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_alias_forbidden
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  baz/1(@)  foo/1(@)  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux/1(@) <F>  qux/1(@)  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider provide/1} OK {provide/1  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux/1} OK {quux/1(@) <F>  }
+
+testouterr_cmd sh {spider envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider provide envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux/1 envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_family_forbidden
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@) <F>  }
+testouterr_cmd sh {spider provide/1} OK {provide/1  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux} OK {quux(@) <F>  }
+
+testouterr_cmd sh {spider envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider provide envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_expired
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1 <F>  provide/2  provide/3  }
+testouterr_cmd sh {spider provide} OK {provide/1 <F>  provide/2  provide/3  }
+testouterr_cmd sh {spider provide/1} OK {provide/1 <F>  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux/1} OK {}
+
+testouterr_cmd sh {spider envvar:FOO} OK {}
+testouterr_cmd sh {spider provide envvar:FOO} OK {}
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_alias_expired
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  baz/1(@)  foo/1(@)  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux/1(@) <F>  qux/1(@)  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider provide/1} OK {provide/1  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux/1} OK {quux/1(@) <F>  }
+
+testouterr_cmd sh {spider envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider provide envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux/1 envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_family_expired
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  quux(@) <F>  }
+testouterr_cmd sh {spider provide/1} OK {provide/1  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux} OK {quux(@) <F>  }
+
+testouterr_cmd sh {spider envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider provide envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_hidden
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  baz/1(@)  foo/1(@)  foo/1.0  foo/2.0  foo/9.0  provide/2  provide/3  quux/1(@)  qux/1(@)  }
+testouterr_cmd sh {spider provide} OK {provide/2  provide/3  }
+testouterr_cmd sh {spider provide/1} OK {provide/1 <H>  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux/1} OK {quux/1(@)  }
+
+testouterr_cmd sh {spider envvar:FOO} OK {}
+testouterr_cmd sh {spider provide envvar:FOO} OK {}
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_alias_hidden
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  baz/1(@)  foo/1(@)  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  qux/1(@)  }
+testouterr_cmd sh {spider provide} OK {provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider provide/1} OK {provide/1  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux/1} OK {quux/1(@) <H>  }
+
+testouterr_cmd sh {spider envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider provide envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux/1 envvar:FOO} OK {}
+
+
+setenv_var TESTSUITE_PROVIDE multiple_and_family_hidden
+
+testouterr_cmd sh {spider} OK {bar/1  bar/2  foo/1.0  foo/2.0  foo/9.0  provide/1  provide/2  provide/3  }
+testouterr_cmd sh {spider provide/1} OK {provide/1  }
+testouterr_cmd sh {spider unk} OK {}
+testouterr_cmd sh {spider quux} OK {quux(@) <H>  }
+
+testouterr_cmd sh {spider envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider provide envvar:FOO} OK {provide/1  }
+testouterr_cmd sh {spider unk envvar:FOO} OK {}
+testouterr_cmd sh {spider quux envvar:FOO} OK {}
+
+file delete $mp/foo
+file delete $mp/bar
+file delete $mp/provide
+file delete $mp/.modulerc
+file delete $mp
+
+unsetenv_var MODULES_TERM_WIDTH
+setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+
+} else {
+    send_user "\tskipping provided-alias tests as specific test setup cannot be built\n"
+}
+
+
+
+#
+# hidden test
+#
+
+setenv_var TESTSUITE_AVAIL_OUTPUT_HIDDEN 1
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+set mp $modpath.3
+set mpre [regsub -all "\(\[.+?\]\)" $mp {\\\1}]
+setenv_path_var MODULEPATH $mp
+
+testouterr_cmd sh {spider -o alias:sym foo@1:} OK "foo/2.0  "
+set tserr "foo/1.0(bar)  foo/2.0  "
+testouterr_cmd sh {spider -o alias:hidden:sym foo@1:} OK $tserr
+testouterr_cmd sh {spider --all -o alias:hidden:sym foo@1:} OK $tserr
+
+setenv_var MODULES_SPIDER_OUTPUT sym:alias:hidden
+testouterr_cmd sh {spider foo@1:} OK $tserr
+testouterr_cmd sh {spider -a foo@1:} OK $tserr
+testouterr_cmd sh {spider -a -o hidden:sym:alias foo@1:} OK $tserr
+
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:alias:hidden
+set tserr "foo/1.0(bar)\nfoo/2.0"
+testouterr_cmd sh {spider -t foo@1:} OK $tserr
+testouterr_cmd sh {spider -t --all foo@1:} OK $tserr
+testouterr_cmd sh {spider --all -t -o hidden:sym:alias foo@1:} OK $tserr
+
+unsetenv_var TESTSUITE_AVAIL_OUTPUT_HIDDEN
+setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+unsetenv_var MODULES_SPIDER_OUTPUT
+unsetenv_var MODULES_SPIDER_TERSE_OUTPUT
+
+
+#
+# -o/--output append/subtract tests
+#
+
+setenv_var TESTSUITE_VARIANT 1
+
+testouterr_cmd sh {spider -o +variant --terse variant/1.0} OK $mp:\nvariant/1.0{foo=val1}
+testouterr_cmd sh {spider --output=+variant --terse variant/1.0} OK $mp:\nvariant/1.0{foo=val1}
+testouterr_cmd sh {spider -o -modulepath --terse variant/1.0} OK variant/1.0
+testouterr_cmd sh {spider --output=-modulepath:sym:tag --terse foo/0.2} OK foo/0.2
+testouterr_cmd sh {spider --output=-modulepath:sym:tag foo/0.2} OK {foo/0.2  }
+
+testouterr_cmd sh {spider --output=-sym: foo/0.2} ERR $tserr_invalid_output_val
+testouterr_cmd sh {spider --output=+foo: foo/0.2} ERR $tserr_invalid_output_val
+testouterr_cmd sh {spider -o +:variant foo/0.2} ERR $tserr_invalid_o_val
+testouterr_cmd sh {spider -o -bar foo/0.2} ERR $tserr_invalid_o_val
+testouterr_cmd sh {ml spider --output=+foo: foo/0.2} ERR $tserr_invalid_output_val
+testouterr_cmd sh {ml spider -o -bar foo/0.2} ERR $tserr_invalid_o_val
+
+set tserr "$modlin $mpre $modlin
+foo/0.2\\(sym\\) <tag>  
+
+Key:
+\\(symbolic-version\\)  <module-tag>  "
+testouterr_cmd_re sh {spider -o +tag:sym foo/0.2} OK $tserr
+
+setenv_var MODULES_SPIDER_OUTPUT sym:tag
+setenv_var MODULES_SPIDER_TERSE_OUTPUT sym:tag
+
+testouterr_cmd sh {spider --output=+variant --terse variant/1.0} OK variant/1.0{foo=val1}
+testouterr_cmd sh {spider --output=+variant --terse foo/0.2} OK {foo/0.2(sym) <tag>}
+testouterr_cmd sh {spider -o -modulepath:sym:tag foo/0.2} OK {foo/0.2  }
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

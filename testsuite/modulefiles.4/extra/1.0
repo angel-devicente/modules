@@ -251,5 +251,93 @@ if {[info exists env(TESTSUITE_EXTRA)]} {
         tag5 {
             variant xtfoo val1 val2 val3
         }
+        use1 {
+            module use /path/to/dir1
+        }
+        use2 {
+            module use {}
+        }
+        use3 {
+            module use /path/to/dir1 /path/to/dir2
+        }
+        use_opt1 {
+            module use -a /path/to/dir1 /path/to/dir2
+        }
+        use_opt2 {
+            module use /path/to/dir1 --append /path/to/dir2
+        }
+        use_opt3 {
+            module use --other /path/to/dir1 /path/to/dir2
+        }
+        use_append1 {
+            append-path MODULEPATH /path/to/dir1
+        }
+        use_append2 {
+            append-path OTHERPATH /path/to/dir1
+        }
+        use_append3 {
+            append-path MODULEPATH /path/to/dir1 /path/to/dir2
+        }
+        use_append_opt1 {
+            append-path -d : MODULEPATH /path/to/dir1 /path/to/dir2
+        }
+        use_append_opt2 {
+            append-path MODULEPATH /path/to/dir1 --duplicates /path/to/dir2
+        }
+        use_append_opt3 {
+            append-path --other MODULEPATH /path/to/dir1 /path/to/dir2
+        }
+        use_prepend1 {
+            prepend-path MODULEPATH /path/to/dir1
+        }
+        use_prepend2 {
+            prepend-path OTHERPATH /path/to/dir1
+        }
+        use_prepend3 {
+            prepend-path MODULEPATH /path/to/dir1 /path/to/dir2
+        }
+        use_prepend_opt1 {
+            prepend-path -d : MODULEPATH /path/to/dir1 /path/to/dir2
+        }
+        use_prepend_opt2 {
+            prepend-path MODULEPATH /path/to/dir1 --duplicates /path/to/dir2
+        }
+        use_prepend_opt3 {
+            prepend-path --other MODULEPATH /path/to/dir1 /path/to/dir2
+        }
+        depends-on-any1 {
+            depends-on-any xtfoo
+        }
+        use_extref1 {
+            module use /path/to/d\$TESTSUITE_EXTRA_EXTREF
+        }
+        use_inref1 {
+            setenv TESTSUITE_EXTRA_INREF unk
+            module use /path/to/d\$TESTSUITE_EXTRA_INREF
+        }
+        use_inref2 {
+            setenv TESTSUITE_EXTRA_INREF ir2
+            module use /path/to/d\$TESTSUITE_EXTRA_INREF
+        }
+        use_append_extref1 {
+            append-path MODULEPATH /path/to/d\$TESTSUITE_EXTRA_EXTREF
+        }
+        use_append_inref1 {
+            setenv TESTSUITE_EXTRA_INREF unk
+            append-path MODULEPATH /path/to/d\$TESTSUITE_EXTRA_INREF
+        }
+        use_append_inref2 {
+            setenv TESTSUITE_EXTRA_INREF ir2
+            append-path MODULEPATH /path/to/d\$TESTSUITE_EXTRA_INREF
+        }
+        tag5 {
+            module-tag xtfoo [module-info name]
+        }
+        tag6 {
+            add-property name xtfoo
+        }
+        tag8 {
+            module-warn --message {warning text} extra/1.0
+        }
     }
 }
