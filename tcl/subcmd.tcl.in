@@ -1913,7 +1913,7 @@ proc cmdModuleAvail {show_oneperline show_mtime show_filter search_filter\
          array set mod_list $dir_mod_list
          set modpath_label [getModulepathLabel $dir]
          set modpath_indent [getModulepathIndent $dir]             
-         reportModules $args $dir mp $hstyle $show_mtime 0 $one_per_line\
+         reportModules $args $modpath_label mp $hstyle $show_mtime 0 $one_per_line\
             $theader_cols hidden-loaded {} $modpath_indent
       } else {
          # add result if not already added from an upper priority modpath

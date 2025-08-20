@@ -1676,7 +1676,7 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
     if {$elt_cnt == 0} {
         if {$indent != 0} {
             if {$terse != 1} {
-             displaySeparatorLine $header $sgrkey $indent
+             displaySeparatorLine $header $sgrkey "" $indent
              reportSeparateNextContent
             }
         }
