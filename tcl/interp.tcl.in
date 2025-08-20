@@ -560,7 +560,6 @@ proc execute-modulerc {modfile modname modspec} {
          module-virtual module-forbid module-forbid module-hide module-hide\
          module-tag module-tag module-info module-info modulepath-label\
          modulepath-label modulepath-indent modulepath-indent setModulesVersion setModulesVersion\
-         getModuleContent getModuleContent lsb-release lsb-release]
          getModuleContent getModuleContent lsb-release lsb-release\
          module-warn module-warn]
 
