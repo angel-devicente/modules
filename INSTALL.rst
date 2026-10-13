@@ -404,7 +404,7 @@ is displayed within brackets):
 
  Directory to host Emacs addon files [``DATAROOTDIR/emacs/lisp``]
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -413,7 +413,7 @@ is displayed within brackets):
  Directory for the executable configuration scripts
  [``PREFIX/etc``]
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -440,7 +440,7 @@ is displayed within brackets):
  Directory of main modulefiles also called system modulefiles
  [``PREFIX/modulefiles``]
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -448,7 +448,7 @@ is displayed within brackets):
 
  Directory to host Nagelfar linter addon files [``DATAROOTDIR/nagelfar``]
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -460,7 +460,7 @@ is displayed within brackets):
 
  Directory to host Vim addon files [``DATAROOTDIR/vim/vimfiles``]
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -479,7 +479,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`advanced_version_spec` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
 
@@ -491,7 +491,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Append rather prepend binary directory to the PATH environment variable when
  the :instopt:`--enable-set-binpath` option is enabled. (default=no)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -500,9 +500,19 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Append rather prepend man page directory to the MANPATH environment variable
  when the :instopt:`--enable-set-manpath` option is enabled. (default=no)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
+
+.. instopt:: --enable-append-pythonpath
+
+ Append rather prepend the ``env_modules`` Python module directory to the
+ PYTHONPATH environment variable when the :instopt:`--enable-set-pythonpath`
+ option is enabled. (default=no)
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. instopt:: --enable-auto-handling
 
@@ -514,7 +524,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`auto_handling` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -533,7 +543,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`avail_indepth` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -547,12 +557,21 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`color` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
     .. versionchanged:: 5.0
        Configuration option default set to ``yes``
+
+.. instopt:: --enable-compressed-changelog
+
+ Control if ``ChangeLog`` documentation file should be installed in a
+ compressed format or not. (default=yes)
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. instopt:: --enable-conflict-unload
 
@@ -563,7 +582,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`conflict_unload` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -575,7 +594,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  installation process handled via a package manager which handles by itself
  the installation of this kind of documents. (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -584,7 +603,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Install the Emacs addon files in the Emacs addons directory defined with the
  :instopt:`--emacsdatadir` option. (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -593,7 +612,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Install some modulefiles provided as example in the system modulefiles
  directory defined with the :instopt:`--modulefilesdir` option. (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -607,7 +626,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`extended_default` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
 
@@ -626,7 +645,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`implicit_default` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -640,7 +659,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`implicit_requirement` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -649,7 +668,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Build and install the Modules Tcl extension library which provides optimized
  Tcl commands for the modulecmd.tcl script. (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -664,7 +683,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`mcookie_version_check` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -677,7 +696,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  configuration option which could be changed after installation with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.5
 
@@ -692,7 +711,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :instopt:`--initdir` option rather than within the ``modulerc`` file.
  (default=no)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -705,7 +724,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  location where to find the Modules Tcl extension library depending on current
  machine architecture. (default=no)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.6
 
@@ -715,7 +734,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  modulefiles and modulercs) in the Nagelfar addons directory defined with the
  :instopt:`--nagelfardatadir` option. (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -728,7 +747,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :instopt:`--enable-conflict-unload` and :instopt:`--enable-require-via`.
  (default=no)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -750,6 +769,28 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
     .. versionchanged:: 5.6
        Enables automated *require via* mechanism
 
+.. instopt:: --enable-paginate
+
+ Control if output of module command should be piped into a pager by default
+ or not. (default=yes)
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. instopt:: --enable-path-entry-reorder
+
+ Change order of entry in a path-like environment variable, when
+ :mfcmd:`prepend-path`, :mfcmd:`append-path` or :subcmd:`use` target a path
+ entry that is already defined in the environment variable. (default=no)
+
+ This installation option defines the default value of the
+ :mconfig:`path_entry_reorder` configuration option which could be changed
+ after installation with the :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. instopt:: --enable-quarantine-support
 
@@ -760,7 +801,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`quarantine_support` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -776,7 +817,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`require_via` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -785,7 +826,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Prepend binary directory defined by the :instopt:`--bindir` option to the
  PATH environment variable in the shell initialization scripts. (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -795,9 +836,19 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  MANPATH environment variable in the shell initialization scripts.
  (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
+
+.. instopt:: --enable-set-pythonpath
+
+ Prepend directory where the ``env_modules`` Python module is installed (see
+ :instopt:`--with-pythondir` option) to the PYTHONPATH environment
+ variable in the shell initialization scripts. (default=yes)
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. instopt:: --enable-set-shell-startup
 
@@ -808,7 +859,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`set_shell_startup` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -824,7 +875,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`silent_shell_debug` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -841,7 +892,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`source_cache` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -857,7 +908,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`spider_indepth` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -878,7 +929,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :mconfig:`unique_name_loaded` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -887,7 +938,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  Install the Vim addon files in the Vim addons directory defined with the
  :instopt:`--vimdatadir` option. (default=yes)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -902,7 +953,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  configuration option which could be changed after installation with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -912,7 +963,7 @@ instance :instopt:`--disable-set-manpath<--enable-set-manpath>`):
  :command:`ml` and :command:`envml` command batch file and ``cmd.cmd``
  initialization script). (default=no)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.5
 
@@ -935,7 +986,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`abort_on_error` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -952,7 +1003,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`avail_output` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -982,7 +1033,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`avail_terse_output` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -1004,7 +1055,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  completion script for Modules is installed in the initialization script
  directory and is sourced from Modules Bash initialization script. (default=)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -1013,7 +1064,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  List of paths to look at when searching the location of tools required to
  build and configure Modules (default=\ ``/usr/bin:/bin:/usr/local/bin``)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -1051,7 +1102,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  equals ``dark``. :mconfig:`colors` could be changed after installation with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1075,6 +1126,32 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
     .. versionchanged:: 5.6
        Default ``nearly-forbidden`` tag color changed
 
+.. instopt:: --with-domainname=BIN
+
+ Name or full path of default domainname program to use to fetch domain name
+ (can be superseded at run-time by environment variable)
+ (default=\ ``domainname``)
+
+ This installation option and :instopt:`--with-domainname-opts` define the
+ default value of the :mconfig:`domainname` configuration option which could
+ be changed after installation with the :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. instopt:: --with-domainname-opts=OPTLIST
+
+ Settings to apply to default domainname program (default=)
+
+ This installation option and :instopt:`--with-domainname` define the default
+ value of the :mconfig:`domainname` configuration option which could be
+ changed after installation with the :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
 .. instopt:: --with-editor=BIN
 
  Name or full path of default editor program to use to open modulefile through
@@ -1084,7 +1161,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  configuration option which could be changed after installation with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -1094,7 +1171,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  completion script for Modules is installed in the initialization script
  directory and is sourced from Modules Fish initialization script. (default=)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -1111,7 +1188,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  configuration option which could be changed after installation with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
 
@@ -1123,12 +1200,26 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  Location where to install Modules initialization configuration files. Either
  ``initdir`` or ``etcdir`` (default=\ ``etcdir``)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
     .. versionchanged:: 5.0
        Configuration option default set to ``etcdir``
+
+.. instopt:: --with-init-envvars=LIST
+
+ Initial values to assign to environment variables before they are modified
+ for the first time. Each entry in LIST must use the format
+ ``VARIABLE_NAME=initial_value``. Entries are separated by ``:``.
+
+ This installation option defines the default value of the
+ :mconfig:`init_envvars` configuration option which could be changed after
+ installation with the :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. instopt:: --with-light-background-colors=SGRLIST
 
@@ -1142,7 +1233,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  equals ``light``. :mconfig:`colors` could be changed after installation with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1178,7 +1269,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`list_output` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -1203,7 +1294,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`list_terse_output` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -1223,7 +1314,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :file:`initrc` configuration file or in the ``modulerc`` file if
  :instopt:`--with-initconf-in` is set to ``initdir``. (default=)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -1238,7 +1329,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`locked_configs` configuration option which cannot not be changed
  after installation.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1256,7 +1347,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`logged_events` configuration option which cannot not be changed
  after installation.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -1269,7 +1360,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  value of the :mconfig:`logger` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -1281,7 +1372,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  value of the :mconfig:`logger` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -1299,7 +1390,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  ``BASEPREFIX/$MODULE_VERSION/modulefiles`` if versioning installation mode
  enabled)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -1311,7 +1402,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  configuration option which could be changed after installation with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
 
@@ -1325,7 +1416,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`nearly_forbidden_days` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.6
 
@@ -1339,7 +1430,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  value of the :mconfig:`pager` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1351,7 +1442,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  of the :mconfig:`pager` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1360,9 +1451,27 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  Name or full path of Python interpreter command to set as shebang for helper
  scripts. (default=\ ``python``)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.5
+
+.. instopt:: --with-pythondir=DIR
+
+ Installation directory of the ``env_modules`` Python module. When this
+ option is not set, :file:`env_modules.py` is installed in the initialization
+ script directory. Whatever the installation directory of this Python module,
+ the :file:`python.py` symbolic link created in the initialization script
+ directory points to its location. (default=)
+
+ If this option is set to the ``site-packages`` directory of the Python
+ installation available on the system, the ``env_modules`` module can be
+ imported without requiring the PYTHONPATH environment variable to be set.
+ In this case the :instopt:`--disable-set-pythonpath<--enable-set-pythonpath>`
+ option may be used.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. instopt:: --with-quarantine-vars=<VARNAME[=VALUE] ...>
 
@@ -1377,7 +1486,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :subcmd:`config` sub-command on :mconfig:`run_quarantine` configuration
  option.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1391,7 +1500,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`search_match` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1409,7 +1518,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`spider_output` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -1427,7 +1536,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`spider_terse_output` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -1441,7 +1550,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`sticky_purge` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -1456,7 +1565,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`tag_abbrev` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -1477,7 +1586,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`tag_color_name` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -1497,7 +1606,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
 
  Name or full path of Tcl interpreter shell (default=\ ``tclsh``)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -1510,7 +1619,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  default value of the :mconfig:`tcl_linter` configuration option which could
  be changed after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -1522,7 +1631,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  value of the :mconfig:`tcl_linter` configuration option which could be
  changed after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -1536,7 +1645,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`term_background` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1550,7 +1659,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`unload_match_order` configuration option which could be changed
  after installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1567,7 +1676,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`variant_shortcut` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -1581,7 +1690,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  :mconfig:`verbosity` configuration option which could be changed after
  installation with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1592,7 +1701,7 @@ instance :instopt:`--without-modulepath<--with-modulepath>`):
  directory and :envvar:`FPATH` is set in Zsh initialization script to point to
  this location. (default=)
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -1661,6 +1770,10 @@ installation.
 | :mconfig:`extended_default`       | ``1``                                        | :instopt:`--enable-extended-default`,        |              |           |
 |                                   |                                              | :envvar:`MODULES_EXTENDED_DEFAULT`           |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`domainname`             | ``domainname``                               | :instopt:`--with-domainname`,                |              |           |
+|                                   |                                              | :instopt:`--with-domainname-opts`,           |              |           |
+|                                   |                                              | :envvar:`MODULES_DOMAINNAME`                 |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`editor`                 | ``vi``                                       | :instopt:`--with-editor`,                    |              |           |
 |                                   |                                              | :envvar:`MODULES_EDITOR`                     |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
@@ -1679,6 +1792,8 @@ installation.
 | :mconfig:`ignore_cache`           | ``0``                                        | :envvar:`MODULES_IGNORE_CACHE`,              |              |           |
 |                                   |                                              | :option:`--ignore-cache`                     |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`ignore_cache_subcmds`   | *Empty by default*                           | :envvar:`MODULES_IGNORE_CACHE_SUBCMDS`       |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`ignore_user_rc`         | ``0``                                        | :envvar:`MODULES_IGNORE_USER_RC`,            |              |           |
 |                                   |                                              | :option:`--ignore-user-rc`                   |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
@@ -1689,6 +1804,13 @@ installation.
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`implicit_requirement`   | ``1``                                        | :instopt:`--enable-implicit-requirement`,    |              |           |
 |                                   |                                              | :envvar:`MODULES_IMPLICIT_REQUIREMENT`       |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`info_extension`         | ``0``                                        | :envvar:`MODULES_INFO_EXTENSION`             |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`init_envvars`           | *Empty by default*                           | :instopt:`--with-init-envvars`               |              |           |
+|                                   |                                              | :envvar:`MODULES_INIT_ENVVARS`               |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`linked_envvars`         | *Empty by default*                           | :envvar:`MODULES_LINKED_ENVVARS`             |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`list_output`            | ``header:idx:variant:sym:tag:key``           | :instopt:`--with-list-output`,               |              |           |
 |                                   |                                              | :envvar:`MODULES_LIST_OUTPUT`,               |              |           |
@@ -1715,13 +1837,24 @@ installation.
 | :mconfig:`ml`                     | ``1``                                        | :instopt:`--enable-ml`,                      | X            |           |
 |                                   |                                              | :envvar:`MODULES_ML`                         |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`modulepath_ignore`      | ``1``                                        | :envvar:`MODULES_MODULEPATH_IGNORE`,         |              |           |
+|                                   |                                              | :option:`--no-modulepath-ignore`             |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`nearly_forbidden_days`  | ``14``                                       | :instopt:`--with-nearly-forbidden-days`,     |              |           |
 |                                   |                                              | :envvar:`MODULES_NEARLY_FORBIDDEN_DAYS`      |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`non_exportable_tags`    | *Empty by default*                           | :envvar:`MODULES_NON_EXPORTABLE_TAGS`        |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`pager`                  | ``less -eFKRX``                              | :instopt:`--with-pager`,                     |              |           |
 |                                   |                                              | :instopt:`--with-pager-opts`,                |              |           |
 |                                   |                                              | :envvar:`MODULES_PAGER`,                     |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`paginate`               | ``1``                                        | :instopt:`--enable-paginate`,                |              |           |
+|                                   |                                              | :envvar:`MODULES_PAGINATE`,                  |              |           |
 |                                   |                                              | :option:`--paginate`, :option:`--no-pager`   |              |           |
++-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
+| :mconfig:`path_entry_reorder`     | ``0``                                        | :instopt:`--enable-path-entry-reorder`,      |              |           |
+|                                   |                                              | :envvar:`MODULES_PATH_ENTRY_REORDER`         |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+
 | :mconfig:`protected_envvars`      | *Unset by default*                           | :envvar:`MODULES_PROTECTED_ENVVARS`          |              |           |
 +-----------------------------------+----------------------------------------------+----------------------------------------------+--------------+-----------+

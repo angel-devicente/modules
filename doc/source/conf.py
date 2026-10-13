@@ -16,6 +16,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import importlib.util
 import os
 import sys
 # sys.path.insert(0, os.path.abspath('.'))
@@ -32,6 +33,29 @@ needs_sphinx = '1.0'
 # ones.
 extensions = []
 
+# generate Open Graph meta tags so links shared on social media get a
+# preview card; extension is an optional dependency, installed on Read The
+# Docs through requirements.txt, so skip it when unavailable locally
+# find_spec raises an error rather returning None if parent 'sphinxext'
+# package is not found
+try:
+    use_ogp = importlib.util.find_spec('sphinxext.opengraph') is not None
+except ModuleNotFoundError:
+    use_ogp = False
+if use_ogp:
+    extensions.append('sphinxext.opengraph')
+    # on Read The Docs, extension gets site URL of the exact doc version
+    # built from READTHEDOCS_CANONICAL_URL environment variable; only set a
+    # fallback URL for builds outside of Read The Docs
+    if os.environ.get('READTHEDOCS', None) != 'True':
+        ogp_site_url = 'https://modules.readthedocs.io/en/latest/'
+    # point to PNG rendering of project logo (relative to site URL) as SVG
+    # is not supported by social media platforms
+    ogp_image = '_static/social_preview.png'
+    ogp_custom_meta_tags = [
+        '<meta name="twitter:card" content="summary_large_image" />',
+    ]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -46,8 +70,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Modules'
-copyright = '1996-2025, Modules Contributors'
-author = ''
+author = 'Modules Contributors'
+copyright = f'1996-2026, {author}'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -79,7 +103,7 @@ def get_version_release_from_git():
             else:
                 return version, version + '+' + branch + '-' + tags
     else:
-        return '5.6.0', ''
+        return '5.7.0', ''
 
 # The short X.Y version.
 # The full version, including alpha/beta/rc tags.
@@ -117,51 +141,41 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 os_rtd = os.environ.get('READTHEDOCS', None) == 'True'
-if os_rtd:
-    html_theme = 'sphinx_rtd_theme'
-    # override wide tables in RTD theme
-    # colorize terminal output
-    html_css_files = [
-        'rtd_literal_block.css',
-        'rtd_theme_overrides.css',
-        'terminal_output.css',
-        ]
+# use the same theme as on Read The Docs when it is installed locally
+use_furo = os_rtd or importlib.util.find_spec('furo') is not None
+if use_furo:
+    html_theme = 'furo'
 else:
     html_theme = 'bizstyle'
-    # colorize terminal output
-    html_css_files = [
-        'literal_block.css',
-        'terminal_output.css',
-        ]
+
+# colorize terminal output
+# handle large table
+html_css_files = [
+    'literal_block.css',
+    'terminal_output.css',
+]
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
 # html_theme_options = {}
-if os_rtd:
+if use_furo:
     html_theme_options = {
-        'logo_only': True,
-    }
-    html_context = {
-        'conf_py_path': '/doc/source/',
-        'display_github': True,
-        'github_user': 'envmodules',
-        'github_repo': 'modules',
-        'github_version': 'main',
+        'sidebar_hide_name': True,
+        'light_logo': 'modules_red.svg',
+        'dark_logo': 'modules_red.svg',
     }
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-if os_rtd:
-    html_logo = '../img/modules_white.svg'
-else:
-    html_logo = '../img/modules_red.svg'
+if not use_furo:
+    html_logo = '_static/modules_red.svg'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = '../img/favicon.ico'
+html_favicon = '_static/favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -208,6 +222,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
+    ('latex_index', 'modules.tex', f'{project} documentation', author, 'manual'),
 ]
 
 
@@ -244,6 +259,7 @@ rst_epilog += '.. |libexecdir| replace:: %s\n' % libexecdir
 rst_epilog += '.. |emph libexecdir| replace:: *%s*\n' % libexecdir
 rst_epilog += '.. |bold libexecdir| replace:: **%s**\n' % libexecdir
 rst_epilog += '.. |file libexecdir| replace:: :file:`%s`\n' % libexecdir
+rst_epilog += '.. |file bindir_modulecmd| replace:: :file:`%s/modulecmd`\n' % bindir
 rst_epilog += '.. |file libexecdir_modulecmd| replace:: :file:`%s/modulecmd.tcl`\n' % libexecdir
 rst_epilog += '.. |etcdir| replace:: %s\n' % etcdir
 rst_epilog += '.. |emph etcdir| replace:: *%s*\n' % etcdir
@@ -306,6 +322,7 @@ man_pages = [
     ('module', 'module', u'command interface to the Modules package', [], 1),
     ('ml', 'ml', u'handy command interface to the Modules package', [], 1),
     ('modulefile', 'modulefile', u'files containing Tcl code for the Modules package', [], 5),
+    ('modulecmd', 'modulecmd', u'generic wrapper pointing to Modules execution engine', [], 1),
     ('envml', 'envml', u'run a command in an environment setting up by Modules', [], 1)
 ]
 
@@ -369,9 +386,9 @@ def ghcommit_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     title = nodes.reference('', commit_id, refuri=commit_url)
     return [title], []
 
-# define new directive/role that can be used as .. subcmd::/:subcmd:,
-# .. mfcmd::/:mfcmd:, .. mfvar::/:mfvar: and .. sitevar::/:sitevar:
 def setup(app):
+    # define new directive/role that can be used as .. subcmd::/:subcmd:,
+    # .. mfcmd::/:mfcmd:, .. mfvar::/:mfvar: and .. sitevar::/:sitevar:
     app.add_object_type('subcmd', 'subcmd',
                         objname='module sub-command',
                         indextemplate='pair: %s; module sub-command',
@@ -388,6 +405,10 @@ def setup(app):
                         objname='siteconfig variable',
                         indextemplate='pair: %s; siteconfig variable',
                         parse_node=parse_cmd_args_node)
+    app.add_object_type(directivename='mhook', rolename='mhook',
+                        objname='hook event',
+                        indextemplate='pair: %s; hook event',
+                        parse_node=parse_cmd_args_node)
     app.add_object_type('instopt', 'instopt',
                         objname='installation option',
                         indextemplate='pair: %s; installation option',
@@ -397,3 +418,9 @@ def setup(app):
                         indextemplate='pair: %s; module configuration option')
     app.add_role('ghcommit', ghcommit_role)
 
+    # exclude latex index document on non-latex output builder
+    def on_builder_inited(app):
+        if app.builder.name != 'latex':
+            app.config.exclude_patterns.append('latex_index.rst')
+
+    app.connect('builder-inited', on_builder_inited)

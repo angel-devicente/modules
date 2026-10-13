@@ -1,0 +1,8 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/Tk/8.6.12-GCCcore-11.3.0
+conflict Tk
+depends-on GCCcore/11.3.0
+depends-on Tcl/8.6.12-GCCcore-11.3.0
+depends-on X11/20220504-GCCcore-11.3.0
+depends-on zlib/1.2.12-GCCcore-11.3.0

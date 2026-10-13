@@ -33,7 +33,7 @@ alias _module_not_yet_loaded '\\
 alias _module_modulepath 'echo ${MODULEPATH} | sed '"'"'s/:/\n/g;'"'"' '
 
 complete module 'C,/*,f,' 'C,.*,f,' 'C,~/*,f,' \
-        'n/help/`_module_avail`/' \
+        'n/help/`_module_avail; echo "@comp_mfile_opts@"`/' \
         'n/add/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
         'n/load/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
         'n/add-any/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
@@ -41,7 +41,7 @@ complete module 'C,/*,f,' 'C,.*,f,' 'C,~/*,f,' \
         'n/try-add/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
         'n/try-load/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
         'n/rm/`_module_loaded; echo "@comp_unload_opts@"`/' \
-        'n/del/`_module_loaded; echo "@comp_unload_opts@"`/' \
+        'n/delete/`_module_loaded; echo "@comp_unload_opts@"`/' \
         'n/remove/`_module_loaded; echo "@comp_unload_opts@"`/' \
         'n/unload/`_module_loaded; echo "@comp_unload_opts@"`/' \
         'n/swap/`_module_loaded; echo "@comp_load_opts@"`/' \
@@ -57,8 +57,8 @@ complete module 'C,/*,f,' 'C,.*,f,' 'C,~/*,f,' \
         'n/is-avail/`_module_avail; echo "@comp_isavail_opts@"`/' \
         'n/is-loaded/`_module_avail; echo "@comp_mfile_opts@"`/' \
         'n/info-loaded/`_module_avail; echo "@comp_mfile_opts@"`/' \
-        'n/restore/`_module_savelist`/' \
-        "n/savelist/(@comp_list_opts@)/" \
+        'n/restore/`_module_savelist; echo "@comp_restore_opts@"`/' \
+        "n/savelist/(@comp_savelist_opts@)/" \
         'n/saveshow/`_module_savelist`/' \
         'n/describe/`_module_savelist`/' \
         'n/saverm/`_module_savelist`/' \
@@ -70,10 +70,10 @@ complete module 'C,/*,f,' 'C,.*,f,' 'C,~/*,f,' \
         'N/use/d/' \
         'n/unuse/`_module_modulepath`/' \
         'n/is-used/`_module_modulepath`/' \
-        'n/purge/n/' \
+        "n/purge/(@comp_purge_opts@)/" \
         'n/refresh/n/' \
-        'n/reload/n/' \
-        'n/update/n/' \
+        "n/reload/(@comp_reload_opts@)/" \
+        "n/update/(@comp_reload_opts@)/" \
         'n/whatis/`_module_avail; echo "@comp_whatis_opts@"`/' \
         "n/apropos/(@comp_search_opts@)/" \
         "n/search/(@comp_search_opts@)/" \
@@ -82,12 +82,7 @@ complete module 'C,/*,f,' 'C,.*,f,' 'C,~/*,f,' \
         'n/path/`_module_avail; echo "@comp_mfile_opts@"`/' \
         'n/edit/`_module_avail`/' \
         'n/sh-to-mod/n/' \
-        'n/source/n/' \
-        'n/initadd/n/' \
-        'n/initprepend/n/' \
-        'n/initrm/n/' \
-        'n/initlist/n/' \
-        'n/initclear/n/' \
+        'n/source/f/' \
         "n/append-path/(@comp_path_opts@)/" \
         "n/prepend-path/(@comp_path_opts@)/" \
         "n/remove-path/(@comp_rm_path_opts@)/" \
@@ -96,11 +91,11 @@ complete module 'C,/*,f,' 'C,.*,f,' 'C,~/*,f,' \
         "n/state/n/" \
         'n/lint/`_module_avail; echo "@comp_lint_opts@"`/' \
         'n/mod-to-sh/`_module_not_yet_loaded; echo "@comp_modtosh_opts@"`/' \
-        "n/reset/n/" \
-        "n/stash/n/" \
+        "n/reset/(@comp_reset_opts@)/" \
+        "n/stash/(@comp_stash_opts@)/" \
         "n/stashclear/n/" \
         "n/stashlist/(@comp_stashlist_opts@)/" \
-        'n/stashpop/`_module_stashlist`/' \
+        'n/stashpop/`_module_stashlist; echo "@comp_stashpop_opts@"`/' \
         'n/stashrm/`_module_stashlist`/' \
         'n/stashshow/`_module_stashlist`/' \
         'n/cachebuild/d/' \

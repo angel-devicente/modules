@@ -1,15 +1,312 @@
 .. _MIGRATING:
 
 New features
-************
+============
 
 This document describes the major changes occurring between versions of
 Modules. It provides an overview of the new features and changed behaviors
 that will be encountered when upgrading.
 
 
+v5.7
+----
+
+This new version is backward-compatible with previous version 5 release. It
+fixes bugs but also introduces new functionalities that are described in this
+section. See the :ref:`5.7 release notes<5.7 release notes>` for a complete
+list of the changes between Modules v5.6 and v5.7.
+
+Improving evaluation performances
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We observed that Modules could feel slow when evaluating more than one hundred
+modulefiles within a single command. To address this, several improvements
+have been implemented:
+
+* In-memory caching of expensive operations: the results of costly operations,
+  such as module specification comparisons, are now cached in memory.
+
+* Reworked environment synchronization between Tcl interpreters: environment
+  synchronization during Tcl modulefile evaluation has been redesigned to rely
+  on Tcl’s internal mechanisms rather than a custom reimplementation. As part
+  of this change, calls to the Tcl ``append`` command have been replaced with
+  ``set``, which reliably triggers synchronization when environment variables
+  are modified.
+
+* More efficient dependency checks: when verifying dependencies against loaded
+  modules, comparisons are now limited to the subset of loaded modules that
+  match the module root name specification, instead of comparing against all
+  loaded modules.
+
+* Lighter-weight resolution of an exact ``name/version`` specification: sites
+  with a modulepath directory holding hundreds or thousands of sibling
+  modulefiles reported slow ``module load`` commands even when the requested
+  version already exists. Correctly computing the implicit ``default`` and
+  ``latest`` symbolic versions of such a directory used to require validating
+  every sibling modulefile in it. The lookup now walks candidate versions from
+  the dictionary-highest to the dictionary-lowest and stops validating as soon
+  as this can be answered: either a higher valid version is found (the
+  requested one is then known not to be ``default`` or ``latest``), or the
+  requested version itself is reached, in which case
+  nothing higher exists. This bypasses the exhaustive scan without changing
+  the resolved result.
+
+For this work, the :command:`mb` utility was extended with new benchmark tests
+that loads 137 modulefiles (``load2``), lists the loaded modules (``list2``),
+and then purges them. Running this benchmark highlights the performance
+improvements, as shown in the table below:
+
++---------+-------------+--------------------+
+|         |      v5.6.1 |             v5.7.0 |
++=========+=============+====================+
+|   load2 |     1038 ms |      384 ms (-63%) |
++---------+-------------+--------------------+
+|   list2 |      222 ms |       29 ms (-87%) |
++---------+-------------+--------------------+
+|   purge |      568 ms |      303 ms (-46%) |
++---------+-------------+--------------------+
+
+A ``load3`` benchmark test was also added, loading a low, non-default
+version of a module out of 500 sibling versions in the same directory. It
+specifically exercises the lighter-weight resolution described above:
+
++---------+-------------+--------------------+
+|         |     v5.6.1  |             v5.7.0 |
++=========+=============+====================+
+|   load3 |       30 ms |       19 ms (-36%) |
++---------+-------------+--------------------+
+
+These measurements were obtained on a system where all modulefiles are stored
+on local flash storage. If your modulefiles reside on a shared network
+filesystem, using a `Module cache`_ is strongly recommended.
+
+A module cache file aggregates the content of all the modulercs and
+modulefiles found in a modulepath and this whole file is evaluated when a
+module search occurs, even if the search targets specific modules. On setups
+with a very large number of modulefiles, resulting in cache files of several
+megabytes, evaluating the whole cache file may take longer than walking
+through the modulepath directory to find the few requested modules. The new
+:mconfig:`ignore_cache_subcmds` configuration option defines a list of
+module sub-commands on which module cache files are ignored. For instance to
+keep cache benefit on listing sub-commands but avoid its penalty on targeted
+ones:
+
+.. parsed-literal::
+
+    :ps:`$` module config ignore_cache_subcmds load:try-load:load-any
+
+When the configuration option is changed from its default value using the
+:subcmd:`config` sub-command, the :envvar:`MODULES_IGNORE_CACHE_SUBCMDS`
+environment variable is defined accordingly. See
+:envvar:`MODULES_IGNORE_CACHE_SUBCMDS` for details.
+
+Reorder existing entries in path-like variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A new :mconfig:`path_entry_reorder` configuration option is introduced to
+control how path-like environment variables are modified when
+:mfcmd:`prepend-path`, :mfcmd:`append-path` or :subcmd:`use` target a path
+entry that is already defined in the environment variable.
+
+By default, this configuration option is set to ``0``, meaning that when a
+path entry already exists, the environment variable is left unchanged. When
+set to ``1``, an existing entry is reordered to the beginning or the end of
+the variable, depending on the command used, unless duplicates are explicitly
+allowed.
+
+.. parsed-literal::
+
+    :ps:`$` module append-path PATHVAR /foo
+    :ps:`$` module append-path PATHVAR /bar
+    :ps:`$` module append-path PATHVAR /foo
+    :ps:`$` echo $PATHVAR
+    /foo:/bar
+    :ps:`$` module config path_entry_reorder 1
+    :ps:`$` module append-path PATHVAR /foo
+    :ps:`$` echo $PATHVAR
+    /bar:/foo
+    :ps:`$` module append-path --duplicates PATHVAR /bar
+    :ps:`$` echo $PATHVAR
+    /bar:/foo:/bar
+
+The default value of :mconfig:`path_entry_reorder` can be defined at
+installation time with the :instopt:`--enable-path-entry-reorder` option. When
+the configuration option is changed from its default value using the
+:subcmd:`config` sub-command, the :envvar:`MODULES_PATH_ENTRY_REORDER`
+environment variable is defined accordingly. See
+:envvar:`MODULES_PATH_ENTRY_REORDER` for details.
+
+.. _Linked environment variables:
+
+Linked environment variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A new configuration option, :mconfig:`linked_envvars`, can be used to
+automatically mirror environment variable changes onto other environment
+variables.
+
+When a modulefile modifies an environment variable using commands such as
+:mfcmd:`setenv`, :mfcmd:`unsetenv`, :mfcmd:`prepend-path`,
+:mfcmd:`append-path`, :mfcmd:`remove-path` or :mfcmd:`pushenv`, the same
+operation is also applied to all variables linked through the
+:mconfig:`linked_envvars` configuration option.
+
+For example, with the following configuration:
+
+.. parsed-literal::
+
+    :ps:`$` module config linked_envvars "CPATH&INCLUDE_PATH"
+
+loading a module that prepends a directory to ``CPATH``:
+
+.. parsed-literal::
+
+    :sgrcm:`prepend-path` CPATH /opt/pkg/include
+
+will also prepend the same directory to ``INCLUDE_PATH``.
+
+Links are directional. In the previous example, changes made to ``CPATH`` are
+also applied to ``INCLUDE_PATH``, but changes made directly to
+``INCLUDE_PATH`` are not applied back to ``CPATH`` unless an explicit reverse
+link is configured.
+
+When enabling this feature, note that existing values are not synchronized
+when the link is established. Only subsequent modifications performed through
+modulefile environment variable commands are propagated to linked variables.
+
+The output of ``module display`` also includes the environment variable
+changes applied to linked environment variables, making these propagated
+updates visible before a module is loaded.
+
+.. _Init environment variables:
+
+Initialize environment variables on first modification
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A new configuration option, :mconfig:`init_envvars`, has been added to define
+initial values for environment variables that are modified through path-like
+modulefile commands.
+
+This feature is particularly useful for variables such as ``MANPATH``, which
+require a leading or trailing colon character to preserve access to the system
+default search paths. Previously, modifying an undefined ``MANPATH`` could
+prevent system manual pages from being found. See the :ref:`man-path` cookbook
+for details.
+
+The :mconfig:`init_envvars` option defines a colon-separated list of
+``VARIABLE_NAME=initial_value`` entries. When a path-like operation is applied
+to an environment variable that is not currently set, the configured initial
+value is assigned before the modification is performed.
+
+For example, with the following configuration:
+
+.. parsed-literal::
+
+    :ps:`$` module config init_envvars MANPATH=
+
+loading a module that prepends a directory to ``MANPATH``:
+
+.. parsed-literal::
+
+    :sgrcm:`prepend-path` MANPATH /opt/pkg/man
+
+will keep a colon character at the end of ``MANPATH``
+
+.. parsed-literal::
+
+    :ps:`$` echo $MANPATH
+    /opt/pkg/man:
+
+This mechanism applies to all path-like environment variable management
+commands, including :mfcmd:`append-path`, :mfcmd:`prepend-path` and
+:mfcmd:`remove-path`.
+
+When values are later removed from an environment variable, it is
+automatically unset if its resulting value matches the configured initial
+value and no explicit reference counter is associated with it.
+
+Hook API
+^^^^^^^^
+
+Site code that needs to run right before or after a modulefile or modulerc
+evaluation could so far only be attached through the ``trace`` Tcl command or
+by renaming an internal :file:`modulecmd.tcl` procedure, both of which bind
+to implementation details that may change from one Modules version to the
+next.
+
+A new ``add-hook`` siteconfig command is introduced to register a procedure
+on one of four stable events without relying on such internal details:
+:mhook:`before-modulefile-eval`, :mhook:`after-modulefile-eval`,
+:mhook:`before-modulerc-eval` and :mhook:`after-modulerc-eval`. Several
+procedures can be registered on the same event; they are then called in
+their registration order.
+
+.. code-block:: tcl
+
+   proc auditRequestedLoad {modfile modname modnamevr modspec mode requested} {
+      if {$requested && $mode eq {load}} {
+         set fd [open /var/log/modules-audit.log a]
+         puts $fd "[clock format [clock seconds]] $modnamevr"
+         close $fd
+      }
+   }
+   add-hook before-modulefile-eval auditRequestedLoad
+
+An error raised by a hook procedure is reported but does not abort the
+running ``module`` command nor prevent other procedures registered on the
+same event from running, since these hooks fire on nearly every modulefile
+or modulerc evaluation.
+
+See the *Hooks* section of :manpage:`module(1)` man page for the full
+argument contract of each event. The ``trace``/rename techniques remain
+available for anything not (yet) covered by a hook event.
+
+These four events are only the first ones introduced through ``add-hook``;
+additional hook events will be added in the future as real site needs for
+them come up. See :ref:`add-new-hook-event` for the guide contributors can
+follow to propose one.
+
+Ignore files in modulepath
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Modulepath directories sometimes hold files that are not modulefiles, like
+helper scripts sourced by modulefiles or software installation files when
+modulefiles are mixed with the software trees they describe. The new
+:mfcmd:`modulepath-ignore` modulefile command lets modulepath maintainers
+describe from rc files such content to ignore when searching for
+modulefiles. Ignored files and directories are handled as if they do not
+exist: they are not checked, not walked down, not reported and not recorded
+in modulepath cache file. Cache build time and size are thus kept
+proportional to the number of actual modulefiles, whatever the amount of
+other files stored in modulepath.
+
+Patterns follow the same syntax and behavior than git with
+:file:`.gitignore` files. For instance to ignore every file with the
+``.tcl`` extension and the whole content of the ``soft`` directory, add to
+the ``.modulerc`` file at the root of the modulepath::
+
+    modulepath-ignore *.tcl soft/
+
+Negated patterns switch to an *ignore all, accept some* logic. For instance
+to only take files with the ``.mod`` extension into account::
+
+    modulepath-ignore * !*/ !*.mod
+
+When defined in a ``.modulerc`` file located within a modulepath, patterns
+are relative to the directory of this rc file. When defined in a global or
+user rc file, patterns apply to every modulepath. As ignored elements are
+excluded from cache files when they are built, pattern definitions should
+not be conditional.
+
+The :mconfig:`modulepath_ignore` configuration option, enabled by default,
+controls whether pattern definitions are applied. Patterns can be skipped
+for one command execution with the :option:`--no-modulepath-ignore` command
+line switch, which helps finding out whether a module is missing because it
+is ignored.
+
+
 v5.6
-====
+----
 
 This new version is backward-compatible with previous version 5 release. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -17,7 +314,7 @@ section. See the :ref:`5.6 release notes<5.6 release notes>` for a complete
 list of the changes between Modules v5.5 and v5.6.
 
 spider sub-command
-------------------
+^^^^^^^^^^^^^^^^^^
 
 Support has been added for the :subcmd:`spider` sub-command introduced by the
 `Lmod`_ project. This sub-command lists available modules found in enabled
@@ -55,7 +352,7 @@ modulepaths and recursively found in modulepaths enabled by available modules.
     -------------- :sgrdi:`/path/to/modulefiles.3` (via bar/1) --------------
     qux/1  qux/2
 
-The :subcmd:`spider` sub-command relies on the :ref:Extra match search
+The :subcmd:`spider` sub-command relies on the :ref:`Extra match search`
 mechanism to scan modulefiles and identify the modulepaths they enable. Since
 all modulefiles are evaluated during this scan, it is recommended to build
 and use a :ref:`Module cache` to improve search performance.
@@ -113,7 +410,7 @@ By default, the *via* information is included in the standard output of the
 .. _Requiring via module:
 
 Requiring *via* module
-----------------------
+^^^^^^^^^^^^^^^^^^^^^^
 
 A loaded module that enables a modulepath is considered the *via* module of
 other loaded modules whose modulefiles are stored in this modulepath. The
@@ -181,7 +478,7 @@ unloaded.
     :sgrl:`loaded`  :sgrdi:`modulepath`
 
 Always see hidden modules
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``hidden`` element is a new allowed value for the :mconfig:`avail_output`,
 :mconfig:`avail_terse_output`, :mconfig:`list_output`,
@@ -203,7 +500,7 @@ When set, this is equivalent to always adding the :option:`--all` command-line
 option.
 
 Issue warning upon module evaluation
-------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The mfcmd:`module-warn` modulefile Tcl command is introduced to define warning
 message to print when loading specified modulefiles.
@@ -229,7 +526,7 @@ The ``warning`` tag is set on modules targeted by a mfcmd:`module-warn`
 command.
 
 Simplified way to define module help message
---------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Until now module help message was defined through a specific Tcl procedure
 that outputs text to *stderr* channel:
@@ -256,7 +553,7 @@ procedure anymore. As :mfcmd:`module-help` is reported on module *display*
 evaluation, help message will also be visible there.
 
 Support for newline character in environment variable value
------------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 It is now possible on *sh*, *bash*, *ksh*, *zsh* and *fish* shells to set
 value for environment variable that contains newline character:
@@ -283,7 +580,7 @@ single quotes rather escaping each special characters:
     value'; export BAR;
 
 Declare additional elements provided by a module
-------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 New :mfcmd:`provide` modulefile command is added to declare additional
 elements included in a modulefile. When the modulefile is loaded, each
@@ -295,7 +592,7 @@ for the module.
 
     :ps:`$` module show foo
     -------------------------------------------------------------------
-    :sgrhi:`/path/to/modulefiles/mp4/foo/1`:
+    :sgrhi:`/path/to/modulefiles/foo/1`:
 
     :sgrcm:`provide`         liba/1.2 libb/2.1
     :sgrcm:`conflict`        foo
@@ -399,7 +696,7 @@ modulefile commands.
 
 
 v5.5
-====
+----
 
 This new version is backward-compatible with previous version 5 release. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -409,7 +706,7 @@ list of the changes between Modules v5.4 and v5.5.
 .. _Logging activity:
 
 Logging activity
-----------------
+^^^^^^^^^^^^^^^^
 
 The ability to log module command activity is now available out of the box. It
 could be enabled on previous versions by using a specific
@@ -469,7 +766,7 @@ Some messages can also be sent during modulefile evaluation by using the
     Apr 29 07:47:51 hostname modules[3777835]: user="username" mode="load" module="foo/1.0" specified="foo/1.0" modulefile="/path/to/modulefiles/foo/1.0" requested="1"
 
 Negating extra match search criteria
-------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``not:`` prefix string is introduced for extra specifier and variant
 criteria. When this prefix is used, the search criteria where it is applied is
@@ -505,7 +802,7 @@ This prefix is recognized on module search context (i.e., :subcmd:`avail`,
 :subcmd:`whatis` and :subcmd:`paths` sub-commands).
 
 PowerShell support
-------------------
+^^^^^^^^^^^^^^^^^^
 
 Support for PowerShell (``pwsh``) is added. This shell may be used with
 Modules on either Unix or Windows platforms. All main :ref:`kind of
@@ -520,7 +817,7 @@ contain the required files to setup PowerShell support.
 .. _Conflict unload MIGRATING:
 
 Conflict unload
----------------
+^^^^^^^^^^^^^^^
 
 Automated module handling is enhanced with the addition of a new mechanism:
 *Conflict Unload*. When loading a module, this new mechanism automatically
@@ -588,7 +885,7 @@ if the loaded environment satisfies the dependencies of the module to reload.
       :sgrin:`Reloading dependent`: bar/3
 
 Improved automated module handling mechanisms
----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Along with the introduction of *Conflict Unload* mechanism, some of the
 existing automated module handling mechanisms have been adapted and enhanced.
@@ -652,7 +949,7 @@ option.
 .. _Specific modulepath for requirements:
 
 Specific modulepath for requirements
-------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A ``--modulepath`` option is introduced on the :mfcmd:`always-load`,
 :mfcmd:`depends-on`, :mfcmd:`prereq`, :mfcmd:`prereq-all` and
@@ -717,7 +1014,7 @@ module will automatically be unloaded.
     :ps:`$` module purge
     :ps:`$` module load bar/1
     :ps:`$` echo $_LMFILES_
-    /path/to/othermfiles/mp2/bar/1
+    /path/to/othermfiles/bar/1
     :ps:`$` module load foo/1
     Loading :sgrhi:`bar/1`
       :sgrer:`ERROR`: Module already loaded from a different modulepath
@@ -734,7 +1031,7 @@ module will automatically be unloaded.
 
 
 v5.4
-====
+----
 
 This new version is backward-compatible with previous version 5 release. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -742,7 +1039,7 @@ section. See the :ref:`5.4 release notes<5.4 release notes>` for a complete
 list of the changes between Modules v5.3 and v5.4.
 
 Enhancing extra specifiers
---------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Extra specifier ``tag`` is introduced to search modules based on tags applied.
 It applies to :subcmd:`avail`, :subcmd:`whatis` and :subcmd:`paths`
@@ -777,7 +1074,7 @@ modules providing any of these variant values.
     foo/1{:sgrvahi:`%a`,\ :sgrvahi:`b`,\ :sgrvahi:`c`}
 
 Purging sticky modules
-----------------------
+^^^^^^^^^^^^^^^^^^^^^^
 
 The :mconfig:`sticky_purge` configuration option is added to define the
 behavior of :subcmd:`purge` sub-command when unloading a sticky or
@@ -806,7 +1103,7 @@ emit a ``warning`` message instead or to be ``silent``.
 
 
 Specific modulepath labels
---------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 :mfcmd:`modulepath-label` command is introduced to define a label to use to
 designate modulepath in module :subcmd:`avail` output. This new command should
@@ -822,7 +1119,7 @@ be used in global or modulepath-specific rc files.
     foo/1.0  foo/2.0
 
 Unique module name loaded
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The configuration option :mconfig:`unique_name_loaded` is introduced to allow
 only one module loaded per module name. It is similar to the *One name rule*
@@ -855,7 +1152,7 @@ module :subcmd:`config` sub-command or at installation time with
 :instopt:`--enable-unique-name-loaded` configure script option.
 
 Cache sourced files
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 You may have gathered common Tcl code files used by all your modulefiles in
 Tcl files that are sourced with :manpage:`source(n)` Tcl command. When loading
@@ -909,7 +1206,7 @@ amount of I/O operations:
 .. _Abort on error:
 
 Abort on error
---------------
+^^^^^^^^^^^^^^
 
 When an error occurs during the evaluation of a modulefile, several module
 sub-commands, like :subcmd:`load` or :subcmd:`unload`, continue their
@@ -984,7 +1281,7 @@ When :instopt:`--enable-new-features` installation option is set, the
 :subcmd:`switch` sub-commands.
 
 Improve error reporting
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 
 Module evaluation error reports have been tweaked to appear where these errors
 occur rather reporting them on the message block of the main action. Such
@@ -1044,7 +1341,7 @@ conflicts rather the generic conflict module specification.
         HINT: Might try "module unload foo/1" first.
 
 New options for source-sh modulefile command
---------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Support for new *shell* mode named ``bash-eval`` is added to
 :mfcmd:`source-sh` modulefile command. With this new mode, the generated
@@ -1112,7 +1409,7 @@ This ``--ignore`` option can be used with any *shell* supported by
 
 
 v5.3
-====
+----
 
 This new version is backward-compatible with previous version 5 release. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -1120,7 +1417,7 @@ section. See the :ref:`5.3 release notes<5.3 release notes>` for a complete
 list of the changes between Modules v5.2 and v5.3.
 
 Module cache
-------------
+^^^^^^^^^^^^
 
 A module cache file can be created under each modulepath directory with new
 :subcmd:`cachebuild` sub-command. Cache file is named :file:`.modulecache` and
@@ -1198,7 +1495,7 @@ Cache file of enabled modulepaths can be deleted all at once with
 :subcmd:`cacheclear` sub-command.
 
 Querying available module variants
-----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A new mechanism named :ref:`Extra match search` is introduced to evaluate
 modulefiles during a module search to find those matching an extra query on a
@@ -1273,7 +1570,7 @@ query.
     :sgrde:`default-version`  {:sgrva:`variant=value`} 
 
 Extra specifiers
-----------------
+^^^^^^^^^^^^^^^^
 
 Extra specifiers are introduced to query content of modulefiles. They can be
 specified with *element:name* syntax as part of module specification on module
@@ -1329,7 +1626,7 @@ version higher or equal to ``1.2`` and variant ``toolchain=a`` selected.
    definitions or as extra specifier values are not resolved.
 
 Append or subtract elements to current option value
----------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For command-line switches and configuration options whose value is a
 colon-separated list, it is now possible to append or subtract elements to the
@@ -1370,7 +1667,7 @@ updated to report variant information:
 
 
 v5.2
-====
+----
 
 This new version is backward-compatible with previous version 5 release. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -1378,7 +1675,7 @@ section. See the :ref:`5.2 release notes<5.2 release notes>` for a complete
 list of the changes between Modules v5.1 and v5.2.
 
 Optional requirements
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 The ``--optional`` option has been added to the :mfcmd:`prereq`,
 :mfcmd:`prereq-all`, :mfcmd:`depends-on` and :mfcmd:`always-load` modulefile
@@ -1424,7 +1721,7 @@ loaded without the *try-load* modules, but now it gets automatically reloaded
 if *try-load* module is loaded afterward, to take it into account.
 
 Linting modulefiles
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 Static analysis of modulefile, modulerc and global/user rc is now possible
 with :subcmd:`lint` sub-command. It relies on an external program defined with
@@ -1516,7 +1813,7 @@ repositories`_.
 .. _EPEL and Fedora repositories: https://src.fedoraproject.org/rpms/nagelfar
 
 mod-to-sh sub-command
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 New sub-command is added to translate modulefile into shell code:
 :subcmd:`mod-to-sh`. It evaluates modulefiles passed as argument and produces
@@ -1563,7 +1860,7 @@ All shells supported by :file:`modulecmd.tcl` script are supported by
 .. _Initial environment:
 
 Initial environment
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 When Modules initializes, it evaluates the :file:`initrc` and
 :file:`modulespath` configuration files to enable default modulepaths and load
@@ -1628,7 +1925,7 @@ other value corresponds to the name of a collection to restore.
 .. _Stashing environment:
 
 Stashing environment
---------------------
+^^^^^^^^^^^^^^^^^^^^
 
 The ability to stash current environment is added with the introduction of the
 :subcmd:`stash` sub-command. When called current environment is saved in a
@@ -1703,7 +2000,7 @@ or all together with :subcmd:`stashclear`.
     No stash collection.
 
 Siteconfig hook variables
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Several Tcl variables are introduced for :ref:`Site-specific configuration`
 script to define specific commands and variables in the evaluation context of
@@ -1784,7 +2081,7 @@ modulerc evaluation.
 
 
 v5.1
-====
+----
 
 This new version is backward-compatible with previous version 5 release. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -1792,7 +2089,7 @@ section. See the :ref:`5.1 release notes<5.1 release notes>` for a complete
 list of the changes between Modules v5.0 and v5.1.
 
 Control output redirection
---------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Since version 4.0, the :command:`module` function is initialized differently
 on *sh*, *bash*, *ksh*, *zsh* and *fish* shells when their session is found
@@ -1822,7 +2119,7 @@ also added to change the output redirection behavior for a single command:
 .. _Change modulefile command behavior:
 
 Change modulefile command behavior
-----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Depending on the evaluation mode of the modulefile (e.g. *load*, *unload*,
 *display*, etc) commands have different behavior. Most common example is the
@@ -1886,7 +2183,7 @@ choose between unsetting variable, setting a value or performing no operation
 when modulefile is unloaded.
 
 Reducing number of I/O operations
----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A new configuration option named :mconfig:`mcookie_check` is introduced to
 control the verification made to files to determine if they are modulefiles.
@@ -1950,7 +2247,7 @@ See the :ref:`reduce-io-load` cookbook recipe to learn additional features of
 Modules that could be leveraged to lower the number of I/O operations.
 
 Shell command completion
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 New modulefile commands :mfcmd:`complete` and :mfcmd:`uncomplete` are added to
 get the ability to respectively define and unset command completion. *bash*,
@@ -1983,7 +2280,7 @@ also been updated to track shell completion changes.
         ...bash completion code...}
 
 Lmod Tcl modulefile support
----------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With this new version, Modules now supports Tcl modulefiles written for
 `Lmod`_, the alternative :command:`module` implementation developed in Lua.
@@ -2005,7 +2302,7 @@ be compatible with existing modulefiles or scripts relying on such variable.
 .. _More tagging capabilities:
 
 More tagging capabilities
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The new :option:`--tag` option helps to define extra tags onto a loading
 module. These tags comes in addition to those inherited from the module state
@@ -2093,7 +2390,7 @@ disabled by default.
    handled by Modules version 5.1 and above.
 
 v5.0
-====
+----
 
 With this new major version the :command:`module` experience has been updated
 to benefit by default from all the advanced behaviors and features developed
@@ -2104,7 +2401,7 @@ Modules v4.8 and v5.0. The :ref:`changes<Modules 5 changes>` document gives an
 in-depth view of the modified behaviors.
 
 Upgraded default configuration
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Release after release, new advanced features were added on Modules 4. They
 were set off by default to avoid breaking change during the version 4 cycle.
@@ -2181,7 +2478,7 @@ configuration file.
   :mconfig:`silent_shell_debug` configuration option to activate.
 
 Removing compatibility version
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ability to co-install version 3.2 of Modules along newer version is
 discontinued. The installation option ``--enable-compat-version``,
@@ -2199,7 +2496,7 @@ document that describes the differences of this version compared to the newer
 releases.
 
 Improving Modules initialization
---------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Modules initialization files are now installed by default in the *etc*
 directory designated by the :instopt:`--etcdir` installation option. The
@@ -2244,7 +2541,7 @@ ensures that the loaded environment is fully inherited from parent shell:
     alias foo='echo foo'
 
 Simplifying path-like variable reference counting
--------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The reference counting mechanism used for path-like environment variable
 enables to determine if a path entry has been added several times (by several
@@ -2320,7 +2617,7 @@ module sub-commands when called from the command-line.
 
 
 v4.8
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -2330,7 +2627,7 @@ list of the changes between Modules v4.7 and v4.8.
 .. _Editing modulefiles:
 
 Editing modulefiles
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 :subcmd:`edit` sub-command is introduced to give the ability to open
 modulefiles in a text editor. Modulefiles can be specified like with any other
@@ -2369,7 +2666,7 @@ the default value of :mconfig:`editor` configuration option but are overridden
 by the :envvar:`MODULES_EDITOR` environment variable.
 
 Using version range in version list
------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The :ref:`Advanced module version specifiers` mechanism has been improved to
 allow the use of version range (*@:version*, *@vers1:vers2* or *@version:*)
@@ -2383,7 +2680,7 @@ supported. Thus it can be either used from the command-line or when writing
 modulefiles, for instance to hide or tag modules or to declare requirements.
 
 Try module load with no complain if not found
----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Add the :subcmd:`try-load` sub-command that tries to load the modulefile
 passed as argument, like the :subcmd:`load` sub-command, but does not raise an
@@ -2422,7 +2719,7 @@ another modulefile
      1) foo/1.0
 
 Module variants
----------------
+^^^^^^^^^^^^^^^
 
 :ref:`Module variants` is a new mechanism that allows to pass arguments to
 evaluated modulefiles in order to achieve different environment variable or
@@ -2522,7 +2819,7 @@ builds that are compatible between each other.
       :sgrin:`Loading requirement`: bar/1.2\ :sgrse:`{`:sgrva:`-debug`:sgrse:`:`:sgrva:`toolchain=a`:sgrse:`}`
 
 Variant shortcuts
------------------
+^^^^^^^^^^^^^^^^^
 
 The :mconfig:`variant_shortcut` configuration option is added to define
 shortcut characters for easily specifying variants. Instead of writing the
@@ -2551,7 +2848,7 @@ Configured shortcuts are also used to report the loaded variant on
 
 
 v4.7
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -2559,7 +2856,7 @@ section. See the :ref:`4.7 release notes<4.7 release notes>` for a complete
 list of the changes between Modules v4.6 and v4.7.
 
 Determining module implementation and version
----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 New Modules variables are introduced to determine during the evaluation of a
 modulefile or a modulerc what *module* implementation is currently in use. The
@@ -2588,7 +2885,7 @@ The :mfvar:`ModuleTool` and :mfvar:`ModuleToolVersion` variables and the
 starting version ``8.4.8``.
 
 Symbolic version to designate module loaded version
----------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When the `Advanced module version specifiers`_ is enabled, the ``loaded``
 symbolic version may be used to designate the currently loaded version of
@@ -2611,7 +2908,7 @@ If no version of specified module can be found loaded, an error is returned.
     :sgrer:`ERROR`: No loaded version found for 'foo' module
 
 Module tags
------------
+^^^^^^^^^^^
 
 Module tags are piece of information that can be associated to individual
 modulefiles. Tags could be purely informational or may lead to specific
@@ -2696,37 +2993,86 @@ attached to.
 Tags inherited from module state, consequence of a module action or set by
 using :mfcmd:`module-tag` but that have a special meaning currently are:
 
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| Tag              | Description             | Set with              | Abbr. | Color                |
-|                  |                         |                       |       |                      |
-+==================+=========================+=======================+=======+======================+
-| auto-loaded      | Module has been loaded  | Inherited             | aL    | .. parsed-literal::  |
-|                  | automatically           |                       |       |     :sgral:`mod/1.0` |
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| forbidden        | Module cannot be loaded | Inherited from        | F     | .. parsed-literal::  |
-|                  |                         | :mfcmd:`module-forbid`|       |     :sgrf:`mod/1.0`  |
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| hidden           | Module is not visible   | Inherited from        | H     | .. parsed-literal::  |
-|                  | on :subcmd:`avail`      | :mfcmd:`module-hide`  |       |     :sgrh:`mod/1.0`  |
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| hidden-loaded    | See `Hiding loaded      | Inherited from        | H     | .. parsed-literal::  |
-|                  | modules`_               | :mfcmd:`module-hide`  |       |     :sgrh:`mod/1.0`  |
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| loaded           | Module is currently     | Inherited             | L     | .. parsed-literal::  |
-|                  | loaded                  |                       |       |     :sgrl:`mod/1.0`  |
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| nearly-forbidden | Module will soon not be | Inherited from        | nL    | .. parsed-literal::  |
-|                  | able to load anymore    | :mfcmd:`module-forbid`|       |     :sgrnf:`mod/1.0` |
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| sticky           | See `Sticky modules`_   | :mfcmd:`module-tag`   | S     | .. parsed-literal::  |
-|                  |                         |                       |       |     :sgrs:`mod/1.0`  |
-+------------------+-------------------------+-----------------------+-------+----------------------+
-| super-sticky     | See `Sticky modules`_   | :mfcmd:`module-tag`   | sS    | .. parsed-literal::  |
-|                  |                         |                       |       |     :sgrss:`mod/1.0` |
-+------------------+-------------------------+-----------------------+-------+----------------------+
+.. only:: html
+
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | Tag              | Description             | Set with               | Abbr. | Color                  |
+    |                  |                         |                        |       |                        |
+    +==================+=========================+========================+=======+========================+
+    | auto-loaded      | Module has been loaded  | Inherited              | aL    | .. parsed-literal::    |
+    |                  | automatically           |                        |       |                        |
+    |                  |                         |                        |       |     :sgral:`mod/1.0`   |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | forbidden        | Module cannot be loaded | Inherited from         | F     | .. parsed-literal::    |
+    |                  |                         | :mfcmd:`module-forbid` |       |                        |
+    |                  |                         |                        |       |     :sgrf:`mod/1.0`    |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | hidden           | Module is not visible   | Inherited from         | H     | .. parsed-literal::    |
+    |                  | on :subcmd:`avail`      | :mfcmd:`module-hide`   |       |                        |
+    |                  |                         |                        |       |     :sgrh:`mod/1.0`    |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | hidden-loaded    | See `Hiding loaded      | Inherited from         | H     | .. parsed-literal::    |
+    |                  | modules`_               | :mfcmd:`module-hide`   |       |                        |
+    |                  |                         |                        |       |     :sgrh:`mod/1.0`    |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | loaded           | Module is currently     | Inherited              | L     | .. parsed-literal::    |
+    |                  | loaded                  |                        |       |                        |
+    |                  |                         |                        |       |     :sgrl:`mod/1.0`    |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | nearly-forbidden | Module will soon not be | Inherited from         | nL    | .. parsed-literal::    |
+    |                  | able to load anymore    | :mfcmd:`module-forbid` |       |                        |
+    |                  |                         |                        |       |     :sgrnf:`mod/1.0`   |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | sticky           | See `Sticky modules`_   | :mfcmd:`module-tag`    | S     | .. parsed-literal::    |
+    |                  |                         |                        |       |                        |
+    |                  |                         |                        |       |     :sgrs:`mod/1.0`    |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+    | super-sticky     | See `Sticky modules`_   | :mfcmd:`module-tag`    | sS    | .. parsed-literal::    |
+    |                  |                         |                        |       |                        |
+    |                  |                         |                        |       |     :sgrss:`mod/1.0`   |
+    +------------------+-------------------------+------------------------+-------+------------------------+
+
+.. only:: not html
+
+    +------------------+-------------------------+------------------------+-------+
+    | Tag              | Description             | Set with               | Abbr. |
+    |                  |                         |                        |       |
+    +==================+=========================+========================+=======+
+    | auto-loaded      | Module has been loaded  | Inherited              | aL    |
+    |                  | automatically           |                        |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
+    | forbidden        | Module cannot be loaded | Inherited from         | F     |
+    |                  |                         | :mfcmd:`module-forbid` |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
+    | hidden           | Module is not visible   | Inherited from         | H     |
+    |                  | on :subcmd:`avail`      | :mfcmd:`module-hide`   |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
+    | hidden-loaded    | See `Hiding loaded      | Inherited from         | H     |
+    |                  | modules`_               | :mfcmd:`module-hide`   |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
+    | loaded           | Module is currently     | Inherited              | L     |
+    |                  | loaded                  |                        |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
+    | nearly-forbidden | Module will soon not be | Inherited from         | nL    |
+    |                  | able to load anymore    | :mfcmd:`module-forbid` |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
+    | sticky           | See `Sticky modules`_   | :mfcmd:`module-tag`    | S     |
+    |                  |                         |                        |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
+    | super-sticky     | See `Sticky modules`_   | :mfcmd:`module-tag`    | sS    |
+    |                  |                         |                        |       |
+    |                  |                         |                        |       |
+    +------------------+-------------------------+------------------------+-------+
 
 Hiding loaded modules
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 The ``--hidden-loaded`` option has been added to the :mfcmd:`module-hide`
 modulefile command and it indicates that designated hidden modules remain
@@ -2777,7 +3123,7 @@ load or unload, the new verbosity level ``verbose2`` can be used (with
       :sgrin:`Loading requirement`: bar/1.0
 
 Sticky modules
---------------
+^^^^^^^^^^^^^^
 
 Module stickiness is introduced, in a similar fashion than on the `Lmod`_
 project, to allow to glue modules to the loaded environment. A sticky module
@@ -2853,7 +3199,7 @@ super-sticky module can be swapped by another version of this same module:
      1) :sgrs:`baz/1.0`
 
 Explaining avail/list output
-----------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A *Key* section is added at the end of the :subcmd:`avail` and :subcmd:`list`
 sub-commands output to give hints on the meaning of the graphical rendition
@@ -2871,7 +3217,7 @@ module name stand for.
     :sgrdi:`modulepath`  :sgrali:`module-alias`     <module-tag>
 
 Configuring avail/list output
------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 New configuration options are introduced to control what content to output in
 addition to modules names on the regular and terse output modes of the
@@ -2967,7 +3313,7 @@ modulepaths are reported as a single list:
    options.
 
 v4.6
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -2977,7 +3323,7 @@ list of the changes between Modules v4.5 and v4.6.
 .. _sh-to-mod_sub-command:
 
 sh-to-mod sub-command
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 The :subcmd:`sh-to-mod` sub-command is added to output as a modulefile content
 the environment changes done by the evaluation of a shell script passed as
@@ -3018,7 +3364,7 @@ those two scripts are currently still provided for compatibility purpose.
 .. _source-sh_modulefile_command:
 
 source-sh modulefile command
-----------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The :mfcmd:`source-sh` modulefile command is introduced to source environment
 changes done by the evaluation of a shell script passed as argument. With
@@ -3083,7 +3429,7 @@ working directory are tracked. The following shells are supported: *sh*,
 *dash*, *csh*, *tcsh*, *bash*, *ksh*, *ksh93*, *zsh* and *fish*.
 
 Querying user's name and groups membership
-------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Two new sub-commands are introduced for the :mfcmd:`module-info` modulefile
 command: ``username`` and ``usergroups``. They respectively fetch the name of
@@ -3111,7 +3457,7 @@ is member of:
 modulefile command are only supported on Unix platform.
 
 Hiding modules
---------------
+^^^^^^^^^^^^^^
 
 The newly introduced :mfcmd:`module-hide` modulefile command enables to
 dynamically hide modulefiles, module aliases or symbolic versions specified to
@@ -3246,7 +3592,7 @@ unaffected by this option and stay hidden.
     bar/2.0       foo/2.0  quuz/1.0  qux/1.0
 
 Forbidding use of modules
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The :mfcmd:`module-forbid` modulefile command is added to dynamically forbid
 the evaluation of modulefiles it specifies. When forbidden, a module cannot be
@@ -3282,8 +3628,8 @@ to guide for instance users when they try to evaluate a forbidden module:
       Software bar/1.0 is decommissioned, please now use bar/2.0
 
 When an evaluated module will soon be forbidden, a message is returned to the
-user to warn him/her of the near limit. An additional warning message can
-also be defined here with the ``--nearly-message`` option to guide users.
+user to warn them of the near limit. An additional warning message can also be
+defined here with the ``--nearly-message`` option to guide users.
 
 .. parsed-literal::
 
@@ -3309,7 +3655,7 @@ controlled at :file:`configure` time with
 environment variable is set.
 
 Tracing module execution
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``trace`` verbosity is introduced between the ``verbose`` and ``debug``
 levels to report details on module searches, resolutions, selections and
@@ -3334,7 +3680,7 @@ palette with a default value of ``2`` (decreased intensity).
 
 
 v4.5
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -3342,7 +3688,7 @@ section. See the :ref:`4.5 release notes<4.5 release notes>` for a complete
 list of the changes between Modules v4.4 and v4.5.
 
 ml command
-----------
+^^^^^^^^^^
 
 The ``ml`` command is added to Modules. ``ml`` is a frontend to the ``module``
 command that reduces the number of characters to type to trigger module
@@ -3381,7 +3727,7 @@ a similar user experience whatever the module implementation used.
 .. _Lmod: https://github.com/TACC/Lmod
 
 JSON format output
-------------------
+^^^^^^^^^^^^^^^^^^
 
 The ``-j`` and ``--json`` command line switches are added for the ``avail``,
 ``list``, ``savelist``, ``whatis`` and ``search`` module sub-commands. When
@@ -3423,7 +3769,7 @@ set, the output result of these sub-commands is rendered in `JSON`_ format:
 .. _JSON: https://tools.ietf.org/html/rfc8259
 
 Improved Windows support
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 A new option to the ``./configure`` script named
 :instopt:`--enable-windows-support` is introduced to install additional files
@@ -3454,7 +3800,7 @@ The :ref:`INSTALL-win` document describes how to install Modules on Windows
 from the distribution zipball.
 
 Error stack trace
------------------
+^^^^^^^^^^^^^^^^^
 
 Error messages will now embed a stack trace for unknown errors to help
 localize the root cause of issues. This change applies to modulefile
@@ -3489,7 +3835,7 @@ A stack trace is also returned when an unknown error occurs in
 .. _Automatic default and latest syms:
 
 Automatic default and latest symbolic versions
-----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When the implicit default mechanism and the `Advanced module version
 specifiers`_ are both enabled, a ``default`` and a ``latest`` symbolic
@@ -3509,7 +3855,7 @@ alias or a regular module version already exists for these ``default`` or
 
 
 v4.4
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -3525,7 +3871,7 @@ list of the changes between Modules v4.3 and v4.4.
 .. _Insensitive case:
 
 Specify modules in a case insensitive manner
---------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ability to match module name in a case insensitive manner has been added.
 This feature can be enabled at different level with the following values set
@@ -3556,7 +3902,7 @@ other icase configurations. When this command-line switch is passed, ``icase``
 mode equals ``always``.
 
 Extended default
-----------------
+^^^^^^^^^^^^^^^^
 
 The extended default mechanism has been introduced to help selecting a module
 when only the first numbers in its version are specified. Starting portion of
@@ -3627,7 +3973,7 @@ Extended default activation can be controlled at configure time with the
 the **config** sub-command with the ``extended_default`` option.
 
 Advanced module version specifiers
-----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ability to specify finer constraints on module version has been added to
 Modules. It enables to filter the module selection to a given version list or
@@ -3730,7 +4076,7 @@ which could be set through the **config** sub-command with the
 
 
 v4.3
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -3738,7 +4084,7 @@ section. See the :ref:`4.3 release notes<4.3 release notes>` for a complete
 list of the changes between Modules v4.2 and v4.3.
 
 Modulepath rc file
-------------------
+^^^^^^^^^^^^^^^^^^
 
 A ``.modulerc`` file found at the root of an enabled modulepath directory is
 now evaluated when modulepath is walked through to locate modulefiles. This
@@ -3748,7 +4094,7 @@ kind of module alias would not be found unless if it is defined at the
 modulepath global scope.
 
 Further I/O operations optimization
------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Additional work has been performed to save a significant number of filesystem
 I/O operations made to search and evaluate modulefiles.
@@ -3779,7 +4125,7 @@ pass. Moreover ``.modulerc`` and ``.version`` read access is tested only if
 these files are found in the directory.
 
 Colored output
---------------
+^^^^^^^^^^^^^^
 
 The ability to graphically enhance some part of the produced output has been
 added to improve readability. Among others, error, warning and info message
@@ -3839,7 +4185,7 @@ than ``0``. Color mode set with these two variables is superseded by mode set
 with ``MODULES_COLOR`` environment variable.
 
 Configure modulecmd with config sub-command
--------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The **config** sub-command has been added to ``module`` to help getting or
 setting the **modulecmd.tcl** options. With no additional command-line
@@ -3879,7 +4225,7 @@ script and Modules-related environment variables. Providing the output of the
 project will help to analyze the situation.
 
 Control module command verbosity
---------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ability to control message verbosity has been added so ``module`` command
 can be configured whether it should display more or less information.
@@ -3907,7 +4253,7 @@ verbosity configuration to respectively set module command silent, verbose or
 in debug mode.
 
 Other new sub-commands, command-line switches and environment variables
------------------------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * The **avail** sub-command gets two new command-line switches: **--indepth**
   and **--no-indepth**. These options control whether search results should
@@ -3992,7 +4338,7 @@ Other new sub-commands, command-line switches and environment variables
 
 
 v4.2
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -4002,7 +4348,7 @@ list of the changes between Modules v4.1 and v4.2.
 .. _v42-conflict-constraints-consistency:
 
 Modulefile conflict constraints consistency
--------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the **conflict** modulefile command, a given modulefile can list the
 other modulefiles it conflicts with. To load this modulefile, the modulefiles
@@ -4060,7 +4406,7 @@ solved, modulefile load will be discarded.
 .. _v42-prereq-constraints-consistency:
 
 Modulefile prereq constraints consistency
------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the **prereq** modulefile command, a given modulefile can list the
 other modulefiles it pre-requires. To load this modulefile, the modulefiles it
@@ -4109,7 +4455,7 @@ constraints of the loaded modulefiles in an environment variable called
 .. _v42-by-passing-module-constraints:
 
 By-passing module defined constraints
--------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ability to by-pass a **conflict** or a **prereq** constraint defined by
 modulefiles is introduced with the ``--force`` command line switch (``-f`` for
@@ -4157,7 +4503,7 @@ constraints corresponding to the **prereq** and **conflict** they declare, the
 .. _v42-automated-module-handling-mode:
 
 Automated module handling mode
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An automatic management of the dependencies between modulefiles has been added
 and it is called *automated module handling mode*. This new mode consists in
@@ -4225,7 +4571,7 @@ actions will be refined over the next feature releases.
 .. _v42-consistency-module-load-unload-commands:
 
 Consistency of module load/unload commands in modulefile
---------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the **module load** modulefile command, a given modulefile can
 automatically load a modulefile it pre-requires. Similarly with the **module
@@ -4285,7 +4631,7 @@ Modules version now that consistency is checked:
 .. _v42-alias-symbolic-name-consistency:
 
 Modulefile alias and symbolic modulefile name consistency
----------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the **module-alias** and **module-version** modulefile commands,
 alternative names can be given to a modulefile. When these names are used to
@@ -4338,7 +4684,7 @@ names of the loaded modulefiles in an environment variable called
 .. _v42-variable-change-through-modulefile-evaluation:
 
 Environment variable change through modulefile evaluation context
------------------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 All environment variable edition commands (``setenv``, ``unsetenv``,
 ``append-path``, ``prepend-path`` and ``remove-path``) have been updated to:
@@ -4361,7 +4707,7 @@ save performances on this global evaluation mode.
 .. _v42-versioned-magic-cookie:
 
 Express Modules compatibility of modulefile with versioned magic cookie
------------------------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Any modulefile should start with the ``#%Module`` file signature (also called
 the Modules magic cookie) and sometimes a version number may be placed right
@@ -4380,7 +4726,7 @@ set.
 .. _v42-module-message-report:
 
 Improved module message report
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Module sub-commands like ``load``, ``unload`` or ``switch``, may perform
 multiple load or unload modulefile evaluations in a row. Also these kind of
@@ -4411,7 +4757,7 @@ the process:
       Loading requirement: bar/4.5
 
 New modulefile commands
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 
 2 new modulefile Tcl commands have been introduced:
 
@@ -4420,7 +4766,7 @@ New modulefile commands
 
 
 v4.1
-====
+----
 
 This new version is backward-compatible with previous version 4 releases. It
 fixes bugs but also introduces new functionalities that are described in this
@@ -4430,7 +4776,7 @@ list of the changes between Modules v4.0 and v4.1.
 .. _Virtual modules:
 
 Virtual modules
----------------
+^^^^^^^^^^^^^^^
 
 A virtual module stands for a module name associated to a modulefile. The
 modulefile is the script interpreted when loading or unloading the virtual
@@ -4446,7 +4792,7 @@ With this feature it is now possible to dynamically define modulefiles
 depending on the context.
 
 Extend module command with site-specific Tcl code
--------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``module`` command can now be extended with site-specific Tcl
 code. ``modulecmd.tcl`` now looks at a **siteconfig.tcl** file in an
@@ -4462,7 +4808,7 @@ without having to touch the main ``modulecmd.tcl``.
 .. _Quarantine mechanism:
 
 Quarantine mechanism to protect module execution
-------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To protect the module command run-time environment from side effect
 coming from the current environment definition a quarantine mechanism
@@ -4487,7 +4833,7 @@ Quarantine mechanism is available for all supported shells except ``csh``
 and ``tcsh``.
 
 Pager support
--------------
+^^^^^^^^^^^^^
 
 The informational messages Modules sends on the *stderr* channel may
 sometimes be quite long. This is especially the case for the avail
@@ -4507,7 +4853,7 @@ variables or command-line switches (``--no-pager``, ``--paginate``).
    effects coming from the system general pager configuration.
 
 Module function to return value in scripting languages
-------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 On Tcl, Perl, Python, Ruby, CMake and R scripting shells, module function
 was not returning value and until now an occurred error led to raising a
@@ -4525,7 +4871,7 @@ instance in Python::
       # failure
 
 New modulefile commands
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 
 4 new modulefile Tcl commands have been introduced:
 
@@ -4548,7 +4894,7 @@ If no loaded modulefile matches the ``module-info loaded`` query, an empty
 string is returned.
 
 New module sub-commands
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 
 Modulefile-specific commands are sometimes wished to be used outside of a
 modulefile context. Especially for the commands managing path variables
@@ -4580,7 +4926,7 @@ of the ``module-info loaded`` modulefile command:
 
 
 v4.0
-====
+----
 
 Major evolution occurs with this v4.0 release as the traditional *module*
 command implemented in C is replaced by the native Tcl version. This full
@@ -4597,7 +4943,7 @@ features that have been discontinued in this new major release or the
 features where a behavior change can be noticed.
 
 New features
-------------
+^^^^^^^^^^^^
 
 On its overall this major release brings a lot more robustness to the
 *module* command with now more than 4000 non-regression tests crafted
@@ -4606,19 +4952,19 @@ with fair amount of improved functionalities. The major new features are
 described in this section.
 
 Additional shells supported
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""
 
 Modules v4 introduces support for **fish**, **lisp**, **tcl** and **R**
 code output.
 
 Non-zero exit code in case of error
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""""""""
 
 All module sub-commands will now return a non-zero exit code in case of error
 whereas Modules v3.2 always returned zero exit code even if issue occurred.
 
 Output redirect
-^^^^^^^^^^^^^^^
+"""""""""""""""
 
 Traditionally the *module* command output text that should be seen by the
 user on *stderr* since shell commands are output to *stdout* to change
@@ -4627,7 +4973,7 @@ output text is redirected to *stdout* after shell command evaluation if
 shell is in interactive mode.
 
 Filtering avail output
-^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""
 
 Results obtained from the **avail** sub-command can now be filtered to only
 get the default version of each module name with use of the **--default**
@@ -4640,7 +4986,7 @@ sorted version of each module name with use of the **--latest** or **-L**
 command line switch.
 
 Extended support for module alias and symbolic version
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Module aliases are now included in the result of the **avail**, **whatis**
 and **apropos** sub-commands. They are displayed in the module path
@@ -4660,7 +5006,7 @@ resolution path to also apply to the relative modulefile if it still
 correspond to the same module name.
 
 Hiding modulefiles
-^^^^^^^^^^^^^^^^^^
+""""""""""""""""""
 
 Visibility of modulefiles can be adapted by use of file mode bits or file
 ownership. If a modulefile should only be used by a given subset of persons,
@@ -4675,7 +5021,7 @@ to access directly a hidden modulefile or when accessing a symbol or an alias
 targeting a hidden modulefile.
 
 Improved modulefiles location
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""
 
 When looking for an implicit default in a modulefile directory, aliases
 are now taken into account in addition to modulefiles and directories to
@@ -4691,7 +5037,7 @@ on this kind of access not readable ``.modulerc`` or ``.version`` files are
 ignored rather producing a missing magic cookie error.
 
 Module collection
-^^^^^^^^^^^^^^^^^
+"""""""""""""""""
 
 Modules v4 introduces support for module *collections*. Collections
 describe a sequence of **module use** then **module load** commands that
@@ -4713,7 +5059,7 @@ variable. Saving collection registers the target footprint by suffixing
 the collection filename with ``.$MODULES_COLLECTION_TARGET``.
 
 Path variable element counter
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""
 
 Modules 4 provides path element counting feature which increases a
 reference counter each time a given path entry is added to a given
@@ -4727,7 +5073,7 @@ modulefiles can append ``/usr/local/bin`` to ``PATH``, which is not unloaded
 until all the modulefiles that loaded it unload too.
 
 Optimized I/O operations
-^^^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""""
 
 Substantial work has been done to reduce the number of I/O operations
 done during global modulefile analysis commands like **avail** or
@@ -4743,7 +5089,7 @@ between each modulerc interpretation.
 .. _Sourcing modulefiles:
 
 Sourcing modulefiles
-^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""
 
 Modules 4 introduces the possibility to **source** a modulefile rather
 loading it. When it is sourced, a modulefile is interpreted into the shell
@@ -4757,21 +5103,21 @@ and *module load* commands.
 
 
 Removed features and substantial behavior changes
--------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Following sections provide list of Modules v3.2 features that are
 discontinued on Modules v4 or features with a substantial behavior change
 that should be taken in consideration when migrating to v4.
 
 Package initialization
-^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""
 
 ``MODULESBEGINENV`` environment snapshot functionality is not supported
 anymore on Modules v4. Modules collection mechanism should be used instead to
 **save** and **restore** sets of enabled modulepaths and loaded modulefiles.
 
 Command line switches
-^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""
 
 Some command line switches are not supported anymore on v4.0. When still
 using them, a warning message is displayed and the command is ran with these
@@ -4786,7 +5132,7 @@ unsupported switches ignored. Following command line switches are concerned:
 * ``--userlvl`` lvl, ``-u`` lvl
 
 Module sub-commands
-^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""
 
 During an **help** sub-command, Modules v4 does not redirect output made
 on stdout in *ModulesHelp* Tcl procedure to stderr. Moreover when running
@@ -4832,7 +5178,7 @@ Following Modules sub-commands are not supported anymore on v4.0:
 
 
 Modules specific Tcl commands
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""
 
 Modules v4 provides path element counting feature which increases a reference
 counter each time a given path entry is added to a given environment
@@ -4869,7 +5215,7 @@ commands are ignored. Following Modules specific Tcl commands are concerned:
 
 
 Further reading
----------------
+^^^^^^^^^^^^^^^
 
 To get a complete list of the differences between Modules v3.2 and v4,
 please read the :ref:`changes` document.

@@ -1,0 +1,79 @@
+name: macos-tests
+
+on:
+  push:
+    branches:
+      - main
+      - v*.*.x
+  pull_request:
+    branches:
+      - main
+      - v*.*.x
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-15
+    env:
+      CONFIGURE_OPTS: |
+        --prefix=/tmp/modules
+        --with-loadedmodules=null:dot
+        --with-tcl=/opt/homebrew/lib
+        --with-tclsh=/opt/homebrew/bin/tclsh
+      COVERAGE: y
+      EXTRA_SCRIPT_PRETEST: make install-testsiteconfig-1 && export TESTSUITE_ENABLE_SITECONFIG=1
+      EXTRA_SCRIPT_POSTTEST: unset TESTSUITE_ENABLE_SITECONFIG
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install system packages
+        run: |
+          brew update
+          brew install autoconf md5sha1sum expect dejagnu grep fish r tcl-tk gzip powershell sphinx-doc
+      - name: Build Modules
+        run: |
+          # handle CONFIGURE_OPTS differently than on linux tests as bash version here
+          # does not support "mapfile" builtin. as a result, CONFIGURE_OPTS cannot contain
+          # here whitespace or shell specific characters like ';'
+          ./configure $CONFIGURE_OPTS
+          make
+      - name: Test Modules build
+        run: |
+          # specific compiling to enable DYLD library insertion
+          for f in lib/testutil-*.c; do
+            n=$(basename "$f" .c)
+            clang -dynamiclib -arch arm64 -arch arm64e -o lib/lib${n}.dylib lib/${n}.c
+          done
+          eval $EXTRA_SCRIPT_PRETEST
+          make test-deps
+          script/mt
+          eval $EXTRA_SCRIPT_POSTTEST
+      - name: Install Modules
+        run: |
+          make install
+      - name: Test Modules installation
+        run: |
+          script/mt install
+          for f in tcl/*.tcl; do
+            script/nglfar2ccov $f
+          done
+          cd lib
+          gcov envmodules
+      - name: Uninstall Modules
+        run: |
+          make uninstall
+      - uses: codecov/codecov-action@v7
+        with:
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: testsuite-logs-${{ github.job }}
+          path: |
+            modules.log
+            install.log
+          retention-days: 5

@@ -1,0 +1,11 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/Boost/1.82.0-GCC-12.3.0
+conflict Boost
+depends-on GCC/12.3.0
+depends-on bzip2/1.0.8-GCCcore-12.3.0
+depends-on zlib/1.2.13-GCCcore-12.3.0
+depends-on XZ/5.4.2-GCCcore-12.3.0
+depends-on zstd/1.5.5-GCCcore-12.3.0
+depends-on ICU/73.2-GCCcore-12.3.0
+setenv	BOOST_ROOT		"/software/Boost/1.82.0-GCC-12.3.0"

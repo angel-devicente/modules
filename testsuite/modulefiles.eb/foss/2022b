@@ -1,0 +1,10 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/foss/2022b
+conflict foss
+depends-on GCC/12.2.0
+depends-on OpenMPI/4.1.4-GCC-12.2.0
+depends-on FlexiBLAS/3.2.1-GCC-12.2.0
+depends-on FFTW/3.3.10-GCC-12.2.0
+depends-on FFTW.MPI/3.3.10-gompi-2022b
+depends-on ScaLAPACK/2.2.0-gompi-2022b-fb

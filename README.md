@@ -1,12 +1,15 @@
-# <img src="https://raw.githubusercontent.com/envmodules/modules/main/doc/img/modules_red.svg" height="180" alt="Modules"/>
+# <img src="https://raw.githubusercontent.com/envmodules/modules/main/share/logo/modules_logo_text.svg" height="180" alt="Modules"/>
 
 [![Linux Build Status](https://github.com/envmodules/modules/workflows/linux-tests/badge.svg)](https://github.com/envmodules/modules/actions?query=workflow:linux-tests)
+[![OS X Build Status](https://github.com/envmodules/modules/workflows/macos-tests/badge.svg)](https://github.com/envmodules/modules/actions?query=workflow:macos-tests)
 [![Windows Build Status](https://github.com/envmodules/modules/workflows/windows-tests/badge.svg)](https://github.com/envmodules/modules/actions?query=workflow:windows-tests)
-[![FreeBSD/OS X/Linux Build Status](https://api.cirrus-ci.com/github/envmodules/modules.svg)](https://cirrus-ci.com/github/envmodules/modules)
 [![Coverage Status](https://codecov.io/gh/envmodules/modules/branch/main/graph/badge.svg)](https://codecov.io/gh/envmodules/modules)
 [![Documentation Status](https://readthedocs.org/projects/modules/badge/?version=latest)](https://modules.readthedocs.io/en/latest/?badge=latest)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/envmodules/modules/badge)](https://scorecard.dev/viewer/?uri=github.com/envmodules/modules)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13922/badge)](https://www.bestpractices.dev/projects/13922)
 [![Packaging status](https://repology.org/badge/tiny-repos/environment-modules.svg)](https://repology.org/metapackage/environment-modules/versions)
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/EnvModules.svg?style=social&label=Follow)](https://twitter.com/EnvModules)
+[![Bluesky](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpublic.api.bsky.app%2Fxrpc%2Fapp.bsky.actor.getProfile%2F%3Factor%3Denvmodules.bsky.social&query=%24.followersCount&style=social&logo=bluesky&label=%40EnvModules)](https://bsky.app/profile/envmodules.bsky.social)
+[![Matrix](https://img.shields.io/matrix/modules%3Amatrix.org?color=darkcyan)](https://matrix.to/#/#modules:matrix.org)
 
 Modules, provides dynamic modification of a user's environment
 ==============================================================
@@ -83,14 +86,6 @@ Requirements
  * Tcl >= 8.5
 
 
-License
--------
-
-Modules is distributed under the GNU General Public License, either version 2
-or (at your option) any later version (`GPL-2.0-or-later`). Read the file
-`COPYING.GPLv2` for details.
-
-
 Documentation
 -------------
 
@@ -110,7 +105,7 @@ type:
 
 The following man pages are provided:
 
-    module(1), ml(1), envml(1), modulefile(5)
+    module(1), ml(1), modulecmd(1), envml(1), modulefile(5)
 
 
 Test suite
@@ -131,11 +126,10 @@ ability to test this installation with:
 Links
 -----
 
-* Web site: http://modules.sourceforge.net
+* Web site: https://envmodules.io
 * Online documentation: https://modules.readthedocs.io
 * GitHub source repository: https://github.com/envmodules/modules
 * GitHub Issue tracking system: https://github.com/envmodules/modules/issues
-* SourceForge project page: http://sourceforge.net/projects/modules/
 
 
 Community
@@ -145,14 +139,15 @@ Modules is an open source project. Questions, discussion, and contributions
 are welcome. You can get in contact with the Modules community via:
 
 * the [modules-interest mailing list][6]
-  (`modules-interest@lists.sourceforge.net`)
+  (`modules-interest@lists.hpsf.io`)
 * the [Modules chat room][7] (`#modules:matrix.org`)
+* the [Technical Steering Committee meeting][8]
 
 The project is also present on several social media platforms:
 
-* X/Twitter: [@EnvModules][8]
-* Mastodon: [@EnvModules@mast.hpc.social][9]
-* Bluesky: [@EnvModules.bsky.social][10]
+* X/Twitter: [@EnvModules][9]
+* Mastodon: [@EnvModules@mast.hpc.social][10]
+* Bluesky: [@EnvModules.bsky.social][11]
 
 
 Contributing
@@ -160,30 +155,47 @@ Contributing
 
 Modules project welcomes contributions of all kinds! Before submitting an
 issue or pull request, please take a moment to review our [Contributing
-guide][11]. It includes important information about issue reporting, coding
+guide][12]. It includes important information about issue reporting, coding
 standards, etc.
 
-Please note that Modules project has a [Code of conduct][12]. It ensures a
+Please note that Modules project has a [Code of conduct][13]. It ensures a
 respectful and inclusive environment for all contributors. By participating in
 the Modules community, you agree to abide by its rules.
 
-This project also adheres to a [Technical charter][13], which defines its
+
+Governance
+----------
+
+Modules is part of the [High Performance Software Foundation](https://hpsf.io)
+within the [Linux Foundation](http://linuxfoundation.org).
+
+This project adheres to a [Technical charter][14], which defines its
 governance model, decision-making process, and long-term vision.
+
+
+License
+-------
+
+Modules is distributed under the GNU General Public License, either version 2
+or (at your option) any later version (`GPL-2.0-or-later`). Read the file
+`COPYING` for details.
 
 
 Authors
 -------
 
-Modules current core developer and maintainer is Xavier Delaruelle,
-xavier.delaruelle@cea.fr
+Modules current maintainers are:
 
-Many thanks go to the [contributors][14] of the Modules project.
+* Xavier Delaruelle, xavier.delaruelle@cea.fr
+* Adrien Cotte, adrien.cotte@asplus.fr
+
+Many thanks go to the [contributors][15] of the Modules project.
 
 
 Acknowledgments
 ---------------
 
-We would like to express our gratitude to [CEA][15] for the resources and
+We would like to express our gratitude to [CEA][16] for the resources and
 funding provided to the project over the recent years.
 
 The following people have notably contributed to Modules and Modules would not
@@ -205,13 +217,14 @@ be what it is without their contributions:
 [3]: https://modules.readthedocs.io/en/stable/MIGRATING.html
 [4]: https://modules.readthedocs.io/en/stable/NEWS.html
 [5]: https://modules.readthedocs.io/en/stable/changes.html
-[6]: https://sourceforge.net/projects/modules/lists/modules-interest
+[6]: https://lists.hpsf.io/g/modules-interest
 [7]: https://matrix.to/#/#modules:matrix.org
-[8]: https://x.com/EnvModules
-[9]: https://mast.hpc.social/@EnvModules
-[10]: https://bsky.app/profile/envmodules.bsky.social
-[11]: https://modules.readthedocs.io/en/latest/CONTRIBUTING.html
-[12]: CODE_OF_CONDUCT.md
-[13]: https://modules.readthedocs.io/en/latest/CHARTER.html
-[14]: https://github.com/envmodules/modules/graphs/contributors
-[15]: https://www.cea.fr/english
+[8]: https://modules.readthedocs.io/en/latest/CONTRIBUTING.html#tsc-meeting
+[9]: https://x.com/EnvModules
+[10]: https://mast.hpc.social/@EnvModules
+[11]: https://bsky.app/profile/envmodules.bsky.social
+[12]: https://modules.readthedocs.io/en/latest/CONTRIBUTING.html
+[13]: CODE_OF_CONDUCT.md
+[14]: https://modules.readthedocs.io/en/latest/CHARTER.html
+[15]: https://github.com/envmodules/modules/graphs/contributors
+[16]: https://www.cea.fr/english

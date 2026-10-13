@@ -1,0 +1,8 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/fontconfig/2.14.1-GCCcore-12.2.0
+conflict fontconfig
+depends-on GCCcore/12.2.0
+depends-on expat/2.4.9-GCCcore-12.2.0
+depends-on freetype/2.12.1-GCCcore-12.2.0
+depends-on util-linux/2.38.1-GCCcore-12.2.0

@@ -1,0 +1,10 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/git/2.42.0-GCCcore-13.2.0
+conflict git
+depends-on GCCcore/13.2.0
+depends-on cURL/8.3.0-GCCcore-13.2.0
+depends-on expat/2.5.0-GCCcore-13.2.0
+depends-on gettext/0.22-GCCcore-13.2.0
+depends-on Perl/5.38.0-GCCcore-13.2.0
+depends-on OpenSSL/1.1

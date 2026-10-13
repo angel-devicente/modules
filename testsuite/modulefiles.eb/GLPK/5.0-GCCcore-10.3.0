@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/GLPK/5.0-GCCcore-10.3.0
+conflict GLPK
+depends-on GCCcore/10.3.0
+depends-on GMP/6.2.1-GCCcore-10.3.0

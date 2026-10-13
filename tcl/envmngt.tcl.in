@@ -3,7 +3,7 @@
 # ENVMNGT.TCL, environment management procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -39,52 +39,51 @@ proc updateErrorCount {count} {
 }
 
 proc renderFalse {} {
-   if {[isStateDefined false_rendered]} {
-      reportDebug {false already rendered}
-   # no shell code to render false if shell not set
-   } elseif {[isStateDefined shell]} {
-      # setup flag to render only once
-      setState false_rendered 1
+   if {[isStateDefined false_rendered] || ![isStateDefined shell]} {
+      return
+   }
 
-      # render a false value most of the time through a variable assignment
-      # that will be looked at in the shell module function calling
-      # modulecmd.tcl to return in turns a boolean status. Except for python
-      # and cmake, the value assigned to variable is also returned as the
-      # entire rendering status
-      switch -- [getState shelltype] {
-         sh - csh - fish {
-            # no need to set a variable on real shells as last statement
-            # result can easily be checked
-            lappend ::g_shcode_out {test 0 = 1;}
-         }
-         tcl {
-            lappend ::g_shcode_out {set _mlstatus 0;}
-         }
-         cmd {
-            lappend ::g_shcode_out {set errorlevel=1}
-         }
-         perl {
-            lappend ::g_shcode_out {{ no strict 'vars'; $_mlstatus = 0; }}
-         }
-         python {
-            lappend ::g_shcode_out {_mlstatus = False}
-         }
-         ruby {
-            lappend ::g_shcode_out {_mlstatus = false}
-         }
-         lisp {
-            lappend ::g_shcode_out {nil}
-         }
-         cmake {
-            lappend ::g_shcode_out {set(_mlstatus FALSE)}
-         }
-         r {
-            lappend ::g_shcode_out {mlstatus <- FALSE}
-         }
-         pwsh {
-            lappend ::g_shcode_out {Set-Variable -Name "_mlstatus" -Value\
-               $false -Scope Global}
-         }
+   # setup flag to render only once
+   setState false_rendered 1
+
+   # render a false value most of the time through a variable assignment
+   # that will be looked at in the shell module function calling
+   # modulecmd.tcl to return in turns a boolean status. Except for python
+   # and cmake, the value assigned to variable is also returned as the
+   # entire rendering status
+   switch -- [getState shelltype] {
+      sh - csh - fish {
+         # no need to set a variable on real shells as last statement
+         # result can easily be checked
+         lappend ::g_shcode_out {test 0 = 1;}
+      }
+      tcl {
+         lappend ::g_shcode_out {set _mlstatus 0;}
+      }
+      cmd {
+         lappend ::g_shcode_out {set errorlevel=1}
+      }
+      perl {
+         lappend ::g_shcode_out {{ no strict 'vars'; $_mlstatus = 0; }}
+      }
+      python {
+         lappend ::g_shcode_out {_mlstatus = False}
+      }
+      ruby {
+         lappend ::g_shcode_out {_mlstatus = false}
+      }
+      lisp {
+         lappend ::g_shcode_out {nil}
+      }
+      cmake {
+         lappend ::g_shcode_out {set(_mlstatus FALSE)}
+      }
+      r {
+         lappend ::g_shcode_out {mlstatus <- FALSE}
+      }
+      pwsh {
+         lappend ::g_shcode_out {Set-Variable -Name "_mlstatus" -Value $false\
+            -Scope Global}
       }
    }
 }
@@ -1178,13 +1177,10 @@ end}
       }
       cmake {
          if {[getConf quarantine_support]} {
-            set pre_exec "\n      execute_process(COMMAND \${_mlre} $tclshbin\
-            \"$::argv0\" cmake "
+            set pre_exec "COMMAND \${_mlre} $tclshbin \\\"$::argv0\\\" cmake"
          } else {
-            set pre_exec "\n      execute_process(COMMAND $tclshbin\
-            \"$::argv0\" cmake "
+            set pre_exec "COMMAND $tclshbin \\\"$::argv0\\\" cmake"
          }
-         set post_exec "\n         OUTPUT_FILE \${tempfile_name})\n"
          set fdef {function(module)
    cmake_policy(SET CMP0007 NEW)}
          if {[getConf quarantine_support]} {
@@ -1195,14 +1191,15 @@ end}
       foreach(_mlv ${_mlv_list})
          if(${_mlv} MATCHES "^[A-Za-z_][A-Za-z0-9_]*$")
             if(DEFINED ENV{${_mlv}})
-               set(_mlre "${_mlre}__MODULES_QUAR_${_mlv}=$ENV{${_mlv}};")
+               string(APPEND _mlre
+                      " [===[__MODULES_QUAR_${_mlv}=$ENV{${_mlv}}]===]")
             endif()
             set(_mlrv "MODULES_RUNENV_${_mlv}")
-            set(_mlre "${_mlre}${_mlv}=$ENV{${_mlrv}};")
+            string(APPEND _mlre " [===[${_mlv}=$ENV{${_mlrv}}]===]")
         endif()
       endforeach()
       if (NOT "${_mlre}" STREQUAL "")
-         set(_mlre "env;${_mlre}__MODULES_QUARANTINE_SET=1;")
+         set(_mlre "env ${_mlre} __MODULES_QUARANTINE_SET=1")
       endif()
    endif()}
          }
@@ -1211,23 +1208,17 @@ end}
    execute_process(COMMAND mktemp -t moduleinit.cmake.XXXXXXXXXXXX
       OUTPUT_VARIABLE tempfile_name
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-   if(${ARGC} EQUAL 1)}
-            # adapt command definition depending on the number of args to be
-            # able to pass to some extend (<5 args) empty string element to
-            # modulecmd (no other way as empty element in ${ARGV} are skipped
-            append fdef "$pre_exec\"\${ARGV0}\"$post_exec"
-            append fdef {   elseif(${ARGC} EQUAL 2)}
-            append fdef "$pre_exec\"\${ARGV0}\" \"\${ARGV1}\"$post_exec"
-            append fdef {   elseif(${ARGC} EQUAL 3)}
-            append fdef "$pre_exec\"\${ARGV0}\" \"\${ARGV1}\"\
-               \"\${ARGV2}\"$post_exec"
-            append fdef {   elseif(${ARGC} EQUAL 4)}
-            append fdef "$pre_exec\"\${ARGV0}\" \"\${ARGV1}\"\
-               \"\${ARGV2}\" \"\${ARGV3}\"$post_exec"
-            append fdef {   else()}
-            append fdef "$pre_exec\${ARGV}$post_exec"
-            append fdef {   endif()
-   if(EXISTS ${tempfile_name})
+}
+   append fdef "   set(quotedArgs \"$pre_exec\")"
+   append fdef {
+   cmake_parse_arguments(PARSE_ARGV 0 FWD "" "" "")
+   foreach(arg IN LISTS FWD_UNPARSED_ARGUMENTS)
+      string(APPEND quotedArgs " [===[${arg}]===]")
+   endforeach()
+   string(APPEND quotedArgs " OUTPUT_FILE ${tempfile_name}")
+   cmake_language(EVAL CODE "execute_process(${quotedArgs})")
+}
+   append fdef {   if(EXISTS ${tempfile_name})
       include(${tempfile_name})
       file(REMOVE ${tempfile_name})
    endif()
@@ -1447,6 +1438,21 @@ proc isEnvVarDefined {var_name} {
    return [info exists ::env($var_name)]
 }
 
+# Get list of valid variable names found in run_quarantine configuration
+# option, cleared from duplicate entries. Warn about invalid names if asked
+proc getQuarantineVarList {{report_bad 0}} {
+   set var_list {}
+   foreach var [split [getConf run_quarantine]] {
+      if {[regexp {^[A-Za-z_][A-Za-z0-9_]*$} $var]} {
+         lappendNoDup var_list $var
+      } elseif {$report_bad && [string length $var]} {
+         reportWarning "Bad variable name set in MODULES_RUN_QUARANTINE\
+            ($var)"
+      }
+   }
+   return $var_list
+}
+
 proc setEnvVarIfUndefined {var_name value} {
    if {![isEnvVarDefined $var_name]} {
       set ::env($var_name) $value
@@ -1464,7 +1470,7 @@ proc set-env {var val} {
       if {[getState is_win] && $val eq {}} {
          unset-env $var
       } else {
-         interp-sync-env set $var $val
+         set ::env($var) $val
 
          unsetEnvVarAsCleared $var
 
@@ -1484,8 +1490,19 @@ proc isEnvVarProtected {var_name} {
    return [expr {$var_name in [getConfList protected_envvars]}]
 }
 
+proc hasEnvVarInitValue {var_name} {
+   if {![isConfDefined init_envvars]} {
+      getConf init_envvars
+   }
+   return [info exists ::g_initEnvvars($var_name)]
+}
+
+proc envVarInitValue {var_name} {
+   return $::g_initEnvvars($var_name)
+}
+
 proc reset-to-unset-env {var {val {}}} {
-   interp-sync-env set $var $val
+   set ::env($var) $val
    # set var as cleared if val is empty
    if {$val eq {}} {
       setEnvVarAsCleared $var
@@ -1519,7 +1536,7 @@ proc unset-env {var {internal 0} {val {}}} {
       # internal variables (like ref counter var) are purely unset if they
       # exists
       } elseif {[isEnvVarDefined $var]} {
-         interp-sync-env unset $var
+         unset ::env($var)
          set intwasset 1
       }
 
@@ -1650,6 +1667,9 @@ proc unload-path {cmd mode dflbhv args} {
       allow_dup idx_val ign_refcount val_set_is_delim glob_match bhv var\
       path_list
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    switch -- $bhv {
       noop {
          return [list $bhv $var]
@@ -1771,6 +1791,17 @@ proc unload-path {cmd mode dflbhv args} {
       set newpath $dir_list
    }
 
+   # clear environment variable if new value equals initial value
+   if {[hasEnvVarInitValue $var] && [envVarInitValue $var] eq [join $newpath\
+      $separator]} {
+      set init_value [envVarInitValue $var]
+      if {!$isrefcount || ![info exists countarr($init_value)] ||\
+         $countarr($init_value) <= 1} {
+         set newpath [list]
+         unset -nocomplain countarr($init_value)
+      }
+   }
+
    # set env variable and corresponding reference counter in any case
    if {![llength $newpath]} {
       unset-env $var
@@ -1800,11 +1831,26 @@ proc add-path {cmd mode dflbhv args} {
          path_list
    }
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    # clean any previously defined pushenv stack
    unset-env [getPushenvVarName $var] 1
 
+   set sharevar [getModshareVarName $var]
+   set isrefcount [expr {$sharevar ne {}}]
+
+   # use initial value defined for env var if not yet defined
+   if {![isEnvVarDefined $var] && [hasEnvVarInitValue $var]} {
+      set init_value [envVarInitValue $var]
+      set-env $var $init_value
+      # setup reference counter in case of empty string entry
+      if {$init_value eq {} && $isrefcount} {
+         set-env $sharevar $init_value:1
+      }
+   }
+
    # no reference count management when no share variable is returned
-   set isrefcount [expr {[set sharevar [getModshareVarName $var]] ne {}}]
    if {$isrefcount} {
       array set countarr [getReferenceCountArray $var $separator]
    }
@@ -1816,27 +1862,43 @@ proc add-path {cmd mode dflbhv args} {
    set val [get-env $var]
 
    foreach dir $path_list {
-      if {![info exists countarr($dir)] || $allow_dup} {
+      # remove $dir from path only if path_entry_reorder is true and
+      # $dir is already in path and duplicates are NOT allowed.
+      if {[getConf path_entry_reorder] && [info exists countarr($dir)]\
+         && ! $allow_dup} {
+         set mpath_list [split $val $separator]
+         set mpath_list [lsearch -inline -all -not -exact $mpath_list $dir]
+         set val [join $mpath_list $separator]
+      }
+      # add $dir to beginning or end only if path_entry_reorder is true or
+      # $dir is NOT in path or duplicates are allowed.
+      # Please note: if path_entry_reorder is true and duplicates are not
+      # allowed, $dir is not in path ($val) - either it was not in or it
+      # had been removed. Hence we have to add it.
+      if {[getConf path_entry_reorder] || ![info exists countarr($dir)]\
+         || $allow_dup} {
          # ignore env var set empty if no empty entry found in reference
          # counter array (sometimes var is cleared by setting it empty not
          # unsetting it)
          if {$val ne {} || [info exists countarr()]} {
             set sep [expr {$val eq $separator ? {} : $separator}]
             set val [expr {$bhv eq {prepend} ? "$dir$sep$val" :\
-               "$val$sep$dir"}]
+                              "$val$sep$dir"}]
          } else {
             set val $dir
          }
       }
-      if {[info exists countarr($dir)]} {
-         # do not increase counter if bare separator string is added or if
-         # reference count is ignored (--ignore-refcount set) unless if
-         # duplicate mode is enabled (--duplicates set)
-         if {!$val_set_is_delim && (!$ign_refcount || $allow_dup)} {
-            incr countarr($dir)
-         }
-      } else {
+      #### ref-counting
+      # if $dir is NOT in path
+      #    set ref-count 1
+      # else
+      #    do NOT increase counter if bare separator string is added or if
+      #    reference count is ignored (--ignore-refcount set) unless if
+      #    duplicate mode is enabled (--duplicates set)
+      if {![info exists countarr($dir)]} {
          set countarr($dir) 1
+      } elseif {!$val_set_is_delim && (!$ign_refcount || $allow_dup)} {
+         incr countarr($dir)
       }
    }
 
@@ -2054,7 +2116,50 @@ proc getModulesEnvVarGlobList {{loaded_ctx 0}} {
    return $envvar_glob_list
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# trace procedure to apply same env change procedure to linked env vars
+proc mirrorEnvVarChange {cmd_str code result op} {
+   # skip mirror processing if initial command failed
+   if {$code} {
+      return
+   }
+   set envvar [getState current_envvar]
+   if {[info exists ::g_linkedEnvvars($envvar)]} {
+      # collect all direct and indirect linked env vars, avoiding cycle loop
+      set linked_envvar_list $::g_linkedEnvvars($envvar)
+      for {set i 0} {$i < [llength $linked_envvar_list]} {incr i} {
+         set linked_envvar [lindex $linked_envvar_list $i]
+         if {[info exists ::g_linkedEnvvars($linked_envvar)]} {
+            lappendNoDup linked_envvar_list\
+               {*}$::g_linkedEnvvars($linked_envvar)
+         }
+      }
+
+      if {![isTopEvaluation]} {
+         set interp_eval_cmd [list interp eval [getCurrentModfileInterpName]]
+      }
+
+      # apply same env var change command on linked env vars
+      # no other trace hook will be triggered as we are processing this one
+      foreach linked_envvar $linked_envvar_list {
+         if {$linked_envvar eq $envvar} {
+            continue
+         }
+         set linked_cmd_str [replaceFirstInStr $cmd_str $envvar\
+            $linked_envvar]
+         # adapt execution if called from modulefile interp
+         if {[info exists interp_eval_cmd]} {
+            set linked_cmd_str [list {*}$interp_eval_cmd $linked_cmd_str]
+         }
+         # execute in same context than initial command
+         uplevel 1 $linked_cmd_str
+      }
+   }
+}
+
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

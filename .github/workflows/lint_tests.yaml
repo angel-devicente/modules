@@ -2,16 +2,22 @@ name: lint-tests
 
 on:
   push:
-    branches-ignore:
-      - c-main
-      - c-3.2
+    branches:
+      - main
+      - v*.*.x
   pull_request:
+    branches:
+      - main
+      - v*.*.x
+
+permissions:
+  contents: read
 
 jobs:
   lint-all:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Install system packages
@@ -29,7 +35,7 @@ jobs:
       - name: Lint script files
         run: |
           script/mt lint
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: testsuite-logs-${{ github.job }}

@@ -157,6 +157,11 @@ testouterr_cmd_re sh {whatis extdfl@1.4.5} OK "$modlin $mpre $modlin
 \\s+extdfl/1.4.5: extdfl/1.4.5"
 testouterr_cmd sh {paths extdfl @1.4.5} [list [list text $mp/extdfl/1.4.5]] {}
 
+# a spec made of a variant-only element (no module name) must be correctly
+# flushed as a wildcard name query once a subsequent element bearing an
+# actual module name starts a new spec (nonamespec-allowed sub-commands only)
+testouterr_cmd sh {avail -t somevariant=val extdfl@1.4} OK "$mp:\nextdfl/1.4.5"
+
 # test various modulefile kind: alias, symver, virtual, directory hidden
 testouterr_cmd sh {avail -t extdfl3@1.00} OK "$mp:\nextdfl3/1.00(@)"
 testouterr_cmd sh {avail -t extdfl7 @3.0} OK "$mp:\nextdfl7/2.10(3.0)"
@@ -661,7 +666,7 @@ if {[is_conf_enabled conflictunload]} {
 }
 testouterr_cmd_re sh {load --force --auto advvers2@5.0} $ans $tserr
 
-setenv_var __MODULES_LMCONFLICT "advvers2/5.3&advvers2 @5.0&advvers2@5.1:advvers2/5.2&advvers2 @5.0"
+setenv_var __MODULES_LMCONFLICT "advvers2/5.2&advvers2 @5.0:advvers2/5.3&advvers2 @5.0&advvers2@5.1"
 if {[is_conf_enabled conflictunload]} {
     set ans [list]
     lappend ans [list unset __MODULES_LMCONFLICT]
@@ -669,7 +674,7 @@ if {[is_conf_enabled conflictunload]} {
     lappend ans [list set _LMFILES_ $mp/advvers2/5.0]
     lappend ans [list set LOADEDMODULES advvers2/5.0]
     lappend ans [list unset __MODULES_LMTAG]
-    set tserr [msg_top_load_conun advvers2/5.0 {} {advvers2/5.3 advvers2/5.2} {advvers2/5.1} {} {}]
+    set tserr [msg_top_load_conun advvers2/5.0 {} {advvers2/5.2 advvers2/5.3} {advvers2/5.1} {} {}]
 } else {
     set tserr [msg_load advvers2/5.0 [err_conlof advvers2/5.2 advvers2/5.3]]
 }

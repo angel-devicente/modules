@@ -1,0 +1,10 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/GLib/2.69.1-GCCcore-11.2.0
+conflict GLib
+depends-on GCCcore/11.2.0
+depends-on libffi/3.4.2-GCCcore-11.2.0
+depends-on gettext/0.21-GCCcore-11.2.0
+depends-on libxml2/2.9.10-GCCcore-11.2.0
+depends-on PCRE/8.45-GCCcore-11.2.0
+depends-on util-linux/2.37-GCCcore-11.2.0

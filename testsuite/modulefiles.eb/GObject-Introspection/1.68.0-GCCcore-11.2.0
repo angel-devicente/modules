@@ -1,0 +1,9 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/GObject-Introspection/1.68.0-GCCcore-11.2.0
+conflict GObject-Introspection
+depends-on GCCcore/11.2.0
+depends-on Python/3.9.6-GCCcore-11.2.0
+depends-on GLib/2.69.1-GCCcore-11.2.0
+depends-on libffi/3.4.2-GCCcore-11.2.0
+depends-on util-linux/2.37-GCCcore-11.2.0

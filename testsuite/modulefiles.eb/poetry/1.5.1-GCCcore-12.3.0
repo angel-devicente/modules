@@ -1,0 +1,9 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/poetry/1.5.1-GCCcore-12.3.0
+conflict poetry
+depends-on GCCcore/12.3.0
+depends-on Python/3.11.3-GCCcore-12.3.0
+depends-on hatchling/1.18.0-GCCcore-12.3.0
+depends-on cryptography/41.0.1-GCCcore-12.3.0
+depends-on virtualenv/20.23.1-GCCcore-12.3.0

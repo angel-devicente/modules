@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/gompi/2022b
+conflict gompi
+depends-on GCC/12.2.0
+depends-on OpenMPI/4.1.4-GCC-12.2.0

@@ -3,7 +3,7 @@
 # REPORT.TCL, output handling procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -91,6 +91,15 @@ proc knerrorOrWarningIfForced {message {code MODULES_ERR_KNOWN}} {
    } else {
       knerror $message $code
    }
+}
+
+proc knerrorModule {topcall message} {
+   if {$topcall} {
+      append message "\nTry 'module --help' for more information."
+   } else {
+      set message "module: $message"
+   }
+   knerror $message
 }
 
 # save message if report is not yet initialized
@@ -371,6 +380,9 @@ proc formatErrStackTrace {errmsg loc {cmdlist {}}} {
          {(procedure } $stackelt] end] {"}] 1]
       if {$cmd1 eq {eval}} {
          set cmd1 $cmd2
+      # remove some calling prefix
+      } elseif {[string range $cmd1 0 3] eq {{*}[}} {
+         set cmd1 [string range $cmd1 4 end]
       }
 
       # filter out stack element referring to or called by an unknown
@@ -634,8 +646,7 @@ proc reportIssue {issuetype issuemsg {issuefile {}}} {
 proc reportCmd {cmd args} {
    # use Tcl native string representation of list
    if {$cmd eq {-nativeargrep}} {
-      set cmd [lindex $args 0]
-      set cmdargs [lrange $args 1 end]
+      set cmdargs [lassign $args cmd]
    } else {
       set cmdargs [listTo tcl $args 0]
    }
@@ -652,6 +663,7 @@ proc reportCmdTrace {cmdstring args} {
 }
 
 proc reportVersion {} {
+   ##nagelfar ignore Too long line
    report {Modules Release @MODULES_RELEASE@@MODULES_BUILD@\
       (@MODULES_BUILD_DATE@)}
 }
@@ -660,10 +672,20 @@ proc reportName {} {
    report Modules
 }
 
-# disable error reporting (non-critical report only) unless debug enabled
+# disable error reporting (non-critical report only) unless debug enabled.
+# keep track of inhibition depth to cope with nested calls
 proc inhibitErrorReport {} {
    if {![isVerbosityLevel trace]} {
-      setState inhibit_errreport 1
+      setState inhibit_errreport [expr {[getState inhibit_errreport] + 1}]
+   }
+}
+
+# withdraw an error report inhibition demand (depth stays null if demand
+# was made under trace verbosity where inhibition is disabled)
+proc uninhibitErrorReport {} {
+   set inhibit_depth [getState inhibit_errreport]
+   if {$inhibit_depth > 0} {
+      setState inhibit_errreport [expr {$inhibit_depth - 1}]
    }
 }
 
@@ -1093,6 +1115,10 @@ proc getStickyUnloadMsg {{tag sticky}} {
    return "Unload of $tag module skipped"
 }
 
+proc getStickyReqUnloadMsg {{tag sticky}} {
+   return "Unload of $tag module requirement skipped"
+}
+
 proc getStickyForcedUnloadMsg {} {
    return {Unload of sticky module forced}
 }
@@ -1472,8 +1498,8 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
       himatcharrvrmap himatcharrvrvalmap
    set clean_list {}
    set vr_list {}
-   set via [expr {[isEltInReport via] ? [getViaModuleForModulepath $header] :\
-      {}}]
+   set via_list [expr {[isEltInReport via] ? [getViaListModuleForModulepath\
+      $header] : {}}]
 
    # treat elements in specified order if any
    ##nagelfar ignore #2 Badly formed if statement
@@ -1499,7 +1525,7 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
             if {$json} {
                ##nagelfar ignore +2 Found constant
                set dispsgr [formatListEltToJsonDisplay $elt type s directory\
-                  1 symbols a $sym_list 1 via s $via 1]
+                  1 symbols a $sym_list 1 via a $via_list 1]
             } elseif {$show_mtime} {
                # append / char after name to clearly indicate this is a dir
                lassign [formatListEltToLongDisplay $elt di / $sym_list sy {}\
@@ -1516,7 +1542,7 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
                set dispsgr [formatListEltToJsonDisplay $elt type s modulefile\
                   1 variants o $vr_list $report_variant symbols a $sym_list 1\
                   tags a $tag_list 1 pathname s [lindex $mod_list($elt) 2] 1\
-                  via s $via 1]
+                  via a $via_list 1]
             } elseif {$show_mtime} {
                set clock_mtime [expr {[lindex $mod_list($elt) 1] ne {} ?\
                   [clock format [lindex $mod_list($elt) 1] -format {%Y/%m/%d\
@@ -1538,7 +1564,7 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
                ##nagelfar ignore +3 Found constant
                set dispsgr [formatListEltToJsonDisplay $elt type s alias 1\
                   symbols a $sym_list 1 tags a $tag_list 1 target s [lindex\
-                  $mod_list($elt) 1] 1 via s $via 1]
+                  $mod_list($elt) 1] 1 via a $via_list 1]
             } elseif {$show_mtime} {
                lassign [formatListEltToLongDisplay $elt al " -> [lindex\
                   $mod_list($elt) 1]" $sym_list sy {} $default_colored\
@@ -1579,7 +1605,6 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
    }
 
    set len_list {}
-   set max_len 0
    # dictionary-sort results unless if output order is specified
    if {![llength $mod_list_order]} {
       set clean_list [lsort -dictionary $clean_list]
@@ -1587,18 +1612,12 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
    if {$json} {
       ##nagelfar ignore Found constant
       upvar 0 clean_list display_list
-      if {![info exists display_list]} {
-         set display_list {}
-      }
    } else {
       set display_list {}
       foreach disp $clean_list {
          # compute display element length list on sorted result
          lappend display_list $sgrmap($disp)
          lappend len_list $lenmap($disp)
-         if {$lenmap($disp) > $max_len} {
-            set max_len $lenmap($disp)
-         }
       }
    }
 
@@ -1612,10 +1631,10 @@ proc reportModules {search_queries header hsgrkey hstyle show_mtime show_idx\
    # output formatted elements
    if {$search_queries == "*"} {
        displayElementList $header $hsgrkey $hstyle $one_per_line $show_idx 1\
-           $display_list $len_list $max_len $via $indent
+           $display_list $len_list $via_list $indent
    } else {
        displayElementList $header $hsgrkey $hstyle $one_per_line $show_idx 1\
-           $display_list $len_list $max_len $via $indent 1
+           $display_list $len_list $via_list $indent 1
    }
 }
 
@@ -1666,11 +1685,11 @@ proc displaySeparatorLine {{title {}} {sgrkey {}} {extra {}} {indent 0}} {
 # get a list of elements and print them in a column or in a
 # one-per-line fashion
 proc displayElementList {header sgrkey hstyle one_per_line display_idx\
-   start_idx display_list {len_list {}} {max_len 0} {via {}} {indent 0} {terse 0}} {
+   start_idx display_list {len_list {}} {via_list {}} {indent 0} {terse 0}} {
    set elt_cnt [llength $display_list]
    reportDebug "header=$header, sgrkey=$sgrkey, hstyle=$hstyle,\
-      elt_cnt=$elt_cnt, max_len=$max_len, one_per_line=$one_per_line,\
-      display_idx=$display_idx, start_idx=$start_idx, via=$via"
+      elt_cnt=$elt_cnt, one_per_line=$one_per_line,\
+      display_idx=$display_idx, start_idx=$start_idx, via=$via_list"
 
    # end proc if no element are to print
     if {$elt_cnt == 0} {
@@ -1691,7 +1710,8 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
       if {$json} {
          report "\"$header\": \{"
       } elseif {$hstyle eq {sepline}} {
-         set extra [expr {[string length $via] ? " (via $via)" : {}}]
+         set extra [expr {[string length $via_list] ? " (via [join $via_list\
+            { > }])" : {}}]
          displaySeparatorLine $header $sgrkey $extra $indent
       } else {
          report [sgr $sgrkey $header]:
@@ -1721,97 +1741,10 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
       # save room for numbers and spacing: 2 or 3 digits + ) + space
       set elt_prefix_len [expr {$display_idx ? $idx_len + 2 : {0}}]
       # save room for two spaces after element
-      set elt_suffix_len 2
-
-      # compute rows*cols grid size with optimized column number
-      # the size of each column is computed to display as much column
-      # as possible on each line
-      incr max_len $elt_suffix_len
-      foreach len $len_list {
-         lappend elt_len [incr len $elt_suffix_len]
-      }
-
       set tty_cols [getState term_columns]
-      # find valid grid by starting with non-optimized solution where each
-      # column length is equal to the length of the biggest element to display
-      set cur_cols [tcl::mathfunc::max [expr {int(($tty_cols - \
-         $elt_prefix_len) / $max_len)}] 0]
-      # when display is found too short to display even one column
-      if {$cur_cols == 0} {
-         set cols 1
-         set rows $elt_cnt
-         array set col_width [list 0 $max_len]
-      } else {
-         set cols 0
-         set rows 0
-      }
-      set last_round 0
-      set restart_loop 0
-      while {$cur_cols > $cols} {
-         if {!$restart_loop} {
-            if {$last_round} {
-               incr cur_rows
-            } else {
-               set cur_rows [expr {int(ceil(double($elt_cnt) / $cur_cols))}]
-            }
-            for {set i 0} {$i < $cur_cols} {incr i} {
-               set cur_col_width($i) 0
-            }
-            for {set i 0} {$i < $cur_rows} {incr i} {
-               set row_width($i) 0
-            }
-            set istart 0
-         } else {
-            ##nagelfar ignore Unknown variable
-            set istart [expr {$col * $cur_rows}]
-            # only remove width of elements from current col
-            for {set row 0} {$row < ($i % $cur_rows)} {incr row} {
-               ##nagelfar ignore Unknown variable
-               incr row_width($row) -[expr {$pre_col_width + $elt_prefix_len}]
-            }
-         }
-         set restart_loop 0
-         for {set i $istart} {$i < $elt_cnt} {incr i} {
-            set col [expr {int($i / $cur_rows)}]
-            set row [expr {$i % $cur_rows}]
-            # restart loop if a column width change
-            if {[lindex $elt_len $i] > $cur_col_width($col)} {
-               set pre_col_width $cur_col_width($col)
-               set cur_col_width($col) [lindex $elt_len $i]
-               set restart_loop 1
-               break
-            }
-            # end search of maximum number of columns if computed row width
-            # is larger than terminal width
-            if {[incr row_width($row) +[expr {$cur_col_width($col) \
-               + $elt_prefix_len}]] > $tty_cols} {
-               # start last optimization pass by increasing row number until
-               # reaching number used for previous column number, by doing so
-               # this number of column may pass in terminal width, if not
-               # fallback to previous number of column
-               if {$last_round && $cur_rows == $rows} {
-                  incr cur_cols -1
-               } else {
-                  set last_round 1
-               }
-               break
-            }
-         }
-         # went through all elements without reaching terminal width limit so
-         # this number of column solution is valid, try next with a greater
-         # column number
-         if {$i == $elt_cnt} {
-            set cols $cur_cols
-            set rows $cur_rows
-            array set col_width [array get cur_col_width]
-            # number of column is fixed if last optimization round has started
-            # reach end also if there is only one row of results
-            if {!$last_round && $rows > 1} {
-               incr cur_cols
-            }
-         }
 
-      }
+      lassign [compute_output_grid $tty_cols $len_list $elt_prefix_len] rows\
+         cols cols_width
       reportDebug list=$display_list
       reportDebug "rows/cols=$rows/$cols,\
          lastcol_item_cnt=[expr {int($elt_cnt % $rows)}]"
@@ -1827,7 +1760,8 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
                }
                # cannot use 'format' as strings may contain SGR codes
                append displist [lindex $display_list $index][string repeat\
-                  { } [expr {$col_width($col) - [lindex $len_list $index]}]]
+                  { } [expr {[lindex $cols_width $col] - [lindex $len_list\
+                  $index] - $elt_prefix_len}]]
             }
          }
          append displist \n
@@ -1838,6 +1772,58 @@ proc displayElementList {header sgrkey hstyle one_per_line display_idx\
    }
    report $displist 1
    reportSeparateNextContent
+}
+
+# returns rows, cols and each col width of the output grid with most cols
+proc compute_output_grid {out_width len_list prefix_len} {
+   set col_sepa_len 2
+   set elt_count [llength $len_list]
+   if {!$elt_count} {
+      return {0 0 {0}}
+   }
+
+   # start with max possible columns guessed from shortest element in list
+   set min_len [tcl::mathfunc::min {*}$len_list]
+   set col_min [expr {$prefix_len + $min_len + $col_sepa_len}]
+   # exact same output with 1 elt to print whether width is tiny or large
+   set max_cols [tcl::mathfunc::min $elt_count\
+      [expr {int(floor(double($out_width) / $col_min))}]]
+
+   for {set cols $max_cols} {$cols > 1} {incr cols -1} {
+      set rows [expr {int(ceil(double($elt_count) / $cols))}]
+      set cols_width {}
+
+      # compute width of each column (max length among elements in that col)
+      for {set c 0} {$c < $cols} {incr c} {
+         set idx_first [expr {$c * $rows}]
+         set idx_last [expr {$idx_first + $rows - 1}]
+         # stop when no more element for available columns
+         if {$idx_first >= $elt_count} {
+            break
+         }
+         set col_max [tcl::mathfunc::max {*}[lrange $len_list $idx_first\
+            $idx_last]]
+         set col_width [expr {$prefix_len + $col_max}]
+         # column separator suffix is not added on last column
+         if {($c + 1) < $cols && ($idx_last + 1) < $elt_count} {
+            incr col_width $col_sepa_len
+         }
+         lappend cols_width $col_width
+
+         # immediately try fewer columns if we already exceed output grid
+         if {[tcl::mathop::+ {*}$cols_width] > $out_width} {
+            break
+         }
+      }
+
+      # ff it fits, this is the maximum cols possible
+      if {[tcl::mathop::+ {*}$cols_width] <= $out_width} {
+         return [list $rows $cols $cols_width]
+      }
+   }
+
+   # fits in 1 column
+   return [list $elt_count 1 {0}]
 }
 
 # Report an output key to help understand what the SGR used on this output
@@ -1942,19 +1928,11 @@ proc displayKey {} {
       }
    }
 
-   # find largest element
-   set max_len 0
-   foreach len $len_list {
-      if {$len > $max_len} {
-         set max_len $len
-      }
-   }
-
    if {[llength $display_list]} {
       # display header
       report Key:
       # display key content
-      displayElementList noheader {} {} 0 0 0 $display_list $len_list $max_len
+      displayElementList noheader {} {} 0 0 0 $display_list $len_list
    }
 }
 
@@ -2064,79 +2042,94 @@ See 'module --help' to get available commands and options.}
 
 proc reportUsage {} {
    reportVersion
-   ##nagelfar ignore #111 Too long line
+   ##nagelfar ignore #141 Too long line
    report {Usage: module [options] [command] [args ...]
 
 Loading / Unloading commands:
-  add | load      modulefile [...]  Load modulefile(s)
-  try-add | try-load modfile [...]  Load modfile(s), no complain if not found
-  add-any | load-any modfile [...]  Load first available modulefile in list
-  rm | unload     modulefile [...]  Remove modulefile(s)
-  purge                             Unload all loaded modulefiles
-  reload | update                   Unload then load all loaded modulefiles
-  switch | swap   [mod1] mod2       Unload mod1 and load mod2
+  add | load [-f] [-i] [--auto|--no-auto] [--tag=LIST] modulefile [...]
+                                    Load modulefile(s)
+  try-add | try-load [-f] [-i] [--auto|--no-auto] [--tag=LIST] modfile [...]
+                                    Load modfile(s), no complain if not found
+  add-any | load-any [-f] [-i] [--auto|--no-auto] [--tag=LIST] modfile [...]
+                                    Load first available modulefile in list
+  rm | remove | delete | unload [-f] [-i] [--auto|--no-auto] modulefile [...]
+                                    Remove modulefile(s)
+  purge [-f]                        Unload all loaded modulefiles
+  reload | update [-f]              Unload then load all loaded modulefiles
+  switch | swap [-f] [-i] [--auto|--no-auto] [--tag=LIST] [mod1] mod2
+                                    Unload mod1 and load mod2
   refresh                           Refresh loaded module volatile components
-  reset                             Restore initial environment
+  reset [-f]                        Restore initial environment
 
 Listing / Searching commands:
-  list   [-a] [-t|-l|-j] [-S|-C] [mod ...]
+  list   [-a] [-t|-l|-j] [-S|-C] [-o LIST] [mod ...]
                                     List all or matching loaded modules
-  avail  [-a] [-t|-l|-j] [-S|-C] [-d|-L] [--indepth|--no-indepth] [mod ...]
+  avail  [-a] [-t|-l|-j] [-S|-C] [-d|-L] [-o LIST]
+         [-i] [--indepth|--no-indepth] [mod ...]
                                     List all or matching available modules
   aliases         [-a]              List all module aliases
-  whatis [-a] [-j] [modulefile ...] Print whatis information of modulefile(s)
+  whatis [-a] [-i] [-j] [modulefile ...]
+                                    Print whatis information of modulefile(s)
   apropos | keyword | search [-a] [-j] str
                                     Search all name and whatis containing str
-  spider [-a] [-t|-l|-j] [-S|-C] [-d|-L] [--indepth|--no-indepth] [mod ...]
+  spider [-a] [-t|-l|-j] [-S|-C] [-d|-L] [-o LIST]
+         [-i] [--indepth|--no-indepth] [mod ...]
                                     Scan all modulepaths and list all or
                                     matching available modules
-  is-loaded       [modulefile ...]  Test if any of the modulefile(s) are loaded
-  is-avail        modulefile [...]  Is any of the modulefile(s) available
-  info-loaded     modulefile        Get full name of matching loaded module(s)
+  is-loaded  [-i] [modulefile ...]  Test if any of the modulefile(s) are loaded
+  is-avail   [-i] modulefile [...]  Is any of the modulefile(s) available
+  info-loaded   [-i] modulefile     Get full name of matching loaded module(s)
 
 Collection of modules handling commands:
   save            [collection|file] Save current module list to collection
-  restore         [collection|file] Restore module list from collection or file
+  restore  [-f]   [collection|file] Restore module list from collection or file
   saverm | disable     [collection] Remove saved collection
   saveshow | describe   [coll|file] Display information about collection
   savelist  [-a] [-t|-l|-j] [-S|-C] [collection ...]
                                     List all or matching saved collections
   is-saved        [collection ...]  Test if any of the collection(s) exists
-  stash                             Save current environment and reset
-  stashpop        [stash]           Restore then remove stash collection
+  stash [-f]                        Save current environment and reset
+  stashpop [-f]   [stash]           Restore then remove stash collection
   stashrm         [stash]           Remove stash collection
   stashshow       [stash]           Display information about stash collection
   stashclear                        Remove all stash collections
-  stashlist                         List all stash collections
+  stashlist [-t|-l|-j]              List all stash collections
 
 Environment direct handling commands:
-  prepend-path [-d c] var val [...] Prepend value to environment variable
-  append-path [-d c] var val [...]  Append value to environment variable
-  remove-path [-d c] var val [...]  Remove value from environment variable
+  prepend-path [-d c] [--duplicates] var val [...]
+                                    Prepend value to environment variable
+  append-path [-d c] [--duplicates] var val [...]
+                                    Append value to environment variable
+  remove-path [-d c] [--index] var val [...]
+                                    Remove value from environment variable
 
 Module cache handling commands:
   cachebuild      [modulepath ...]  Create cache file for modulepath(s)
   cacheclear                        Delete cache file in enabled modulepath(s)
 
 Other commands:
-  help            [modulefile ...]  Print this or modulefile(s) help info
-  display | show  modulefile [...]  Display information about modulefile(s)
-  test            [modulefile ...]  Test modulefile(s)
+  help       [-i] [modulefile ...]  Print this or modulefile(s) help info
+  display | show  [-i] modulefile [...]
+                                    Display information about modulefile(s)
+  test       [-i] [modulefile ...]  Test modulefile(s)
   use     [-a|-p] dir [...]         Add dir(s) to MODULEPATH variable
   unuse           dir [...]         Remove dir(s) from MODULEPATH variable
   is-used         [dir ...]         Is any of the dir(s) enabled in MODULEPATH
-  path            modulefile        Print modulefile path
-  paths           modulefile        Print path of matching available modules
+  path       [-i] modulefile        Print modulefile path
+  paths      [-i] modulefile        Print path of matching available modules
   clear           [-f]              Reset Modules-specific runtime information
-  source          scriptfile [...]  Execute scriptfile(s)
-  config [--dump-state|name [val]]  Display or set Modules configuration
+  source [--auto|--no-auto] [-f] scriptfile [...]
+                                    Execute scriptfile(s)
+  config [--dump-state|name [val]|--reset name]
+                                    Display or set Modules configuration
   state           [name]            Display Modules state
   sh-to-mod       shell shellscript [arg ...]
                                     Make modulefile from script env changes
-  mod-to-sh       shell modulefile [...]
+  mod-to-sh  [-f] [-i] [--auto|--no-auto] shell modulefile [...]
                                     Make shell code from modulefile env changes
   edit            modulefile        Open modulefile in editor
-  lint       [-a] [modulefile ...]  Check syntax of modulefile
+  lint       [-a] [-i] [modulefile ...]
+                                    Check syntax of modulefile
 
 Switches:
   -t | --terse    Display output in terse format
@@ -2162,9 +2155,13 @@ Switches:
   --tag=LIST      Apply tag to loading module on 'load', 'try-load', 'load-any'
                   or 'switch' sub-commands (LIST is made of tag names
                   separated by ':')
-  --ignore-cache  Ignore module cache
-  --ignore-user-rc
-                  Skip evaluation of user-specific module rc file
+  -d C | --delim C
+                  Set delimiter character instead of ':' (on 'prepend-path',
+                  'append-path' or 'remove-path' sub-commands)
+  --duplicates    Allow duplicate entries (on 'prepend-path' or 'append-path'
+                  sub-commands)
+  --index         Given value is an index in the variable's list, instead of
+                  a value to look up (on 'remove-path' sub-command)
 
 Options:
   -h | --help     This usage info
@@ -2175,14 +2172,19 @@ Options:
   -v | --verbose  Enable verbose messages
   -s | --silent   Turn off error, warning and informational messages
   --timer         Report execution times
-  --paginate      Pipe mesg output into a pager if stream attached to terminal
-  --no-pager      Do not pipe message output into a pager
+  -p | --paginate Pipe mesg output into a pager if stream attached to terminal
+  -P | --no-pager Do not pipe message output into a pager
   --redirect      Send output to stdout (only for sh, bash, ksh, zsh and fish)
   --no-redirect   Send output to stderr
   --color[=WHEN]  Colorize the output; WHEN can be 'always' (default if
                   omitted), 'auto' or 'never'
   -w COLS | --width=COLS
-                  Set output width to COLS columns.}
+                  Set output width to COLS columns.
+  --ignore-cache  Ignore module cache
+  --ignore-user-rc
+                  Skip evaluation of user-specific module rc file
+  --no-modulepath-ignore
+                  Do not apply modulepath-ignore pattern definitions}
 }
 
 # create appropriate message and kind of report when a requirement is not
@@ -2204,7 +2206,7 @@ proc reportMissingPrereqError {curmodnamevr modulepath_list args} {
 }
 
 proc setConflictErrorAsReported {args} {
-   appendNoDupToList ::report_conflict([currentState evalid]) {*}$args
+   lappendNoDup ::report_conflict([currentState evalid]) {*}$args
    # save content added to remove it later if evaluation is withdrawn
    if {[depthState reportholdid]} {
       lappend ::g_holdReportConflict([currentState reportholdid]) \
@@ -2257,7 +2259,10 @@ proc reportFinalError {error_msg} {
    reportError $error_msg
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

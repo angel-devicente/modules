@@ -1,0 +1,8 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/hwloc/2.8.0-GCCcore-12.2.0
+conflict hwloc
+depends-on GCCcore/12.2.0
+depends-on numactl/2.0.16-GCCcore-12.2.0
+depends-on libxml2/2.10.3-GCCcore-12.2.0
+depends-on libpciaccess/0.17-GCCcore-12.2.0

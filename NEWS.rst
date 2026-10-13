@@ -6,10 +6,328 @@ Release notes
 This file describes changes in recent versions of Modules. It primarily
 documents those changes that are of interest to users and admins.
 
+.. _5.7 release notes:
+
+Modules 5.7.0 (2026-09-21)
+--------------------------
+
+* Script: improve :command:`mrel` to always ask a Fedora Kerberos ticket.
+* Use CMake ``EVAL CODE`` to forward arguments passed to ``module`` CMake
+  function. (fix issue #419 with contribution from Benoit Dumas)
+* Doc: update email address in `Code of conduct`_ to report bad behavior to
+  maintainers.
+* Move *modules-interest* mailing-list to HPSF.
+* Script: add tests on :command:`mb` utility to track performance of load,
+  list and purge sub-commands with large number (>100) of modules.
+* Script: fix procedure call timing of Tcllib profiler module within
+  :command:`mlprof` to avoid mixing timers from calls made at different
+  interpretation level.
+* Parse loaded environment in early execution stage and always fail if an
+  inconsistency is detected.
+* Improve performances of loaded module comparison used when checking
+  conflict and requirement dependencies. (fix issue #603)
+* Fix environment variable synchronization issue between modulefile evaluation
+  interpreters: supersede the ``append`` Tcl command rather sync interpreters
+  for each environment variable change. A substantial performance improvement
+  is observed when loading or unloading many modulefiles. (fix issue #603)
+* Script: add ``--with-lmod`` option to :command:`mb` command to compare
+  current Modules version against an installed version of Lmod.
+* Update the :subcmd:`sh-to-mod` mechanism to correctly parse shell alias on
+  Dash shell version 0.5.13.
+* Update the :subcmd:`sh-to-mod` mechanism to correctly parse path-like
+  environment variable on Fish shell version 4.3.
+* When fetching user's groups, in case a group name cannot be resolved use
+  this group gid number as name instead of raising an error. (fix issue #604)
+* Introduce :mconfig:`path_entry_reorder` configuration option that change
+  order of entry in a path-like environment variable when it is added again.
+  This new configuration option is disabled by default. This option can be
+  changed at installation time with :instopt:`--enable-path-entry-reorder`.
+  When :mconfig:`path_entry_reorder` is changed with :subcmd:`config`
+  sub-command, it sets the :envvar:`MODULES_PATH_ENTRY_REORDER` environment
+  variable. (fix issue #595 with contribution from Achim Gsell)
+* Install: reorder the options in the :file:`configure` script help message
+  alphabetically.
+* Doc: add manual page for :ref:`modulecmd(1)` command.
+* Make :mfcmd:`getenv` modulefile command available from module rc file
+  evaluation context. (fix issue #588)
+* Install: add installation option
+  :instopt:`--disable-compressed-changelog<--enable-compressed-changelog>` to
+  cope with packaging process handling documentation file compression at their
+  level. (fix issue #592)
+* Add :option:`-p` option as an abbreviated form for :option:`--paginate`.
+  (fix issue #593)
+* Add :option:`-P` option as an abbreviated form for :option:`--no-pager`.
+  (fix issue #606)
+* Doc: add :ref:`organize-tsc-meeting` guide.
+* Add the :mconfig:`paginate` configuration option to control whether or not
+  output message should be piped into defined pager by default. This option
+  can be changed at installation time with :instopt:`--enable-paginate`. When
+  :mconfig:`paginate` is changed with :subcmd:`config` sub-command, it sets
+  the :envvar:`MODULES_PAGINATE` environment variable. (fix issue #594)
+* Doc: add :ref:`plan-next-release-content` guide
+* Introduce the :mconfig:`non_exportable_tags` configuration option that lists
+  tags that should not be exported to modules once loaded. When
+  :mconfig:`non_exportable_tags` is changed with :subcmd:`config` sub-command,
+  it sets the :envvar:`MODULES_NON_EXPORTABLE_TAGS` environment variable. (fix
+  issue #608)
+* Improve the performance of the module’s column output by removing the costly
+  optimization that attempts to fit more columns within the available screen
+  width. (fix issue #622)
+* Fix superseding definition of ``source`` Tcl command when
+  :mconfig:`source_cache` configuration option is enabled to support
+  ``-encoding`` option. (fix issue #627)
+* Correctly parse the module specifications passed as argument on
+  :mfcmd:`depends-on`, mfcmd:`always-load` and :mfcmd:`prereq-all` modulefile
+  commands. It especially fixes module specification containing the definition
+  of variants. (fixes issue #626)
+* Report the full *via* path for modules on :subcmd:`avail` and
+  :subcmd:`spider` sub-commands rather the last part of this via information.
+  JSON output is updated to report the ``via`` key as an array rather as a
+  string. (fix issue #586)
+* Introduce the :mconfig:`info_extension` configuration option to consider
+  that module extensions have a pure informational purpose and no module alias
+  is associated to them. Extensions defined with :mfcmd:`provide` modulefile
+  command are not affected by this mechanism. When :mconfig:`info_extension`
+  is changed with :subcmd:`config` sub-command, it sets the
+  :envvar:`MODULES_INFO_EXTENSION` environment variable. (fix issue #585)
+* Doc: add :ref:`linked-envvars` design notes.
+* Add the :mconfig:`linked_envvars` configuration option to apply the same
+  value update commands to all linked environment variables. When
+  :mconfig:`linked_envvars` is changed with :subcmd:`config` sub-command, it
+  sets the :envvar:`MODULES_LINKED_ENVVARS` environment variable. (fix issue
+  #609)
+* Doc: add :ref:`init-envvars` design notes.
+* Add the :mconfig:`init_envvars` configuration option to define initial
+  values to assign to environment variables before they are modified for the
+  first time. This option can be changed at installation time with
+  :instopt:`--with-init-envvars`. When :mconfig:`init_envvars` is changed with
+  :subcmd:`config` sub-command, it sets the :envvar:`MODULES_INIT_ENVVARS`
+  environment variable. (fix issue #572)
+* Enable lexical binding in Emacs addon file. (contribution from Peter Oliver)
+* Script: update :command:`mt` utility to analyze test suite log file when
+  test suite run is aborted.
+* Correctly match loaded modules specified as requirement with a trailing
+  ``/`` character after module name. (fix issue #640)
+* Also consider ``-`` in addition to ``.`` as a version number separator
+  character when selecting a module with the :mconfig:`extended_default`
+  mechanism. (fix issue #619)
+* Rename Modules initialization script for Python ``env_modules.py`` to make
+  it a proper Python module name.
+* Rename the Python initialization script to :file:`env_modules.py` so that it
+  uses a valid Python module name. Generates a :file:`python.py` symlink onto
+  :file:`env_modules.py` to preserve compatibility. (contribution from Byron
+  Boulton)
+* Install: introduce the :instopt:`--enable-set-pythonpath` installation
+  option to prepend Modules ``init`` directory to the :envvar:`PYTHONPATH`
+  environment variable during Modules initialization. This option is enabled
+  by default and make it easier to import the ``env_modules`` Python module.
+  (fix issue #483 with contribution from Byron Boulton)
+* Install: add the :instopt:`--enable-append-pythonpath` installation option,
+  which causes :instopt:`--enable-set-pythonpath` to append the Modules
+  ``init`` directory to :envvar:`PYTHONPATH` instead of prepending it.
+  (contribution from Byron Boulton)
+* Doc: clarify shell script, executed by :mfcmd:`source-sh` modulefile command
+  or :subcmd:`sh-to-mod` sub-command, does not get access to shell aliases,
+  functions or completions settings only available in interactive sessions or
+  defined in profile files. (fix issue #646)
+* Report a global known error when Modules Tcl extension library cannot be
+  loaded. (fix issue #644)
+* Add :mconfig:`domainname` configuration option to define the command to run
+  to fetch domain name. It can be changed at installation time with
+  :instopt:`--with-domainname` and :instopt:`--with-domainname-opts` options.
+  When :mconfig:`domainname` is changed with :subcmd:`config` sub-command, it
+  sets the :envvar:`MODULES_DOMAINNAME` environment variable. (fix issue #645)
+* Update the :mfcmd:`source-sh` modulefile command and :subcmd:`sh-to-mod`
+  sub-command mechanism to produce a more consistent value for a path-like
+  environment variable change that requires both a prepended and an appended
+  part expressed with a different delimiter character: a :mfcmd:`setenv`
+  command is now generated instead in this situation.
+* Update the :mfcmd:`source-sh` modulefile command and :subcmd:`sh-to-mod`
+  sub-command mechanism to no longer de-duplicate a path entry found several
+  times in the entries it prepends or in the entries it appends, and to add
+  the ``--duplicates`` option on a generated :mfcmd:`prepend-path` or
+  :mfcmd:`append-path` command when one of the path entries it adds is
+  already found in the variable value prior script evaluation, is found
+  several times in the entries it adds or is found in both the entries it
+  prepends and the entries it appends, so this entry is not silently
+  absorbed by these commands' default de-duplication behavior nor relocated
+  by the :mconfig:`path_entry_reorder` configuration option.
+* Resolve an exact ``name/version`` specification without validating every
+  sibling modulefile found in its directory, by walking versions from the
+  dictionary-highest to the dictionary-lowest and stopping as soon as the
+  implicit ``default`` and ``latest`` symbolic versions are settled. A
+  substantial performance improvement is observed when loading an existing
+  modulefile out of a directory holding hundreds or thousands of sibling
+  versions. (fix issue #561)
+* Doc: add :ref:`module-find-and-resolution` design notes.
+* Doc: add :ref:`devel-testsuite` guide describing the DejaGnu testsuite
+  structure.
+* Doc: document and cross-reference :ref:`commit-message-conventions` in
+  :ref:`CONTRIBUTING`.
+* Doc: document :ref:`code-comments` conventions in :ref:`CONTRIBUTING`.
+* Doc: add :ref:`devel-ci` guide describing continuous integration usage.
+* Install: rename the shipped ``COPYING.GPLv2`` license file to ``COPYING``,
+  the name convention recognized by packaging tools.
+* Doc: fix favicon rendering with a black background instead of white on
+  viewers that ignore transparency, by setting its transparent pixels to a
+  white matte color instead of black.
+* Doc: document Windows Terminal profile setup as an alternative way to
+  initialize Modules on Windows without an install script. (fix issue #634)
+* Install: use ``reg add`` instead of ``setx /M`` to persist the system-wide
+  ``PATH`` environment variable in :file:`INSTALL.bat` and
+  :file:`UNINSTALL.bat`, as ``setx`` silently truncates the value it writes
+  to 1024 characters, which could corrupt the system ``PATH`` when installing
+  from a shell with an already long inherited ``PATH`` (e.g. a Visual Studio
+  Developer Prompt). (fix issue #654)
+* Doc: add :ref:`hook-api` design notes.
+* Add the ``add-hook`` siteconfig command to register a procedure on one of
+  4 stable hook events (:mhook:`before-modulefile-eval`,
+  :mhook:`after-modulefile-eval`, :mhook:`before-modulerc-eval`,
+  :mhook:`after-modulerc-eval`), so sites no longer need to rely on ``trace``
+  or procedure renaming, which bind to internal implementation details, to
+  run code before or after a modulefile or modulerc evaluation. (fix issue
+  #607)
+* Doc: add :ref:`add-new-hook-event` guide describing how to contribute a
+  new hook event.
+* Doc: add :ref:`sync-remote-appdir` cookbook recipe.
+* Testsuite: add *completion* testsuite to validate shell Tab completion of
+  this project. This testsuite can be invoked with ``make testcompletion`` or
+  ``script/mt comp``. It drives a real bash, zsh, fish or tcsh session
+  through `Expect <http://expect.sourceforge.net/>`_ to press the Tab key
+  against the built shell completion script and check the resulting
+  candidate list.
+* Init: fix numerous inconsistencies between ``module help``'s usage message
+  and the option flags and positional arguments each sub-command actually
+  accepts, and between that usage message and what bash, fish, tcsh and zsh
+  Tab completion offer for each sub-command. Guarded against regressing with
+  a new ground-truth check in the *completion* testsuite that compares
+  ``module``/``ml`` Tab completion against the sub-commands, switches,
+  options and argument kinds parsed straight out of ``module help``.
+* Init: no longer offer the legacy :subcmd:`initadd`, :subcmd:`initclear`,
+  :subcmd:`initlist`, :subcmd:`initprepend` and :subcmd:`initrm`
+  sub-commands as Tab completion candidates (bash, fish, tcsh, zsh), since
+  ``module help`` does not document them.
+* Testsuite: add *cookbook* testsuite to validate the recipes documented
+  under :ref:`cookbook`. This testsuite can be invoked with ``make
+  testcookbook`` or ``script/mt cook``. It builds a sandboxed fixture
+  from the exact files a recipe ships under :file:`doc/example/`, then runs
+  the commands demonstrated in the recipe's ``Usage example`` documentation
+  in order and checks that similar output is obtained. Currently covers the
+  :ref:`sync-remote-appdir` recipe.
+* Doc: add :ref:`modulepath-ignore` design notes.
+* Add :mfcmd:`modulepath-ignore` modulefile command to define, from rc
+  files, gitignore-style patterns describing modulepath content to ignore
+  when searching for modulefiles. Ignored files and directories are handled
+  as if they do not exist: they are not checked, not walked down, not
+  reported and not recorded in modulepath cache file. Add
+  :mconfig:`modulepath_ignore` configuration option and
+  :option:`--no-modulepath-ignore` command line switch to control whether
+  pattern definitions are applied. (fix issue #562)
+* Install: add the :instopt:`--with-pythondir` installation option to
+  define the directory where to install the ``env_modules`` Python module.
+  It enables for instance to install :file:`env_modules.py` with the other
+  Python modules available on the system. When this option is set,
+  :instopt:`--enable-set-pythonpath` adds this directory to
+  :envvar:`PYTHONPATH` instead of the Modules ``init`` directory. (fix issue
+  #643)
+* Introduce :mconfig:`ignore_cache_subcmds` configuration option that
+  defines a list of module sub-commands on which module cache files are
+  ignored. It is useful when cache files are large: a sub-command targeting
+  specific modules (like :subcmd:`load`) may find them faster by walking
+  through modulepath directories than by evaluating whole cache files. When
+  :mconfig:`ignore_cache_subcmds` is changed with :subcmd:`config`
+  sub-command, it sets the :envvar:`MODULES_IGNORE_CACHE_SUBCMDS`
+  environment variable. (fix issue #563)
+* Protect the creation of the Tcl sub-interpreters used to evaluate modulercs
+  and modulefiles with the quarantine mechanism. Environment variables listed
+  in the :mconfig:`run_quarantine` configuration option are unset or set to
+  the value of their corresponding :envvar:`MODULES_RUNENV_\<VAR\>` variable
+  during this creation step, then restored to their original value. (fix
+  issue #623)
+* Doc: adopt the Linux kernel policy on :ref:`ai-coding-assistants` in
+  :ref:`CONTRIBUTING`: AI agents must never add their own ``Signed-off-by:``
+  trailer and their involvement must be disclosed with an ``Assisted-by:``
+  trailer.
+* Doc: add the :ref:`user-guide` document that explains a selection of
+  useful but lesser known features through practical examples and common
+  use cases.
+* Init: fix command injection in Bash completion when module names contain
+  shell meta-characters. Completion candidates were passed to ``compgen -W``
+  which evaluates command substitution syntax. (fix `CVE-2026-85013`_ found
+  by AISLE in partnership with Red Hat)
+* Accept abbreviated upper bounds in version ranges such as ``@3.20:3`` to
+  select versions starting at ``3.20`` within major version ``3``. (fix issue
+  #698)
+* Fix resolution of relative path entries in :envvar:`MODULEPATH` when a
+  module is loaded during a modulefile evaluation. Such entry was resolved
+  against the directory of the evaluating modulefile rather than against the
+  current working directory. A relative *directory* argument of the
+  :mfcmd:`is-used` modulefile command or of the :subcmd:`unuse` sub-command
+  is also resolved against the current working directory to recognize such
+  entry whatever its form.
+* Keep non-sticky requirements of sticky modules loaded during a
+  :subcmd:`purge` and explicitly report why their unload is skipped according
+  to the :mconfig:`sticky_purge` configuration. (fix issue #582)
+* Fix internal error raised by :subcmd:`switch` sub-command when the unload
+  of the switched-off module fails after some of its dependent modules were
+  unloaded for reload, and switch sequence continues as ``switch_unload`` is
+  not set in :mconfig:`abort_on_error`. Dependent modules restored by the
+  failed unload are not reloaded anymore.
+
+.. _CVE-2026-85013: https://github.com/envmodules/modules/security/advisories/GHSA-8hrw-p88g-qhmg
+
+
 .. _5.6 release notes:
 
+Modules 5.6.2 (2026-09-07)
+--------------------------
+
+* Init: fix command injection in Bash completion when module names contain
+  shell meta-characters. Completion candidates were passed to ``compgen -W``
+  which evaluates command substitution syntax. (fix `CVE-2026-85013`_ found
+  by AISLE in partnership with Red Hat)
+
+
+Modules 5.6.1 (2025-11-25)
+--------------------------
+
+* Script: improve :command:`mrel` to better support Koji states and not rely
+  on sudo privileges to test a new release.
+* Script: adapt utilities to only use :command:`curl` rather also requiring
+  :command:`wget`.
+* Doc: :ref:`CHARTER` has been approved on September 4, 2025.
+* Doc: add :ref:`EESSI` design notes.
+* Doc: update :ref:`modulefile(5)` man page to describe the :mfcmd:`report`
+  modulefile command, which is supported since version 4.0. 
+* Doc: use `Furo`_ Sphinx theme for the documentation published on Read The
+  Docs.
+* Doc: describe how to call modulefile command from a hook procedure in
+  :ref:`module(1)` man page. (fix issue #590)
+* Doc: add warning in :ref:`INSTALL-win` to mention :command:`ml` command name
+  conflict with *MSVC x86 toolchain* ``ml.exe``. (fix issue #589)
+* Doc: add :ref:`maintainer-guide`.
+* Doc: website is now located at https://envmodules.io.
+* Doc: precise that no automatic path resolution is performed on
+  :mfcmd:`prepend-path`, :mfcmd:`append-path` or :mfcmd:`remove-path`
+  modulefile commands. (fix issue #597)
+* Doc: add way to build latexpdf documentation.
+* Ensure that a module having the same name than a loaded module from
+  another modulepath does not inherit its tags. (fix issue #599)
+* Drop tags stored in memory that applies to a module when unloading it. It
+  ensures that tags applied to the module when reloaded from a different
+  modulepath are not inherited.
+* Always apply *abort on error* behavior in case a Dependent Reload sticky
+  (and :option:`--force` is not set) or super-sticky module fails to reload.
+  (fix issue #601)
+* When loading a module, check already loaded modules and their aliases
+  exactly matching specification before looking at available modules and their
+  aliases. (fix issue #602)
+
+.. _Furo: https://github.com/pradyunsg/furo
+
+
 Modules 5.6.0 (2025-07-31)
---------------------------------
+--------------------------
 
 * Rename :file:`contrib` directory as :file:`share` in sources to use clearer
   name for architecture and configuration independent files.
@@ -181,7 +499,7 @@ Modules 5.6.0 (2025-07-31)
   if Tcl 9 is selected.
 * Introduce the :mfcmd:`provide` modulefile command that defines module alias
   over currently evaluating module. This helps convey that the module offers
-  additional functionality or components.
+  additional functionality or components. (fix issue #539)
 * Change :mfcmd:`extensions` modulefile command to be an alias over the
   :mfcmd:`provide` command.
 * Add the ``provided-alias`` element in the allowed value list of the
@@ -557,6 +875,15 @@ Modules 5.4.0 (2024-02-20)
 
 
 .. _5.3 release notes:
+
+Modules 5.3.2 (2026-09-07)
+--------------------------
+
+* Init: fix command injection in Bash completion when module names contain
+  shell meta-characters. Completion candidates were passed to ``compgen -W``
+  which evaluates command substitution syntax. (fix `CVE-2026-85013`_ found
+  by AISLE in partnership with Red Hat)
+
 
 Modules 5.3.1 (2023-06-27)
 --------------------------
@@ -1993,6 +2320,15 @@ Modules 4.6.0 (2020-09-16)
 
 
 .. _4.5 release notes:
+
+Modules 4.5.4 (2026-09-07)
+--------------------------
+
+* Init: fix command injection in Bash completion when module names contain
+  shell meta-characters. Completion candidates were passed to ``compgen -W``
+  which evaluates command substitution syntax. (fix `CVE-2026-85013`_ found
+  by AISLE in partnership with Red Hat)
+
 
 Modules 4.5.3 (2020-08-31)
 --------------------------

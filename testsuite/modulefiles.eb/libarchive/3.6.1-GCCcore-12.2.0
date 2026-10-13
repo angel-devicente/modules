@@ -1,0 +1,10 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libarchive/3.6.1-GCCcore-12.2.0
+conflict libarchive
+depends-on GCCcore/12.2.0
+depends-on zlib/1.2.12-GCCcore-12.2.0
+depends-on XZ/5.2.7-GCCcore-12.2.0
+depends-on libxml2/2.10.3-GCCcore-12.2.0
+depends-on OpenSSL/1.1
+depends-on zstd/1.5.2-GCCcore-12.2.0

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # MT, run all or specific parts of the test suite
-# Copyright (C) 2018-2022 Xavier Delaruelle
+# Copyright (C) 2018-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,6 +32,8 @@ Test suites:
   cov             Coverage mode of modulecmd.tcl testsuite
   install         Test Modules installation
   lint            Lint script files of this repository
+  comp            Test shell completion scripts
+  cook            Test the cookbook recipes documented in doc/source/cookbook
 
 Select parts of testsuite:
   serienum        Identification number of testsuite directory containing a
@@ -46,6 +48,8 @@ Examples:
   $0
   $0 quick
   $0 lint
+  $0 comp
+  $0 cook
   $0 50/37 61 70/{290,440}
 "
 }
@@ -54,6 +58,13 @@ Examples:
 echo_error() {
    echo -e "ERROR: $1" >&2
    exit 1
+}
+
+# process log file to highlight failed tests
+review_log() {
+   if [ -e $testserie.log ]; then
+      script/mtreview $testserie.log
+   fi
 }
 
 if [ ! -e tcl/main.tcl.in ]; then
@@ -94,6 +105,16 @@ if [ $# -gt 0 ]; then
       target='testlint'
       testserie='lint'
       setuptestfiles=(00/005 00/006 00/011)
+      shift
+   elif [ "$1" = "comp" ]; then
+      target='testcompletion'
+      testserie='completion'
+      setuptestfiles=(00/005 00/006 00/007 00/008 00/010 00/011 00/020 00/030 00/040 00/050)
+      shift
+   elif [ "$1" = "cook" ]; then
+      target='testcookbook'
+      testserie='cookbook'
+      setuptestfiles=(00/005 00/006 00/010 00/011)
       shift
    fi
 fi
@@ -213,6 +234,9 @@ if [ -t 1 ]; then
    trap 'kill $! 2>/dev/null' EXIT
 fi
 
+# parse errors in log even if full run is aborted
+trap 'review_log && exit 1' SIGINT
+
 export RUNTESTFLAGS='-v -v >/dev/null 2>&1'
 $make $target
 ret=$?
@@ -222,11 +246,8 @@ if [ -t 1 ]; then
 fi
 
 # highlight failed tests
-retreview=0
-if [ -e $testserie.log ]; then
-   script/mtreview $testserie.log
-   retreview+=$?
-fi
+review_log
+retreview=$?
 
 # testsuite ok but mtreview failed to run
 if [ $ret -eq 0 ] && [ $retreview -ne 0 ]; then

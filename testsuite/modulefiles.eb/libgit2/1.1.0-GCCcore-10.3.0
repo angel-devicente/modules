@@ -1,0 +1,7 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libgit2/1.1.0-GCCcore-10.3.0
+conflict libgit2
+depends-on GCCcore/10.3.0
+depends-on PCRE/8.44-GCCcore-10.3.0
+depends-on OpenSSL/1.1

@@ -1,0 +1,8 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/cURL/8.3.0-GCCcore-13.2.0
+conflict cURL
+depends-on GCCcore/13.2.0
+depends-on zlib/1.2.13-GCCcore-13.2.0
+depends-on OpenSSL/1.1
+setenv	CURL_INCLUDES		"/software/cURL/8.3.0-GCCcore-13.2.0/include"

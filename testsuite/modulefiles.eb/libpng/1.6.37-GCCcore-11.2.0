@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libpng/1.6.37-GCCcore-11.2.0
+conflict libpng
+depends-on GCCcore/11.2.0
+depends-on zlib/1.2.11-GCCcore-11.2.0

@@ -130,6 +130,11 @@ if {$install_setzshfpath eq {y}} {
     set install_zshcompletiondir $install_initdir/zsh-functions
 }
 
+# env_modules python module is installed in initdir if no specific location
+if {$install_pythondir eq {}} {
+    set install_pythondir $install_initdir
+}
+
 # locate siteconfig file
 set siteconfig_file "$install_etcdir/siteconfig.tcl"
 set siteconfig_filere [regsub -all "\(\[.+?\]\)" $siteconfig_file {\\\1}]
@@ -166,9 +171,9 @@ if {$install_libtclenvmodules eq {y}} {
     set getgroupslib_file lib/libtestutil-getgroups$install_shlib_suffix
     set 0getgroupslib_file lib/libtestutil-0getgroups$install_shlib_suffix
     set dupgetgroupslib_file lib/libtestutil-dupgetgroups$install_shlib_suffix
-    set getgrgidlib_file lib/libtestutil-getgrgid$install_shlib_suffix
     set timelib_file lib/libtestutil-time$install_shlib_suffix
     set mktimelib_file lib/libtestutil-mktime$install_shlib_suffix
+    set tcl_loadfilelib_file lib/libtestutil-tcl_loadfile$install_shlib_suffix
 }
 
 # check file permission capabilities
@@ -248,10 +253,19 @@ if {![string length $xrdb]} {
 send_user "\tX11 setup is [expr {$is_xrdb_avail ? {KO} : {OK}}]\n"
 
 # check if domainname binary is available on this system
-set domainname [auto_execok domainname]
+set domainname [auto_execok $install_domainname]
 
-# display result of id command
+# ensure id command is run with POSIX locale to correctly parse it
+if {[info exists ::env(LANG)]} {
+    set ORIG_LANG $::env(LANG)
+}
+set ::env(LANG) C
 set idoutput [exec id]
+if {[info exists ORIG_LANG]} {
+    set ::env(LANG) $ORIG_LANG
+} else {
+    unset ::env(LANG)
+}
 send_user "\tid output is '$idoutput'\n"
 
 # get current working directory
@@ -261,31 +275,51 @@ set ORIG_CWD [pwd]
 set username [exec id -u -n]
 set userid [exec id -u]
 send_user "\tCurrent username is '$username'\n"
-set group_name_fetch_failed 0
-if {[catch {
-    # correctly split groups in case some contain a space character (like on Cygwin/MSYS platforms)
-    set usergroups [lsort [split [string range [exec id -G -n -z] 0 end-1] \0]]
-} errMsg]} {
-    # fallback to a more generic groups retrieval (in case '-z' option not supported on id)
-    if {[catch {
-        set usergroups [lsort [exec id -G -n]]
-    } errMsg]} {
-        set group_name_fetch_failed 1
-        # fallback in case all group names could not be resolved by 'id' command
-        # it happens especially when running testsuite through mockbuild
-        foreach grpinfo [split [string range [lindex [split $idoutput] 2] 7 end] ,] {
-            if {[set idx [string first ( $grpinfo]] != -1} {
-                set grp [string range $grpinfo $idx+1 end-1]
-            } else {
-                set grp $grpinfo
-            }
-            lappend usergroups $grp
-        }
-        set usergroups [lsort $usergroups]
-    }
+
+# generic group retrieval as -z option is not supported by id in some environment
+# and using "-G -n" will produce an error in case the group name cannot be resolved
+# here we parse the standard global output of id command
+set usergroups {}
+set id_out_grp_start [expr {[string first {groups=} $idoutput] + 7}]
+set id_out_next_start [string first = $idoutput $id_out_grp_start]
+if {$id_out_next_start > -1} {
+    set id_out_grp_end [expr {[string last { } $idoutput $id_out_next_start] - 1}]
+} else {
+    set id_out_grp_end end
 }
+set id_grp_output [string range $idoutput $id_out_grp_start $id_out_grp_end]
+foreach grp_info [split $id_grp_output ,] {
+    if {[set idx [string first ( $grp_info]] != -1} {
+        set grp [string range $grp_info $idx+1 end-1]
+    } else {
+        set grp $grp_info
+    }
+    lappend usergroups $grp
+}
+set usergroups [lsort $usergroups]
 send_user "\tGroups of current user are '$usergroups'\n"
 set userfgroup [lindex $usergroups 0]
+
+set sudo [auto_execok sudo]
+set is_sudo_supported 0
+if {[string length $sudo]} {
+    if {![catch {exec $sudo -n -E true} errMsg]} {
+        set is_sudo_supported 1
+    }
+}
+send_user "\tCall to sudo command is [expr {$is_sudo_supported ? { } : {not }}]supported\n"
+
+set setpriv [auto_execok setpriv]
+set setpriv_call {}
+if {[string length $setpriv]} {
+    if {$tcl_platform(user) eq {root}} {
+        set setpriv_call [list $setpriv]
+    } elseif {$is_sudo_supported} {
+        set setpriv_call [list $sudo -n -E $setpriv]
+    }
+}
+send_user "\tCall setpriv command with '$setpriv_call'\n"
+
 
 set is_mogui_avail [string length [lindex [auto_execok mogui-cmd] 0]]
 
@@ -421,6 +455,14 @@ set warn_stickyunload "$::warn_msgs: Unload of sticky module skipped"
 set err_stickyunloadf "$::warn_msgs: Unload of sticky module forced"
 set err_superstickyunload "$::error_msgs: Unload of super-sticky module skipped"
 set warn_superstickyunload "$::warn_msgs: Unload of super-sticky module skipped"
+set err_stickyrequnload "$::error_msgs: Unload of sticky module requirement\
+    skipped"
+set warn_stickyrequnload "$::warn_msgs: Unload of sticky module requirement\
+    skipped"
+set err_superstickyrequnload "$::error_msgs: Unload of super-sticky module\
+    requirement skipped"
+set warn_superstickyrequnload "$::warn_msgs: Unload of super-sticky module\
+    requirement skipped"
 set err_reqfull "$::error_msgs: Module version must be specified to load module"
 set err_nomodloaded "$error_msgs: $msg_nomodloaded"
 set err_modfromdiffpathloaded "$error_msgs: Module already loaded from a different modulepath"
@@ -437,7 +479,7 @@ set xrdb_warn "$x11_warn_prefix\n$error_msgs: $xrdb_notfound_msg"
 if {!$is_xrdb_avail} {
     set x11_warn "$x11_warn_prefix\n$error_msgs: $xrdb_issue_msg"
 }
-set domainname_warn "$error_msgs: Command 'domainname' cannot be found"
+set domainname_warn "$error_msgs: Command '$install_domainname' cannot be found"
 set lsb_cmd_err "$error_msgs: Command 'lsb_release' cannot be found"
 
 
@@ -569,6 +611,10 @@ proc err_depre {mod} {
 
 proc err_depref {mod} {
     return "$::warn_msgs: Reload of dependent $mod failed"
+}
+
+proc err_stickydepre {mod} {
+    return "$::error_msgs: Reload of sticky dependent $mod failed"
 }
 
 proc err_depreun {mod} {
@@ -900,6 +946,10 @@ proc if_availindepth {then {else {}}} {
     return [expr {$::install_availindepth eq {y} ? $then : $else}]
 }
 
+proc if_searchcontains {then {else {}}} {
+    return [expr {$::install_searchmatch eq {contains} ? $then : $else}]
+}
+
 proc if_configlocked {option then {else {}}} {
     return [expr {[is_config_locked $option] ? $then : $else}]
 }
@@ -910,6 +960,10 @@ proc is_config_locked {option} {
 
 proc is_real_shell {shell} {
     return [expr {[lsearch -exact $::real_shells $shell] != -1}]
+}
+
+proc is_full_path {file_path} {
+    return [regexp {^(|\.|\.\.)/} $file_path]
 }
 
 # helper procedures to format block message output

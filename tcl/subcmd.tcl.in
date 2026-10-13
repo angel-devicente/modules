@@ -3,7 +3,7 @@
 # SUBCMD.TCL, module sub-commands procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,11 +23,7 @@
 proc cmdModuleList {show_oneperline show_mtime search_match args} {
    set json [isStateEqual report_format json]
 
-   # load tags from loaded modules
-   cacheCurrentModules
-
    if {[llength $args]} {
-      defineModEqProc [isIcase] [getConf extended_default]
       # match passed name against any part of loaded module names
       set mtest [expr {{contains} in $search_match ? {matchin} : {match}}]
       set search_queries $args
@@ -222,7 +218,6 @@ proc cmdModuleSearch {args} {
 
    set json [isStateEqual report_format json]
    set icase [isIcase]
-   defineModEqProc $icase [getConf extended_default]
 
    lappend searchmod rc_defs_included
    if {![llength $mod_pattern_list]} {
@@ -419,7 +414,7 @@ proc cmdModuleSearch {args} {
    }
    lpopState mode
 
-   setState inhibit_errreport 0
+   uninhibitErrorReport
 
    # report errors if a modulefile was searched but not found
    if {{wild} ni $searchmod && !$foundmod} {
@@ -641,8 +636,8 @@ proc cmdModuleSave {{coll default}} {
    }
    # generate collection content with header indicating oldest Modules version
    # compatible with collection syntax
-   set coll_header [expr {[llength $curr_tag_arrser] ? {#%Module5.1} :\
-      {}}]
+   ##nagelfar ignore Bad expression
+   set coll_header [expr {[llength $curr_tag_arrser] ? {#%Module5.1} : {}}]
 
    set save [formatCollectionContent [getModulePathList returnempty 0]\
       $curr_mod_list $curr_tag_arrser $coll_header]
@@ -933,7 +928,6 @@ proc cmdModuleSavelist {show_oneperline show_mtime search_match args} {
       }
       set display_list {}
       set len_list {}
-      set max_len 0
       set one_per_line [expr {$show_mtime || $show_oneperline}]
       set show_idx [expr {!$one_per_line}]
       # prepare query to highlight
@@ -954,15 +948,12 @@ proc cmdModuleSavelist {show_oneperline show_mtime search_match args} {
             } else {
                lappend display_list $collsgr
                lappend len_list [set len [string length $coll]]
-               if {$len > $max_len} {
-                  set max_len $len
-               }
             }
          }
       }
 
       displayElementList noheader {} {} $one_per_line $show_idx $start_idx\
-         $display_list $len_list $max_len
+         $display_list $len_list
    }
 }
 
@@ -1007,7 +998,7 @@ proc cmdModuleSource {mode args} {
 # one of the prereq procedures
 proc cmdModuleIntLoad {topcall command mode tag_list args} {
    # ignore flag used in collection to track non-user asked state
-   set args [replaceFromList $args --notuasked]
+   lrem args --notuasked
    # no error raised on empty argument list to cope with initadd command that
    # may expect this behavior
    if {![llength $args]} {
@@ -1091,7 +1082,21 @@ proc cmdModuleLoad {context uasked tryload loadany tag_list modulepath_list\
 
    set ret 0
    set one_mod_loaded 0
+
+   # if a switch action is ongoing...
+   if {$context eq {swload}} {
+      set swprocessing 1
+      # context is ReqLo if switch is called from a modulefile
+      if {![isTopEvaluation]} {
+         set context reqlo
+      }
+      upvar newhidden hidden
+      upvar newmsgrecid msgrecid
+   }
+
    lappendState mode load
+   lappendState eval_context $context
+
    foreach mod $args {
       set mod_load_in_error 0
       # stop when first module in list is loaded if any mode enabled
@@ -1099,24 +1104,22 @@ proc cmdModuleLoad {context uasked tryload loadany tag_list modulepath_list\
          break
       }
 
-      # if a switch action is ongoing...
-      if {$context eq {swload}} {
-         set swprocessing 1
-         # context is ReqLo if switch is called from a modulefile
-         if {![isTopEvaluation]} {
-            set context reqlo
-         }
-         upvar newhidden hidden
-         upvar newmsgrecid msgrecid
-      }
-      lappendState eval_context $context
       # loading module is visible by default
       set hidden 0
       # error if module not found or forbidden
       set notfounderr [expr {!$tryload}]
 
-      lassign [getPathToModule $mod $modulepath_list $notfounderr] modfile\
-         modname modnamevr
+      # first try to resolve over loaded mods unless spec corresponds to
+      # multiple module designations, otherwise search avail mods
+      unset -nocomplain modfile
+      if {[getCmpSpecFromVersSpec $mod] eq {eq}} {
+         lassign [getPathToModule $mod $modulepath_list 0 exact] modfile\
+            modname modnamevr
+      }
+      if {![info exists modfile] || ![string length $modfile]} {
+         lassign [getPathToModule $mod $modulepath_list $notfounderr] modfile\
+            modname modnamevr
+      }
 
       # record evaluation attempt on specified module name
       registerModuleEvalAttempt $context $mod $modfile
@@ -1231,7 +1234,7 @@ proc cmdModuleLoad {context uasked tryload loadany tag_list modulepath_list\
                   $modulepath_list]
                reportDebug "conun mod list is '$conun_mod_list'"
                if {[llength $conun_mod_list]} {
-                  foreach conun_mod [lreverse $conun_mod_list] {
+                  foreach conun_mod $conun_mod_list {
                      if {[cmdModuleUnload conun match 1 s 0 $conun_mod]} {
                         # error message already sent within cmdModuleUnload
                         knerrorOrWarningIfForced {}
@@ -1434,8 +1437,8 @@ proc cmdModuleIntUnload {mode args} {
          set conun_mod_list {}
          foreach conun_arg $args {
             # unload attempt in reverse load order
-            appendNoDupToList conun_mod_list {*}[lreverse\
-               [getLoadedMatchingName $conun_arg returnall]]
+            lappendNoDup conun_mod_list {*}[lreverse [getLoadedMatchingName\
+               $conun_arg returnall]]
          }
          set ret 0
          foreach conun_mod $conun_mod_list {
@@ -1471,21 +1474,24 @@ proc cmdModuleUnload {context match auto force onlyureq args} {
       set force [getState force]
    }
    set ret 0
+
+   # if a switch action is ongoing...
+   if {$context eq {swunload}} {
+      set swprocessing 1
+      # context is ConUn if switch is called from a modulefile
+      if {![isTopEvaluation]} {
+         set context conun
+      }
+      upvar oldhidden hidden
+      upvar olduasked uasked
+      upvar oldmsgrecid msgrecid
+   }
+
    lappendState mode unload
+   lappendState eval_context $context
+
    foreach mod $args {
       set mod_unload_in_error 0
-      # if a switch action is ongoing...
-      if {$context eq {swunload}} {
-         set swprocessing 1
-         # context is ConUn if switch is called from a modulefile
-         if {![isTopEvaluation]} {
-            set context conun
-         }
-         upvar oldhidden hidden
-         upvar olduasked uasked
-         upvar oldmsgrecid msgrecid
-      }
-      lappendState eval_context $context
       # unloading module is visible by default
       set hidden 0
       set uasked 1
@@ -1680,6 +1686,16 @@ proc cmdModuleUnload {context match auto force onlyureq args} {
          # update cache arrays
          unsetLoadedModule $modname $modfile
 
+         if {[array exists ::g_isLoadedMatchSpecificPathMemCache]} {
+            array unset ::g_isLoadedMatchSpecificPathMemCache
+         }
+         if {[array exists ::g_isLoadingMatchSpecificPathMemCache]} {
+            array unset ::g_isLoadingMatchSpecificPathMemCache
+         }
+         if {[array exists ::g_loadRequirementModuleListMemCache]} {
+            array unset ::g_loadRequirementModuleListMemCache
+         }
+
          # unregister declared source-sh
          unsetEnvLoadedModuleProperty $modname sourcesh
          unsetLoadedSourceSh $modname
@@ -1707,16 +1723,11 @@ proc cmdModuleUnload {context match auto force onlyureq args} {
 
          # unset tags declared for this module
          unsetEnvLoadedModuleProperty $modname tag
-         # also remove the auto-loaded and keep-loaded tags from
-         # in-memory knowledge not to re-apply them if module is reloaded
-         # in other conditions
-         unsetModuleAndVariantsTag $modname $modnamevr auto-loaded keep-loaded
+         # also remove tags from in-memory knowledge not to re-apply them if
+         # module is reloaded in other conditions
+         unsetModuleAndVariantsTag $modname $modnamevr
          unsetEnvLoadedModuleProperty $modname extratag
-         # also remove extra tags from in-memory knowledge not re-apply
-         # them if module is reloaded in other conditions
-         set extratag_list [getExtraTagList $modname]
-         unsetModuleAndVariantsTag $modname $modnamevr {*}$extratag_list
-         unsetModuleAndVariantsExtraTag $modname $modnamevr {*}$extratag_list
+         unsetModuleAndVariantsExtraTag $modname $modnamevr
          unsetEnvLoadedModuleProperty $modname stickyrule
 
          if {[getConf auto_handling] && $auto && [isTopEvaluation] &&\
@@ -1843,7 +1854,7 @@ proc cmdModuleAliases {} {
       getModules $dir {} 0 {}
    }
 
-   setState inhibit_errreport 0
+   uninhibitErrorReport
 
    set display_list {}
    foreach name [lsort -dictionary [array names ::g_moduleAlias]] {
@@ -1937,18 +1948,13 @@ proc cmdModuleAvail {show_oneperline show_mtime show_filter search_filter\
       displayKey
    }
 
-   setState inhibit_errreport 0
+   uninhibitErrorReport
 }
 
 proc runModuleUse {cmd mode pos args} {
    if {$args eq {}} {
       showModulePath
    } else {
-      if {$pos eq {remove}} {
-         # get current module path list
-         set modpathlist [getModulePathList returnempty 0 0]
-      }
-
       foreach path $args {
          switch -glob -- $path {
             --remove-on-unload - --append-on-unload - --prepend-on-unload -\
@@ -1970,18 +1976,13 @@ proc runModuleUse {cmd mode pos args} {
             }
             default {
                if {$pos eq {remove}} {
-                  if {$path in $modpathlist} {
-                     lappend pathlist $path
-                  # transform given path in an absolute path which should have
-                  # been registered in the MODULEPATH env var. however for
-                  # compatibility with previous behavior where relative paths
-                  # were registered in MODULEPATH given path is first checked
-                  # against current path list
-                  } elseif {[set abspath [getAbsolutePath $path]] in\
-                     $modpathlist} {
-                     lappend pathlist $abspath
-                  # even if not found, transmit this path to remove-path in
-                  # case several path elements have been joined as one string
+                  # transmit path as registered in MODULEPATH env var, where
+                  # variable references are kept as-is. even if not found,
+                  # transmit given path to remove-path in case several path
+                  # elements have been joined as one string
+                  if {[set usedpath [getUsedModulePathEntry $path 0]] ne\
+                     {}} {
+                     lappend pathlist $usedpath
                   } else {
                      lappend pathlist $path
                   }
@@ -2052,6 +2053,7 @@ proc cmdModuleAutoinit {} {
 
    # define current Modules version if versioning enabled
    ##nagelfar ignore #4 Strange command
+   ##nagelfar ignore +3 Too long line
    @VERSIONING@if {![isEnvVarDefined MODULE_VERSION]} {
    @VERSIONING@   setenv MODULE_VERSION @MODULES_RELEASE@@MODULES_BUILD@
    @VERSIONING@   setenv MODULE_VERSION_STACK @MODULES_RELEASE@@MODULES_BUILD@
@@ -2101,9 +2103,8 @@ proc cmdModuleAutoinit {} {
 
       # record what has just been loaded in the virtual init collection
       setenv __MODULES_LMINIT [getLoadedInit]
-   # if user environment is already initialized, refresh the already loaded
-   # modules unless if environment is inconsistent
-   } elseif {![catch {cacheCurrentModules}]} {
+   # if user environment is already initialized, refresh already loaded mods
+   } else {
       cmdModuleRefresh
    }
 
@@ -2150,7 +2151,10 @@ proc cmdModuleAutoinit {} {
       @setmanpath@@notusemanpath@}
       @setmanpath@if {{@mandir@} ni [split $manpath :]} {
       @setmanpath@   if {![isEnvVarDefined MANPATH]} {
-      @setmanpath@      append-path MANPATH {}
+      @setmanpath@      if {![hasEnvVarInitValue MANPATH] || [envVarInitValue MANPATH] ne\
+      @setmanpath@         {}} {
+      @setmanpath@         append-path MANPATH {}
+      @setmanpath@      }
       @setmanpath@   # ensure no duplicate ':' is set
       @setmanpath@   } elseif {[envVarEquals MANPATH :]} {
       @setmanpath@      remove-path MANPATH {}
@@ -2159,6 +2163,11 @@ proc cmdModuleAutoinit {} {
       @setmanpath@   @appendmanpath@-path MANPATH {@mandir@}
       @setmanpath@}
    }
+
+   # add env_modules python module directory to PYTHONPATH if enabled
+   @setpythonpath@if {{@pythondir@} ni [split [get-env PYTHONPATH] :]} {
+   @setpythonpath@   @appendpythonpath@-path PYTHONPATH {@pythondir@}
+   @setpythonpath@}
 
    # source shell completion script if available, not installed in default
    # completion locations and only if shell is interactive
@@ -2176,8 +2185,7 @@ proc cmdModuleAutoinit {} {
 }
 
 proc cmdModuleInit {args} {
-   set init_cmd [lindex $args 0]
-   set init_list [lrange $args 1 end]
+   set init_list [lassign $args init_cmd]
    set notdone 1
    set nomatch 1
 
@@ -2226,7 +2234,7 @@ proc cmdModuleInit {args} {
                      }
                      add {
                         foreach newmodule $init_list {
-                           set modules [replaceFromList $modules $newmodule]
+                           lrem modules $newmodule
                         }
                         lappend newinit "$cmd$modules $init_list$comments"
                         # delete new modules in potential next lines
@@ -2234,7 +2242,7 @@ proc cmdModuleInit {args} {
                      }
                      prepend {
                         foreach newmodule $init_list {
-                           set modules [replaceFromList $modules $newmodule]
+                           lrem modules $newmodule
                         }
                         lappend newinit "$cmd$init_list $modules$comments"
                         # delete new modules in potential next lines
@@ -2243,7 +2251,7 @@ proc cmdModuleInit {args} {
                      rm {
                         set oldmodcount [llength $modules]
                         foreach oldmodule $init_list {
-                           set modules [replaceFromList $modules $oldmodule]
+                           lrem modules $oldmodule
                         }
                         set modcount [llength $modules]
                         lappend newinit [expr {$modcount ?\
@@ -2308,6 +2316,11 @@ proc cmdModuleResurface {cmd args} {
          # already defined. remove-path: to ensure paths are removed whatever
          # their reference counter value
          lappend optlist --ignore-refcount
+
+         # sync environment variable changes if some links are defined
+         if {[llength [getState linked_envvars]]} {
+            trace add execution $cmd leave mirrorEnvVarChange
+         }
       }
    }
 
@@ -2502,8 +2515,8 @@ proc cmdModuleConfig {dump_state args} {
          set curconfvallist [getConfList $name]
          switch -- [string index $value 0] {
             + {
-               appendNoDupToList curconfvallist {*}[split [string range\
-                  $value 1 end] :]
+               lappendNoDup curconfvallist {*}[split [string range $value 1\
+                  end] :]
                set value [join $curconfvallist :]
             }
             - {
@@ -2636,9 +2649,6 @@ proc cmdModuleRefresh {} {
    lappendState mode refresh
    # create an eval id to track successful/failed module evaluations
    pushMsgRecordId refresh-[depthState modulename] 0
-
-   # load variants from loaded modules
-   cacheCurrentModules
 
    foreach lm [getEnvLoadedModulePropertyParsedList refresh] {
       # prepare info to execute modulefile
@@ -2858,7 +2868,7 @@ proc cmdModuleLint {args} {
             }
          }
       }
-      setState inhibit_errreport 0
+      uninhibitErrorReport
    } else {
       foreach mod $args {
          lassign [getPathToModule $mod] modfile modname modnamevr
@@ -2949,9 +2959,6 @@ proc cmdModuleReset {} {
 proc cmdModuleStash {} {
    # check if there is something to stash
    if {[getConf reset_target_state] eq {__purge__}} {
-      # load tags from loaded modules
-      cacheCurrentModules
-
       # current environment differs from initial 'purge' state when at least
       # a module is loaded and it is not super-sticky and not sticky or force
       # mode is enabled to allow sticky tag unload
@@ -3137,13 +3144,15 @@ proc cmdModuleSpider {show_oneperline show_mtime show_filter search_filter\
       foreach {new_modpath from_mod_list} [getScanModuleElt $modpath use] {
          if {[string length $new_modpath] && $new_modpath ni $modpath_list} {
             lappend modpath_list $new_modpath
-            setLoadedUse [lindex $from_mod_list 0] $new_modpath
+            set via_mod [lindex $from_mod_list 0]
+            setLoadedUse $via_mod $new_modpath
+            setViaModuleModulepath $via_mod $modpath
          }
       }
    }
    unsetConf advanced_version_spec
    defineParseModuleSpecificationProc [getConf advanced_version_spec]
-   setState inhibit_errreport 0
+   uninhibitErrorReport
    reportTrace $modpath_list {Collect modulepaths}
 
    # perform an avail on all collected modulepaths
@@ -3151,7 +3160,10 @@ proc cmdModuleSpider {show_oneperline show_mtime show_filter search_filter\
       $search_match $modpath_list {*}$args
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

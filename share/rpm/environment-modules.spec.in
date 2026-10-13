@@ -6,12 +6,12 @@
 %endif
 
 Name:           environment-modules
-Version:        5.6.0
+Version:        5.7.0
 Release:        @MODULES_RPM_RELEASE@%{?dist}
 Summary:        Provides dynamic modification of a user's environment
 
 License:        GPL-2.0-or-later
-URL:            http://modules.sourceforge.net/
+URL:            https://envmodules.io
 Source0:        http://downloads.sourceforge.net/modules/modules-@MODULES_RELEASE@@MODULES_BUILD@.tar.bz2
 
 BuildRequires:  tcl
@@ -19,6 +19,11 @@ BuildRequires:  dejagnu
 BuildRequires:  make
 BuildRequires:  sed
 BuildRequires:  less
+# python3_sitelib macro and byte-compilation of env_modules.py installed
+# in this directory
+%if 0%{?fedora} >= 22 || 0%{?rhel} >= 8
+BuildRequires:  python3-devel
+%endif
 %if 0%{?rhel} && 0%{?rhel} <= 8
 BuildRequires:  util-linux
 %else
@@ -58,10 +63,9 @@ Requires:       procps-ng
 Requires:       man-db
 %endif
 Requires(post): coreutils
-Requires(post): %{_sbindir}/update-alternatives
-Requires(postun): %{_sbindir}/update-alternatives
+Requires(post): %{_bindir}/update-alternatives
+Requires(postun): %{_bindir}/update-alternatives
 Provides:       environment(modules)
-Obsoletes:      modules-tcl <= 1.923
 Obsoletes:      environment-modules-compat <= 4.8.99
 
 # Tcl linter is useful for module lint command
@@ -87,7 +91,7 @@ clean fashion. All popular shells are supported, including bash, ksh,
 zsh, sh, csh, tcsh, as well as some scripting languages such as perl.
 
 Modules are useful in managing different versions of applications.
-Modules can also be bundled into metamodules that will load an entire
+Modules can also be bundled into meta-modules that will load an entire
 suite of different applications.
 
 NOTE: You will need to get a new shell after installing this package to
@@ -121,8 +125,13 @@ have access to the module alias.
            --disable-doc-install \
            --enable-modulespath \
            --with-python=%{pythonbin} \
+%if 0%{?fedora} >= 22 || 0%{?rhel} >= 8
+           --with-pythondir=%{python3_sitelib} \
+           --disable-set-pythonpath \
+%endif
            --with-modulepath=%{_datadir}/Modules/modulefiles:%{_sysconfdir}/modulefiles:%{_datadir}/modulefiles \
-           --with-quarantine-vars='LD_LIBRARY_PATH LD_PRELOAD'
+           --with-quarantine-vars='LD_LIBRARY_PATH LD_PRELOAD' \
+           --with-init-envvars='MANPATH='
 
 %if 0%{?fedora} >= 22 || 0%{?rhel} >= 7
 %make_build
@@ -192,27 +201,27 @@ make test QUICKTEST=1
 
 # Migration from version 3.x to 4
 if [ "$(readlink /etc/alternatives/modules.sh)" = '%{_datadir}/Modules/init/modules.sh' ]; then
-  %{_sbindir}/update-alternatives --remove modules.sh %{_datadir}/Modules/init/modules.sh
+  update-alternatives --remove modules.sh %{_datadir}/Modules/init/modules.sh
 fi
 
-%{_sbindir}/update-alternatives \
+update-alternatives \
   --install %{_sysconfdir}/profile.d/modules.sh modules.sh %{_datadir}/Modules/init/profile.sh 40 \
-  --slave %{_sysconfdir}/profile.d/modules.csh modules.csh %{_datadir}/Modules/init/profile.csh \
-  --slave %{_datadir}/fish/vendor_conf.d/modules.fish modules.fish %{_datadir}/Modules/init/fish \
-  --slave %{_bindir}/modulecmd modulecmd %{_datadir}/Modules/libexec/modulecmd.tcl
+  --follower %{_sysconfdir}/profile.d/modules.csh modules.csh %{_datadir}/Modules/init/profile.csh \
+  --follower %{_datadir}/fish/vendor_conf.d/modules.fish modules.fish %{_datadir}/Modules/init/fish \
+  --follower %{_bindir}/modulecmd modulecmd %{_datadir}/Modules/libexec/modulecmd.tcl
 
 %postun
 if [ $1 -eq 0 ] ; then
-  %{_sbindir}/update-alternatives --remove modules.sh %{_datadir}/Modules/init/profile.sh
+  update-alternatives --remove modules.sh %{_datadir}/Modules/init/profile.sh
 fi
 %endif
 
 
 %files
 %if 0%{?rhel} && 0%{?rhel} <= 6
-%doc COPYING.GPLv2
+%doc COPYING
 %else
-%license COPYING.GPLv2
+%license COPYING
 %endif
 %doc ChangeLog.gz README NEWS.txt MIGRATING.txt INSTALL.txt CONTRIBUTING.txt changes.txt
 %{_sysconfdir}/modulefiles
@@ -237,6 +246,10 @@ fi
 %{_datadir}/Modules/libexec/modulecmd.tcl
 %dir %{_datadir}/Modules/init
 %{_datadir}/Modules/init/*
+%if 0%{?fedora} >= 22 || 0%{?rhel} >= 8
+%{python3_sitelib}/env_modules.py
+%{python3_sitelib}/__pycache__/env_modules.cpython-*.pyc
+%endif
 # do not need to require shell package as we "own" completion dir
 %dir %{bash_completions_dir}
 %{bash_completions_dir}/module
@@ -254,6 +267,7 @@ fi
 %{_mandir}/man1/envml.1.gz
 %{_mandir}/man1/ml.1.gz
 %{_mandir}/man1/module.1.gz
+%{_mandir}/man1/modulecmd.1.gz
 %{_mandir}/man5/modulefile.5.gz
 %{macrosdir}/macros.%{name}
 %{vimfiles_root}/ftdetect/modulefile.vim
@@ -267,6 +281,22 @@ fi
 
 
 %changelog
+* Mon Sep 21 2026 Xavier Delaruelle <xavier.delaruelle@cea.fr> - 5.7.0-1
+- Update to 5.7.0
+- Add modulecmd(1) man page
+- Initialize MANPATH to an empty string when set for the first time
+- Rename COPYING.GPLv2 license file to COPYING
+- Install 'env_modules' Python module in %%python3_sitelib
+
+* Mon Sep 07 2026 Xavier Delaruelle <xavier.delaruelle@cea.fr> - 5.6.2-1
+- Update to 5.6.2 (fix CVE-2026-85013)
+
+* Tue Nov 25 2025 Xavier Delaruelle <xavier.delaruelle@cea.fr> - 5.6.1-1
+- Update to 5.6.1
+- Update-alternatives is now available from _bindir
+- Remove reference to very old obsolete package
+- Update URL to https://envmodules.io
+
 * Thu Jul 31 2025 Xavier Delaruelle <xavier.delaruelle@cea.fr> - 5.6.0-1
 - Update to 5.6.0
 - Add envml(1) man page

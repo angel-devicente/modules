@@ -1,0 +1,12 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/OpenMPI/4.1.4-GCC-12.2.0
+conflict OpenMPI
+depends-on GCC/12.2.0
+depends-on zlib/1.2.12-GCCcore-12.2.0
+depends-on hwloc/2.8.0-GCCcore-12.2.0
+depends-on libevent/2.1.12-GCCcore-12.2.0
+depends-on UCX/1.13.1-GCCcore-12.2.0
+depends-on libfabric/1.16.1-GCCcore-12.2.0
+depends-on PMIx/4.2.2-GCCcore-12.2.0
+depends-on UCC/1.1.0-GCCcore-12.2.0

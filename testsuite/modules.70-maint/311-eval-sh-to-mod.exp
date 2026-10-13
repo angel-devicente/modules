@@ -69,9 +69,19 @@ foreach var [array names -glob FOO*] {
     unsetenv_var $var
 }
 
+# prepare things if PYTHONPATH is configured by autoinit
+if {[is_conf_enabled setpythonpath]} {
+    unsetenv_var PYTHONPATH
+    if {[string first { } $install_pythondir] != -1} {
+        set pythondirenc "{$install_pythondir}"
+    } else {
+        set pythondirenc $install_pythondir
+    }
+}
+
 # expected script env changes
 set tsvarpre "prepend-path\tFOOPATH /path/to/dir1 /path/to/dir2 /path/to/dir3
-prepend-path\tFOOPATHCB /path/to/dir1 /path/to/d\\{r2 /path/to/dir3
+prepend-path\tFOOPATHCB /path/to/dir1 /path/to/d\\\{r2 /path/to/dir3
 prepend-path\tFOOPATHEM {} /path/to/dir1 /path/to/dir2 /path/to/dir3
 prepend-path\tFOOPATHWC /path/to/dir1 /path/to/d*r2 /path/to/dir3"
 set tsvarappwpath {}
@@ -136,7 +146,7 @@ if {$install_setbinpath eq {y} && $install_bindir ni [split $::env(PATH) :]} {
     }
 }
 set tsvar "setenv\t\tFOO value
-setenv\t\tFOOCB va\\{ue
+setenv\t\tFOOCB va\\\{ue
 setenv\t\tFOOEM {}
 setenv\t\tFOOPATHSP {/path/to/dir1 /path/to/dir2 /path/to/dir3}
 setenv\t\tFOOPATHSPEM {/path/to/dir1 /path/to/dir2 /path/to/dir3 }
@@ -172,6 +182,30 @@ if {[info exists shell_pathname(bash-eval)]} {
 skip_if_quick_mode
 
 
+foreach path_entry_reorder {0 1} {
+
+setenv_var MODULES_PATH_ENTRY_REORDER $path_entry_reorder
+
+# reset state accumulated by a previous run through this loop, so each
+# path_entry_reorder value is tested from the same clean starting point
+foreach var [array names env -glob FOO*] {
+    unsetenv_var $var
+}
+unsetenv_var TESTSUITE_SHTOMOD_NOVAR
+unsetenv_var TESTSUITE_SHTOMOD_NOPATH
+unsetenv_var TESTSUITE_SHTOMOD_NOFUNC
+unsetenv_var TESTSUITE_SHTOMOD_NOALIAS
+unsetenv_var TESTSUITE_SHTOMOD_NOCOMP
+unsetenv_var TESTSUITE_SHTOMOD_NOCD
+unsetenv_var TESTSUITE_SHTOMOD_PATHDUP
+unsetenv_var TESTSUITE_SHTOMOD_MODULE
+unsetenv_var MODULES_SET_SHELL_STARTUP
+unsetenv_var MODULES_CMD
+unsetenv_var MODULES_COLLECTION_TARGET
+unsetenv_var testsuite
+unsetenv_path_var MODULEPATH
+unsetenv_loaded_module
+
 # remove progressively all kind of changes
 setenv_var TESTSUITE_SHTOMOD_NOVAR 1
 setenv_var TESTSUITE_SHTOMOD_NOPATH 1
@@ -199,7 +233,7 @@ testouterr_shtomod ALL {} OK {}
 unsetenv_var TESTSUITE_SHTOMOD_NOVAR
 set tserr_noarg "#%Module
 setenv\t\tFOO value
-setenv\t\tFOOCB va\\{ue
+setenv\t\tFOOCB va\\\{ue
 setenv\t\tFOOEM {}
 setenv\t\tFOOSP {value }
 setenv\t\tFOOWC va*ue"
@@ -207,8 +241,8 @@ set tserr "#%Module
 setenv\t\tFOO value
 setenv\t\tFOOARG1 val
 setenv\t\tFOOARG2 {value }
-setenv\t\tFOOARG3 val\\{ue
-setenv\t\tFOOCB va\\{ue
+setenv\t\tFOOARG3 val\\\{ue
+setenv\t\tFOOCB va\\\{ue
 setenv\t\tFOOEM {}
 setenv\t\tFOOSP {value }
 setenv\t\tFOOWC va*ue"
@@ -222,7 +256,7 @@ setenv\t\tFOOARG1 v'l
 setenv\t\tFOOARG2 val\\\"e
 setenv\t\tFOOARG3 {val\\\"e}
 setenv\t\tFOOARG4 {}
-setenv\t\tFOOCB va\\{ue
+setenv\t\tFOOCB va\\\{ue
 setenv\t\tFOOEM {}
 setenv\t\tFOOSP {value }
 setenv\t\tFOOWC va*ue"
@@ -238,7 +272,7 @@ setenv\t\tFOOARG1 v'l
 setenv\t\tFOOARG2 val\\\"e
 setenv\t\tFOOARG3 {val\\\"e}
 setenv\t\tFOOARG4 {}
-setenv\t\tFOOCB va\\{ue
+setenv\t\tFOOCB va\\\{ue
 setenv\t\tFOOEM {}
 setenv\t\tFOOSP {value }
 setenv\t\tFOOWC va*ue"
@@ -255,14 +289,14 @@ setenv_var FOOPATH /path/to/dir1:/path/to/dir2:/path/to/dir3
 setenv_var FOOPATHEM :/path/to/dir1:/path/to/dir2:/path/to/dir3
 setenv_var FOOPATHSP "/path/to/dir1 /path/to/dir2 /path/to/dir3"
 setenv_var FOOPATHSPEM "/path/to/dir1 /path/to/dir2 /path/to/dir3 "
-setenv_var FOOPATHCB /path/to/dir1:/path/to/d{r2:/path/to/dir3
+setenv_var FOOPATHCB /path/to/dir1:/path/to/d\{r2:/path/to/dir3
 setenv_var FOOPATHWC /path/to/dir1:/path/to/d*r2:/path/to/dir3
 testouterr_shtomod ALL {} OK {}
 setenv_var FOOPATH /path/to/dir2
 setenv_var FOOPATHEM /path/to/dir2
 setenv_var FOOPATHSP /path/to/dir2
 setenv_var FOOPATHSPEM /path/to/dir2
-setenv_var FOOPATHCB /path/to/d{r2
+setenv_var FOOPATHCB /path/to/d\{r2
 setenv_var FOOPATHWC /path/to/d*r2
 set tserr "#%Module
 append-path\t-d { } FOOPATHSP /path/to/dir3
@@ -282,21 +316,18 @@ setenv_var FOOPATH "/path/to/dir2:/path"
 setenv_var FOOPATHEM "/path/to/dir2:/path"
 setenv_var FOOPATHSP "/path/to/dir2 /path"
 setenv_var FOOPATHSPEM "/path/to/dir2 /path"
-setenv_var FOOPATHCB "/path/to/d{r2:/path"
+setenv_var FOOPATHCB "/path/to/d\{r2:/path"
 setenv_var FOOPATHWC "/path/to/d*r2:/path"
+# the prepend and append chunks here would use a different delimiter
+# character ('/' vs ':'): a plain setenv is used instead of the two path
+# commands, to produce a more consistent value
 set tserr "#%Module
-append-path\t-d / FOOPATH dir3
-append-path\t-d / FOOPATHCB dir3
-append-path\t-d / FOOPATHEM dir3
-append-path\t-d / FOOPATHSP dir3
-append-path\t-d / FOOPATHSPEM {dir3 }
-append-path\t-d / FOOPATHWC dir3
-prepend-path\t-d { } FOOPATHSP /path/to/dir1
-prepend-path\t-d { } FOOPATHSPEM /path/to/dir1
-prepend-path\tFOOPATH /path/to/dir1
-prepend-path\tFOOPATHCB /path/to/dir1
-prepend-path\tFOOPATHEM {} /path/to/dir1
-prepend-path\tFOOPATHWC /path/to/dir1"
+setenv\t\tFOOPATH /path/to/dir1:/path/to/dir2:/path/to/dir3
+setenv\t\tFOOPATHCB /path/to/dir1:/path/to/d\\\{r2:/path/to/dir3
+setenv\t\tFOOPATHEM :/path/to/dir1:/path/to/dir2:/path/to/dir3
+setenv\t\tFOOPATHSP {/path/to/dir1 /path/to/dir2 /path/to/dir3}
+setenv\t\tFOOPATHSPEM {/path/to/dir1 /path/to/dir2 /path/to/dir3 }
+setenv\t\tFOOPATHWC /path/to/dir1:/path/to/d*r2:/path/to/dir3"
 testouterr_shtomod ALL {} OK $tserr
 unsetenv_var FOOPATH
 unsetenv_var FOOPATHEM
@@ -339,11 +370,15 @@ setenv_var FOOPATHDUPMIX /path/to/dir2
 setenv_var FOOPATHDUPSP /path/to/dir2
 setenv_var FOOPATHDUPSPEM /path/to/dir2
 set tserr "#%Module
+append-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir3 /path/to:dir4 /path/to/dir3
+append-path\t--duplicates -d { } FOOPATHDUPSPEM /path/to/dir1 /path/to/dir3 /path/to/dir3 {}
+append-path\t--duplicates FOOPATHDUP /path/to/dir1 /path/to/dir3 {/path/to dir4} /path/to/dir3
+append-path\t--duplicates FOOPATHDUPEM /path/to/dir1 /path/to/dir3 {} /path/to/dir3
 append-path\t-d { } FOOPATHDUPMIX /path/to/dir1:/path/to/dir3:/path/to/dir3:
-append-path\t-d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir3 /path/to:dir4
-append-path\t-d { } FOOPATHDUPSPEM /path/to/dir1 /path/to/dir3 {}
-append-path\tFOOPATHDUP /path/to/dir1 /path/to/dir3 {/path/to dir4}
-append-path\tFOOPATHDUPEM /path/to/dir1 /path/to/dir3 {}
+prepend-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir1
+prepend-path\t--duplicates -d { } FOOPATHDUPSPEM /path/to/dir1 /path/to/dir1
+prepend-path\t--duplicates FOOPATHDUP /path/to/dir1 /path/to/dir1
+prepend-path\t--duplicates FOOPATHDUPEM {} /path/to/dir1 /path/to/dir1
 prepend-path\t-d { } FOOPATHDUPMIX :/path/to/dir1:/path/to/dir1"
 testouterr_shtomod ALL {} OK $tserr
 
@@ -354,12 +389,15 @@ setenv_var FOOPATHDUPMIX "/path/to/dir2 /path/to/dir1"
 setenv_var FOOPATHDUPSP "/path/to/dir2 /path/to/dir1"
 setenv_var FOOPATHDUPSPEM "/path/to/dir2 /path/to/dir1"
 set tserr "#%Module
-append-path\t-d { } FOOPATHDUPSP /path/to/dir3 /path/to:dir4
-append-path\t-d { } FOOPATHDUPSPEM /path/to/dir3 {}
-append-path\tFOOPATHDUP /path/to/dir3 {/path/to dir4}
-append-path\tFOOPATHDUPEM /path/to/dir3 {}
-append-path\tFOOPATHDUPMIX /path/to/dir3 {}
-prepend-path\t-d { } FOOPATHDUPMIX :/path/to/dir1:/path/to/dir1"
+append-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir3 /path/to:dir4 /path/to/dir3
+append-path\t--duplicates -d { } FOOPATHDUPSPEM /path/to/dir3 /path/to/dir3 {}
+append-path\t--duplicates FOOPATHDUP /path/to/dir3 {/path/to dir4} /path/to/dir3
+append-path\t--duplicates FOOPATHDUPEM /path/to/dir3 {} /path/to/dir3
+prepend-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir1
+prepend-path\t--duplicates -d { } FOOPATHDUPSPEM /path/to/dir1 /path/to/dir1
+prepend-path\t--duplicates FOOPATHDUP /path/to/dir1 /path/to/dir1
+prepend-path\t--duplicates FOOPATHDUPEM {} /path/to/dir1 /path/to/dir1
+setenv\t\tFOOPATHDUPMIX {:/path/to/dir1:/path/to/dir1 /path/to/dir2 /path/to/dir1:/path/to/dir3:/path/to/dir3:}"
 testouterr_shtomod ALL {} OK $tserr
 
 # ambiguous prior value
@@ -369,8 +407,8 @@ setenv_var FOOPATHDUPMIX :
 setenv_var FOOPATHDUPSP /path/to/dir1
 setenv_var FOOPATHDUPSPEM { }
 set tserr "#%Module
-append-path\t-d { } FOOPATHDUPSP /path/to/dir2 /path/to/dir3 /path/to:dir4
-append-path\tFOOPATHDUP /path/to/dir2 /path/to/dir3 {/path/to dir4}
+append-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 /path/to:dir4 /path/to/dir3
+append-path\t--duplicates FOOPATHDUP /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 {/path/to dir4} /path/to/dir3
 prepend-path\t-d 3 FOOPATHDUPSPEM {/path/to/dir1 /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir} { /path/to/dir}
 setenv\t\tFOOPATHDUPEM :/path/to/dir1:/path/to/dir1:/path/to/dir2:/path/to/dir1:/path/to/dir3::/path/to/dir3
 setenv\t\tFOOPATHDUPMIX {:/path/to/dir1:/path/to/dir1 /path/to/dir2 /path/to/dir1:/path/to/dir3:/path/to/dir3:}"
@@ -383,8 +421,8 @@ setenv_var FOOPATHDUPMIX {}
 setenv_var FOOPATHDUPSP /path/to/dir1
 setenv_var FOOPATHDUPSPEM {}
 set tserr "#%Module
-append-path\t-d { } FOOPATHDUPSP /path/to/dir2 /path/to/dir3 /path/to:dir4
-append-path\tFOOPATHDUP /path/to/dir2 /path/to/dir3 {/path/to dir4}
+append-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 /path/to:dir4 /path/to/dir3
+append-path\t--duplicates FOOPATHDUP /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 {/path/to dir4} /path/to/dir3
 setenv\t\tFOOPATHDUPEM :/path/to/dir1:/path/to/dir1:/path/to/dir2:/path/to/dir1:/path/to/dir3::/path/to/dir3
 setenv\t\tFOOPATHDUPMIX {:/path/to/dir1:/path/to/dir1 /path/to/dir2 /path/to/dir1:/path/to/dir3:/path/to/dir3:}
 setenv\t\tFOOPATHDUPSPEM {/path/to/dir1 /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 /path/to/dir3 }"
@@ -397,13 +435,13 @@ setenv_var FOOPATHDUPMIX "/path/to/dir1 /path/to/dir2"
 setenv_var FOOPATHDUPSP {/path/to:dir4}
 setenv_var FOOPATHDUPSPEM {/path/to/dir3 }
 set tserr "#%Module
-append-path\t-d { } FOOPATHDUPMIX /path/to/dir1:/path/to/dir3:/path/to/dir3:
-append-path\t-d { } FOOPATHDUPSP /path/to/dir3
-append-path\tFOOPATHDUP /path/to/dir2 /path/to/dir3 {/path/to dir4}
-prepend-path\t-d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir2
-prepend-path\t-d { } FOOPATHDUPSPEM /path/to/dir1 /path/to/dir2
-prepend-path\tFOOPATHDUPEM /path/to/dir2
-prepend-path\tFOOPATHDUPMIX /path/to/dir1"
+append-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir3
+append-path\t--duplicates FOOPATHDUP /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 {/path/to dir4} /path/to/dir3
+append-path\t--duplicates FOOPATHDUPEM /path/to/dir3
+prepend-path\t--duplicates -d { } FOOPATHDUPSP /path/to/dir1 /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3
+prepend-path\t--duplicates -d { } FOOPATHDUPSPEM /path/to/dir1 /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3
+prepend-path\t--duplicates FOOPATHDUPEM {} /path/to/dir1 /path/to/dir1 /path/to/dir2
+setenv\t\tFOOPATHDUPMIX {:/path/to/dir1:/path/to/dir1 /path/to/dir2 /path/to/dir1:/path/to/dir3:/path/to/dir3:}"
 testouterr_shtomod ALL {} OK $tserr
 
 unsetenv_var TESTSUITE_SHTOMOD_PATHDUP
@@ -493,8 +531,11 @@ if {$install_versioning eq {y}} {
 setenv\t\tMODULE_VERSION_STACK $install_version\n"
 }
 append tserr $tsvarsetwpath
-append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar
-setenv\t\ttestsuite yes"
+append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar"
+if {[is_conf_enabled setpythonpath]} {
+    append tserr "\nsetenv\t\tPYTHONPATH $pythondirenc"
+}
+append tserr "\nsetenv\t\ttestsuite yes"
 set tserrbash "$tserr$extratserr"
 foreach sh $shtomod_avail_shells {
     # unset module definition on bash when module is predefined
@@ -512,7 +553,11 @@ if {$install_versioning eq {y}} {
 setenv\t\tMODULE_VERSION_STACK $install_version\n"
 }
 append tserr $tsvarsetwpath
-append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar$extratserr"
+append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar"
+if {[is_conf_enabled setpythonpath]} {
+    append tserr "\nsetenv\t\tPYTHONPATH $pythondirenc"
+}
+append tserr $extratserr
 testouterr_shtomod bash-eval {} OK $tserr
 
 # module is loaded prior sh-to-mod
@@ -524,9 +569,14 @@ if {$install_versioning eq {y}} {
 setenv\t\tMODULE_VERSION_STACK $install_version\n"
 }
 append tserr $tsvarsetwpath
-append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar$extratserr"
+append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar"
+if {[is_conf_enabled setpythonpath]} {
+    append tserr "\nsetenv\t\tPYTHONPATH $pythondirenc"
+}
+append tserr $extratserr
 testouterr_shtomod bash-eval {} OK $tserr
 
+}
 
 #
 #  Cleanup

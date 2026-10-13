@@ -20,11 +20,11 @@ Support questions
 -----------------
 
 Please use the `modules-interest mailing list`_
-(``modules-interest@lists.sourceforge.net``) or the `Modules chat room`_
+(``modules-interest@lists.hpsf.io``) or the `Modules chat room`_
 (``#modules:matrix.org``) for questions. Do not use the
 issue tracker for this.
 
-.. _modules-interest mailing list: https://sourceforge.net/projects/modules/lists/modules-interest
+.. _modules-interest mailing list: https://lists.hpsf.io/g/modules-interest
 .. _Modules chat room: https://matrix.to/#/#modules:matrix.org
 
 Asking for new features
@@ -53,6 +53,26 @@ for guidelines on how to report such issues responsibly.
 
 .. _security policy: https://github.com/envmodules/modules/security
 
+.. _tsc-meeting:
+
+TSC meeting
+-----------
+
+A meeting of the Technical Steering Committee (TSC) is organized every
+quarter. This meeting is open to anyone willing to learn more about the
+project and its ongoing activities.
+
+The TSC usually defines or refines the roadmap for the next version during
+this meeting. The community may also raise their concerns or questions to the
+maintainers.
+
+Please visit the `Modules wiki`_ to find the date and time of the next TSC
+meeting, along with the connection details for joining the virtual session.
+The wiki also includes the agenda for upcoming meetings and notes from
+previous ones.
+
+.. _Modules wiki: https://github.com/envmodules/modules/wiki
+
 .. _submitting-patches:
 
 Submitting patches
@@ -71,14 +91,19 @@ Start coding
 ~~~~~~~~~~~~
 
 * Create a branch to identify the issue or feature you would like to work on
-* Using your favorite editor, make your changes, `committing as you go`_.
-* Comply to the `coding conventions of this project <coding-conventions_>`_.
+* Using your favorite editor, make your changes, `committing as you go`_
+  and following the `commit message conventions
+  <commit-message-conventions_>`_ of this project.
+* Comply to the `coding conventions of this project <coding-conventions_>`_
+  and its `code comments guidelines <code-comments_>`_.
 * Your Tcl code has to be compatible with Tcl version 8.5 and above (see
   `Tcl 8.5 commands reference`_)
 * Include tests that cover any code changes you make. Make sure the test fails
   without your patch.
 * `Run the tests <running-the-tests_>`_ and `verify coverage <running-test-coverage_>`_.
 * `Sign-off your commits <developer-certificate-of-origin_>`_.
+* If you used `AI coding assistants <ai-coding-assistants_>`_, disclose it in
+  your commit message.
 * Push your commits to GitHub and `create a pull request`_.
 
 .. _committing as you go: https://afraid-to-commit.readthedocs.io/en/latest/git/commandlinegit.html#commit-your-changes
@@ -93,6 +118,8 @@ howtos are also available:
 
 * :ref:`add-new-sub-command`
 * :ref:`add-new-config-option`
+* :ref:`add-new-hook-event`
+* :ref:`devel-testsuite`
 
 .. _running-the-tests:
 
@@ -103,12 +130,14 @@ Run the basic test suite with::
 
    make test
 
-This only runs the tests for the current environment. `GitHub Actions`_ and
-`Cirrus CI`_ will run the full suite when you submit your pull request.
+This only runs the tests for the current environment. `GitHub Actions`_ will
+run the full suite when you submit your pull request. See
+:ref:`devel-testsuite` for a full description of how the testsuite is
+organized and how to add or debug tests.
 
-There are more than 17 000 test cases thus it generally takes around 12
+There are around 25 000 test cases thus it generally takes around 12
 minutes to run the full test suite. It can be executed in *quick* mode to just
-run the most essential tests in about 1 minute::
+run the most essential tests (around 1 900 test cases) in about 1 minute::
 
    make test QUICKTEST=y
 
@@ -123,7 +152,6 @@ Run :command:`script/mt` with ``--help`` option to get usage details and
 syntax to select several testfiles.
 
 .. _GitHub Actions: https://github.com/envmodules/modules/actions
-.. _Cirrus CI: https://cirrus-ci.com/github/envmodules/modules
 
 .. _running-test-coverage:
 
@@ -235,6 +263,66 @@ Coding conventions
 
 .. _Tcl minimal escaping style: https://wiki.tcl-lang.org/page/Tcl+Minimal+Escaping+Style
 
+.. _code-comments:
+
+Code comments
+~~~~~~~~~~~~~
+
+Modules follows the code comment philosophy described by John Ousterhout in
+`A Philosophy of Software Design`_:
+
+* A comment should say something the code itself cannot: the reasoning
+  behind a choice, a non-obvious constraint or side effect, or a workaround
+  for a specific bug. Well-named identifiers and clear code already say
+  *what* is happening, so do not restate that in a comment.
+* Write comments at a different level of detail than the code: either more
+  precise, spelling out units, boundary conditions or special values that
+  the code leaves implicit, or more abstract, giving the reader a
+  big-picture summary of what a block of code accomplishes.
+* Document a procedure's interface from the caller's point of view, e.g.
+  what it does, its arguments and return value, and any non-obvious
+  behavior or ordering requirement, separately from implementation comments
+  that explain what a tricky part of the body does and why, not how.
+* Keep comments next to the code they describe and update them whenever
+  that code changes, so they never drift out of sync. Prefer higher-level
+  comments, which stay accurate across minor code changes, over ones that
+  just restate implementation detail.
+* Capture the *why* behind a non-obvious change as a comment in the code
+  itself, not only in the commit message, since a reader examining the code
+  later will not necessarily go digging through its history.
+
+.. _A Philosophy of Software Design: https://web.stanford.edu/~ouster/cgi-bin/aposd.php
+
+.. _commit-message-conventions:
+
+Commit message conventions
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Prefix the subject line with the area touched, followed by a colon and a
+  lowercase verb, when a change is confined to that area, e.g. ``doc:``,
+  ``ts:`` (testsuite), ``install:`` (build system), ``gh:`` (GitHub
+  Actions), ``init:`` (shell init/completion scripts), ``script:``
+  (maintainer tooling), ``rpm:``, ``lint:``, ``vim:``, ``emacs:`` or
+  ``lib:``. Combine two areas with a slash, e.g. ``doc/ts:``, only when a
+  single prefix would be misleading. Leave the subject unprefixed, with a
+  capitalized verb, for changes to the core Tcl engine or its behavior.
+* Use the imperative mood for the verb starting the subject, e.g. ``Add``
+  or ``doc: fix``, not ``Added``/``Adds`` or ``doc: fixed``/``fixes``.
+* Do not end the subject with a period and try to keep it around 50 to 72
+  characters.
+* Separate a commit body from its subject with a blank line and wrap it to
+  about the same width as the subject. Use it to explain *why* the change
+  is needed, following the `code comments guidelines <code-comments_>`_,
+  rather than restating what the diff already shows. Omit the body when the
+  subject line alone says everything there is to say.
+* Reference an issue this commit resolves on its own line in the body,
+  e.g. ``Fixes #645`` or ``Closes #572``.
+* Disclose `AI coding assistants <ai-coding-assistants_>`_ involvement, if
+  any, with an ``Assisted-by:`` trailer.
+* `Sign-off your commits <developer-certificate-of-origin_>`_ with a
+  ``Signed-off-by:`` trailer, always as the last line of the commit
+  message.
+
 .. _developer-certificate-of-origin:
 
 Developer Certificate of Origin (DCO)
@@ -273,6 +361,33 @@ will fail. You will need to amend your commit::
     git commit --amend -s
 
 .. _Developer Certificate of Origin (DCO): https://developercertificate.org/
+
+.. _ai-coding-assistants:
+
+AI coding assistants
+~~~~~~~~~~~~~~~~~~~~
+
+Modules follows the Linux kernel's approach to AI-assisted contributions. AI
+tools may help write a patch, but the human submitter remains fully
+responsible for it: reviewing all AI-generated code, ensuring it complies
+with the project's licensing requirements and `coding conventions
+<coding-conventions_>`_, and testing it thoroughly.
+
+AI agents must not add ``Signed-off-by`` tags. Only a human can certify the
+`DCO <developer-certificate-of-origin_>`_, so the human submitter still adds
+their own ``Signed-off-by`` line as usual.
+
+When AI tools are used, disclose their involvement with an ``Assisted-by``
+trailer at the end of the commit message::
+
+    Assisted-by: AGENT_NAME:MODEL_VERSION [TOOL1] [TOOL2]
+
+``AGENT_NAME`` is the name of the AI tool or framework and ``MODEL_VERSION``
+is the specific model version used. ``[TOOL1] [TOOL2]`` are optional
+specialized analysis tools used alongside it (e.g. a linter); basic
+development tools (git, make, editors) should not be listed. For example::
+
+    Assisted-by: Claude:claude-sonnet-5
 
 .. _commit-hooks:
 

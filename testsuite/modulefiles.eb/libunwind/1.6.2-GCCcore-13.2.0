@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libunwind/1.6.2-GCCcore-13.2.0
+conflict libunwind
+depends-on GCCcore/13.2.0
+depends-on XZ/5.4.4-GCCcore-13.2.0

@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libdrm/2.4.107-GCCcore-11.2.0
+conflict libdrm
+depends-on GCCcore/11.2.0
+depends-on X11/20210802-GCCcore-11.2.0

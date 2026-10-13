@@ -1,7 +1,7 @@
 ##########################################################################
 
 # CACHE.TCL, cache management procedures
-# Copyright (C) 2022-2025 Xavier Delaruelle
+# Copyright (C) 2022-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -50,19 +50,15 @@ proc getLimitedAccessesInDirectory {modpath} {
       return {}
    }
 
-   foreach igndir [getConf ignored_dirs] {
-      set ignored_dirs($igndir) 1
-   }
    # walk through directory to find elements with limited access
    array set limited_arr {}
    lappend full_list $modpath
    for {set i 0} {$i < [llength $full_list]} {incr i 1} {
       set elt [lindex $full_list $i]
-      set elttail [file tail $elt]
       set eltname [getModuleNameFromModulepath $elt $modpath]
       if {[file isdirectory $elt]} {
          # skip ignored dirs
-         if {![info exists ignored_dirs($elttail)]} {
+         if {![isPathIgnored $modpath $elt 1]} {
             if {[isFileAccessLimited $elt 1]} {
                set limited_arr($eltname) d
             # only walk through directory content if its access is not limited
@@ -81,14 +77,13 @@ proc getLimitedAccessesInDirectory {modpath} {
             }
          }
       } else {
-         # skip ignored files
-         switch -glob -- $elttail {
-            *~ - *,v - \#*\# {}
-            default {
-               if {[isFileAccessLimited $elt 0]} {
-                  set limited_arr($eltname) f
-               }
-            }
+         # skip ignored files (rc files are exempt from ignore pattern
+         # check: without their limited access record, the content of a
+         # pattern-matching rc file with restricted access would get
+         # plainly recorded in cache file)
+         if {![isPathIgnored $modpath $elt 0] && [isFileAccessLimited $elt\
+            0]} {
+            set limited_arr($eltname) f
          }
       }
    }
@@ -108,11 +103,19 @@ proc getLimitedAccessesInDirectory {modpath} {
 # Build cache file content for given modulepath
 proc formatModuleCacheContent {modpath} {
    set content {}
+   # rc files are evaluated during modulepath walk to apply the path ignore
+   # patterns they may define: silence their evaluation errors like during
+   # an avail-like walk (their bare content is recorded whether their code
+   # is correct or not)
+   inhibitErrorReport
+
    # collect files from modulepath directory
    array set found_list [findModules $modpath * 0 1]
 
    # collect files and dirs from modulepath directory with limited access
    array set limited_list [getLimitedAccessesInDirectory $modpath]
+
+   uninhibitErrorReport
 
    # concatenate element found and those with limited access as the second
    # kind may not be part of found list
@@ -271,8 +274,7 @@ proc execute-cachefile {cachefile modpath} {
    reportTrace '$cachefile' {Evaluate cache file}
    # create cachefile interpreter at first interpretation
    if {![interp exists $itrp]} {
-      reportDebug "creating interp $itrp"
-      interp create $itrp
+      createInterp $itrp
 
       # dump initial interpreter state to restore it before each cachefile
       # interpretation.
@@ -378,8 +380,10 @@ proc limited-access-directory {dir} {
 proc findModulesInCacheFile {modpath mod depthlvl fetch_mtime} {
    set cachefile [getModuleCacheFilename $modpath]
 
-   # check if cache should be ignored
-   if {[getConf ignore_cache]} {
+   # check if cache should be ignored, either globally or for currently
+   # running top-level sub-command
+   if {[getConf ignore_cache] || [topCommandName] in [getConfList\
+      ignore_cache_subcmds]} {
       return [list 0 {}]
    }
 
@@ -485,7 +489,8 @@ proc findModulesInCacheFile {modpath mod depthlvl fetch_mtime} {
 
    # walk through list of matching limited access dirs and files to find
    # modules available to current user (transmit list of known files and dirs
-   # to avoid file stat tests)
+   # to avoid file stat tests). rc files recorded in cache are evaluated
+   # first there, as their patterns may apply to this walk
    findModulesFromDirsAndFiles $modpath $limited_list $depthlvl $fetch_mtime\
       cache_arr modfile_indir hidden_list flimited_arr dlimited_arr
 
@@ -495,7 +500,10 @@ proc findModulesInCacheFile {modpath mod depthlvl fetch_mtime} {
    return [list 1 $cache_list]
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

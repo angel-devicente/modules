@@ -1,0 +1,7 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libepoxy/1.5.10-GCCcore-12.2.0
+conflict libepoxy
+depends-on GCCcore/12.2.0
+depends-on X11/20221110-GCCcore-12.2.0
+depends-on Mesa/22.2.4-GCCcore-12.2.0

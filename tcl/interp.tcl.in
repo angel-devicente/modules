@@ -3,7 +3,7 @@
 # INTERP.TCL, sub-interpreter management procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,6 +28,43 @@ proc nimp {cmd args} {
    reportWarning "'$cmd' command not implemented"
 }
 
+proc createInterp {itrp} {
+   # set quarantine variables to their runtime value or unset them during
+   # interp creation to protect this initialization step from their current
+   # definition (e.g., a TCL_LIBRARY variable pointing at a broken Tcl
+   # installation)
+   set quar_var_list [getQuarantineVarList]
+   foreach var $quar_var_list {
+      if {[info exists ::env($var)]} {
+         set quar_orig_val($var) $::env($var)
+      }
+      if {[info exists ::env(MODULES_RUNENV_$var)]} {
+         reportDebug "Set '$var' environment variable in quarantine\
+            ($::env(MODULES_RUNENV_$var))"
+         set ::env($var) $::env(MODULES_RUNENV_$var)
+      } else {
+         reportDebug "Unset '$var' environment variable in quarantine"
+         unset -nocomplain ::env($var)
+      }
+   }
+
+   reportDebug "creating interp $itrp"
+   interp create $itrp
+
+   # restore environment variables put in quarantine once interp is created
+   foreach var $quar_var_list {
+      if {[info exists quar_orig_val($var)]} {
+         set ::env($var) $quar_orig_val($var)
+      } else {
+         unset -nocomplain ::env($var)
+         # also unset variable in created interp if it was set during
+         # creation: this env entry is not removed by the unset above and a
+         # read attempt on it would raise a "no such variable" error
+         ##nagelfar ignore Found constant
+         interp eval $itrp [list unset -nocomplain ::env($var)]
+      }
+   }
+}
 
 # Get identifier name of current Tcl modulefile interpreter. An interp is
 # dedicated to each mode/auto_handling option value/depth level of modulefile
@@ -35,42 +72,6 @@ proc nimp {cmd args} {
 proc getCurrentModfileInterpName {} {
    return __modfile_[currentState mode]_[getConf auto_handling]_[depthState\
       modulename]
-}
-
-# synchronize environment variable change over all started sub interpreters
-proc interp-sync-env {op var {val {}}} {
-   set envvar ::env($var)
-   ##nagelfar vartype envvar varName
-
-   # apply operation to main interpreter
-   switch -- $op {
-      set { set $envvar $val }
-      unset { unset $envvar }
-   }
-
-   # apply operation to each sub-interpreters if not found autosynced
-   if {[llength [interp slaves]]} {
-      reportDebug "$op var='$envvar', val='$val' on interp(s) [interp slaves]"
-
-      foreach itrp [interp slaves] {
-         switch -- $op {
-            set {
-               # no value pre-check on Windows platform as an empty value set
-               # means unsetting variable which lead querying value to error
-               if {[getState is_win] || ![interp eval $itrp [list info exists\
-                  $envvar]] || [interp eval $itrp [list set $envvar]] ne\
-                  $val} {
-                  interp eval $itrp [list set $envvar $val]
-               }
-            }
-            unset {
-               if {[interp eval $itrp [list info exists $envvar]]} {
-                  interp eval $itrp [list unset $envvar]
-               }
-            }
-         }
-      }
-   }
 }
 
 # Initialize list of interp alias commands to define for given evaluation mode
@@ -90,17 +91,21 @@ proc initModfileModeAliases {mode auto aliasesVN aliasesPassArgVN\
          reportCmdTrace reportWarning reportWarning reportError reportError\
          incrErrorCount incrErrorCount report report isWin initStateIsWin\
          puts putsModfileCmd getModuleContent getModuleContent lsb-release\
-         lsb-release getModuleHelpLines getModuleHelpLines]
+         lsb-release getModuleHelpLines getModuleHelpLines append\
+         appendModfileCmd]
 
       if {[getConf source_cache]} {
          lappend ::g_modfileBaseAliases source sourceModfileCmd
+      }
+      if {[llength [getState linked_envvars]]} {
+         lappend ::g_modfileBaseAliases mirrorEnvVarChange mirrorEnvVarChange
       }
 
       # list of alias commands whose target procedure is adapted according to
       # the evaluation mode
       set ::g_modfileEvalModes {load unload display help test whatis refresh\
          scan}
-      ##nagelfar ignore #49 Too long line
+      ##nagelfar ignore #50 Too long line
       array set g_modfilePerModeAliases {
 add-property   {add-property   nop            reportCmd      nop            nop            nop            nop          nop}
 always-load    {always-load    nop            reportCmd      nop            nop            nop            nop          always-load-sc}
@@ -110,7 +115,7 @@ complete       {complete       complete-un    reportCmd      nop            nop 
 conflict       {conflict       nop            reportCmd      nop            nop            nop            nop          conflict-sc }
 depends-on     {prereqAllModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-all-sc}
 depends-on-any {prereqAnyModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-sc   }
-extensions     {provide        nop            reportCmd      nop            nop            nop            nop          provide-sc  }
+extensions     {extensions     nop            reportCmd      nop            nop            nop            nop          extensions-sc}
 family         {family         family-un      reportCmd      nop            nop            nop            nop          family-sc   }
 haveDynamicMPATH {nop          nop            nop            nop            nop            nop            nop          nop         }
 hide-modulefile {hide-modulefile hide-modulefile hide-modulefile hide-modulefile hide-modulefile hide-modulefile nop   nop         }
@@ -129,6 +134,7 @@ module-hide    {module-hide    module-hide    module-hide    module-hide    modu
 module-tag     {module-tag     module-tag     module-tag     module-tag     module-tag     module-tag     nop          nop         }
 module-warn    {module-warn    module-warn    module-warn    module-warn    module-warn    module-warn    nop          nop         }
 module-whatis  {nop            nop            reportCmd      nop            nop            module-whatis  nop          nop         }
+modulepath-ignore {modulepath-ignore modulepath-ignore modulepath-ignore modulepath-ignore modulepath-ignore modulepath-ignore nop nop}
 prepend-path   {prepend-path   prepend-path-un prepend-path  prepend-path   prepend-path   edit-path-wh   nop          edit-path-sc}
 prereq-all     {prereqAllModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-all-sc}
 prereq-any     {prereqAnyModfileCmd  nop      reportCmd      nop            nop            nop            nop          prereq-sc   }
@@ -155,7 +161,8 @@ x-resource     {x-resource     x-resource     reportCmd      nop            nop 
 
    # alias commands where interpreter ref should be passed as argument
    array set aliasesPassArg [list getvariant [list __itrp__] puts [list\
-      __itrp__] variant [list __itrp__] source [list __itrp__]]
+      __itrp__] variant [list __itrp__] source [list __itrp__] append [list\
+      __itrp__]]
 
    # initialize list with all commands not dependent of the evaluation mode
    array set aliases $::g_modfileBaseAliases
@@ -184,7 +191,12 @@ x-resource     {x-resource     x-resource     reportCmd      nop            nop 
       # in display mode (except for source-sh and unique-name-conflict)
       } elseif {$mode eq {display} && $alias ni {source-sh\
          unique-name-conflict}} {
-         set traces($alias) reportCmdTrace
+         lappend traces($alias) reportCmdTrace
+      }
+      # mirror environment variable changes if some links are defined
+      if {[llength [getState linked_envvars]] && $alias in {append-path\
+         prepend-path pushenv remove-path setenv unsetenv}} {
+         lappend traces($alias) mirrorEnvVarChange
       }
    }
 }
@@ -220,7 +232,6 @@ proc execute-modulefile {modfile modname modnamevrvar modspec requested\
 
    # gather all tags of evaluated modulefile
    if {$fetch_tags} {
-      cacheCurrentModules 0
       collectModuleTags $modnamevr
    }
 
@@ -229,7 +240,7 @@ proc execute-modulefile {modfile modname modnamevrvar modspec requested\
       array set ::g_modfileUntrackVars [list ModulesCurrentModulefile 1 env 1]
 
       # commands that should be renamed before aliases setup
-      array set ::g_modfileRenameCmds [list puts _puts]
+      array set ::g_modfileRenameCmds [list puts _puts append _append]
    }
    # dedicate an interpreter per mode and per level of interpretation to have
    # a dedicated interpreter in case of cascaded multi-mode interpretations
@@ -274,8 +285,7 @@ proc execute-modulefile {modfile modname modnamevrvar modspec requested\
 
    # create modulefile interpreter at first interpretation
    if {![interp exists $itrp]} {
-      reportDebug "creating interp $itrp"
-      interp create $itrp
+      createInterp $itrp
 
       # initialize global static variables for modulefile interp
       foreach {var val} $::g_modfileBaseVars {
@@ -300,12 +310,18 @@ proc execute-modulefile {modfile modname modnamevrvar modspec requested\
       g_modfileUntrackVars g_modfileProcs $aliasesVN $aliasesPassArgVN\
       $tracesVN g_modfileRenameCmds $dumpCommandsVN
 
+   runHooks before-modulefile-eval $modfile $modname $modnamevr $modspec\
+      $mode $requested
+
    set vr_spec_list [getVariantListFromVersSpec $modnamevr]
    set failed_eval [catch {evaluateModulefile $itrp $modfile $vr_spec_list}\
       errorMsg]
 
    set eval_return_code [renderModulefileEvalError $itrp $mode $modfile\
       $failed_eval $errorMsg]
+
+   runHooks after-modulefile-eval $modfile $modname $modnamevr $modspec\
+      $mode $requested $eval_return_code
 
    if {$mode eq {load} && ![isStateDefined rc_running]} {
       if {[catch {checkModuleConflict $modname $modnamevr} errorMsg]} {
@@ -554,12 +570,14 @@ proc execute-modulerc {modfile modname modspec} {
 
       # list interpreter alias commands to define
       array set ::g_modrcAliases [list uname uname system system versioncmp\
-         versioncmp hide-modulefile hide-modulefile hide-version\
-         hide-modulefile is-loaded is-loaded is-used is-used module-version\
-         module-version module-alias module-alias module-virtual\
-         module-virtual module-forbid module-forbid module-hide module-hide\
-         module-tag module-tag module-info module-info modulepath-label\
-         modulepath-label modulepath-indent modulepath-indent setModulesVersion setModulesVersion\
+         versioncmp getenv getenv hide-modulefile hide-modulefile\
+         hide-version hide-modulefile is-loaded is-loaded is-used is-used\
+         module-version module-version module-alias module-alias\
+         module-virtual module-virtual module-forbid module-forbid\
+         module-hide module-hide module-tag module-tag module-info\
+         module-info modulepath-ignore modulepath-ignore modulepath-label\
+         modulepath-label modulepath-indent modulepath-indent\
+         setModulesVersion setModulesVersion\
          getModuleContent getModuleContent lsb-release lsb-release\
          module-warn module-warn]
 
@@ -609,8 +627,7 @@ proc execute-modulerc {modfile modname modspec} {
    reportTrace '$modfile' {Evaluate modulerc}
    # create modulerc interpreter at first interpretation
    if {![interp exists $itrp]} {
-      reportDebug "creating interp $itrp"
-      interp create $itrp
+      createInterp $itrp
 
       # initialize global static variables for modulerc interp
       foreach {var val} $::g_modrcBaseVars {
@@ -635,9 +652,14 @@ proc execute-modulerc {modfile modname modspec} {
       g_modrcUntrackVars g_modrcProcs g_modrcAliases g_modrcAliasesPassArg\
       g_modrcAliasesTraces g_modrcRenameCmds g_modrcCommands
 
+   runHooks before-modulerc-eval $modfile $modname
+
    set failed_eval [catch {evaluateModulerc $itrp $modfile} errorMsg]
 
-   renderModulercEvalError $itrp $modfile $failed_eval $errorMsg
+   set eval_return_code [renderModulercEvalError $itrp $modfile $failed_eval\
+      $errorMsg]
+
+   runHooks after-modulerc-eval $modfile $modname $eval_return_code
 
    # default version set via ModulesVersion variable in .version file
    # override previously defined default version for modname
@@ -794,8 +816,9 @@ proc initInterpCommands {itrp fresh aliasesVN aliasesPassArgVN tracesVN\
    }
 
    foreach alias [array names traces] {
-      interp eval $itrp [list trace add execution $alias leave\
-         $traces($alias)]
+      foreach trace_proc $traces($alias) {
+         interp eval $itrp [list trace add execution $alias leave $trace_proc]
+      }
    }
 }
 
@@ -841,7 +864,7 @@ proc resetInterpState {itrp fresh dumpVarsVN dumpArrayVarsVN untrackVarsVN\
    } elseif {$dumpCommands ne [$itrp eval {info commands}]} {
       reportDebug "missing command(s), recreating interp $itrp"
       interp delete $itrp
-      interp create $itrp
+      createInterp $itrp
       initInterpCommands $itrp 1 $aliasesVN $aliasesPassArgVN $tracesVN\
          $renameCmdsVN
    }
@@ -876,7 +899,10 @@ proc resetInterpState {itrp fresh dumpVarsVN dumpArrayVarsVN untrackVarsVN\
    }
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

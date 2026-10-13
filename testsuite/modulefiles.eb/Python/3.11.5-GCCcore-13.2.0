@@ -1,0 +1,14 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/Python/3.11.5-GCCcore-13.2.0
+conflict Python
+depends-on GCCcore/13.2.0
+depends-on binutils/2.40-GCCcore-13.2.0
+depends-on bzip2/1.0.8-GCCcore-13.2.0
+depends-on zlib/1.2.13-GCCcore-13.2.0
+depends-on libreadline/8.2-GCCcore-13.2.0
+depends-on ncurses/6.4-GCCcore-13.2.0
+depends-on SQLite/3.43.1-GCCcore-13.2.0
+depends-on XZ/5.4.4-GCCcore-13.2.0
+depends-on libffi/3.4.4-GCCcore-13.2.0
+depends-on OpenSSL/1.1

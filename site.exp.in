@@ -32,6 +32,8 @@ set install_libdir32 "@libdir32@"
 set install_setmanpath "@setmanpath@"
 set install_appendmanpath "@appendmanpath@"
 set install_usemanpath "@usemanpath@"
+set install_setpythonpath "@setpythonpath@"
+set install_appendpythonpath "@appendpythonpath@"
 set install_setbinpath "@setbinpath@"
 set install_appendbinpath "@appendbinpath@"
 set install_examplemodulefiles "@examplemodulefiles@"
@@ -40,6 +42,7 @@ set install_initconfin "@initconfin@"
 
 set install_builddoc "@builddoc@"
 
+set install_paginate "@paginate@"
 set install_pager "@pager@"
 set install_pageropts "@pageropts@"
 set install_pagercmd $install_pager
@@ -53,6 +56,13 @@ set install_loggeropts "@loggeropts@"
 set install_loggercmd $install_logger
 if {$install_loggeropts ne {}} {
     append install_loggercmd " $install_loggeropts"
+}
+
+set install_domainname "@domainname@"
+set install_domainnameopts "@domainnameopts@"
+set install_domainnamecmd $install_domainname
+if {$install_domainnameopts ne {}} {
+    append install_domainnamecmd " $install_domainnameopts"
 }
 
 set install_verbosity "@verbosity@"
@@ -117,9 +127,15 @@ set install_variantshortcut "@variantshortcut@"
 
 set install_editor "@editor@"
 
+set install_pathentryreorder "@pathentryreorder@"
+
+set install_initenvvars "@initenvvars@"
+
 set install_bashcompletiondir "@bashcompletiondir@"
 set install_fishcompletiondir "@fishcompletiondir@"
 set install_zshcompletiondir "@zshcompletiondir@"
+
+set install_pythondir "@pythondir@"
 
 set install_tcllinter "@tcllinter@"
 set install_tcllinteropts "@tcllinteropts@"

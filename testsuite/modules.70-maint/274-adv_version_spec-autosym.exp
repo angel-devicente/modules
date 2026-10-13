@@ -40,7 +40,7 @@ set mpre [regsub -all "\(\[.+?\]\)" $mp {\\\1}]
 # setup specific environment
 setenv_path_var MODULEPATH $mp
 
-set key_sym "\n\nKey:\n(symbolic-version)  "
+set key_sym "\n\nKey:\n(symbolic-version)"
 
 # test auto symbols enablement (when implicit_default and advanced_version_spec
 # is enabled and no module version already exists)
@@ -172,7 +172,7 @@ testouterr_cmd sh {is-loaded autosym1/default} OK {}
 testouterr_cmd sh {is-loaded autosym1@latest} OK {}
 testouterr_cmd sh {load autosym1/default} OK {}
 testouterr_cmd sh {load autosym1@latest} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym1/1(default)   2) autosym1/2  $key_sym"
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym1/1(default)   2) autosym1/2$key_sym"
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
 
@@ -194,7 +194,7 @@ testouterr_cmd sh {is-loaded autosym2/default} OK {}
 testouterr_cmd sh {is-loaded autosym2@latest} OK {}
 testouterr_cmd sh {load autosym2/default} OK {}
 testouterr_cmd sh {load autosym2@latest} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym2/1   2) autosym2/2(bar:latest)  $key_sym"
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym2/1   2) autosym2/2(bar:latest)$key_sym"
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
 
@@ -220,7 +220,7 @@ testouterr_cmd sh {is-loaded autosym3/default} OK {}
 testouterr_cmd sh {is-loaded autosym3@latest} OK {}
 testouterr_cmd sh {load autosym3/default} OK {}
 testouterr_cmd sh {load autosym3@latest} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym3/1(default)   2) autosym3/2(latest)  $key_sym"
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym3/1(default)   2) autosym3/2(latest)$key_sym"
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
 
@@ -245,7 +245,7 @@ testouterr_cmd sh {is-loaded autosym4/default} OK {}
 testouterr_cmd sh {is-loaded autosym4@latest} OK {}
 testouterr_cmd sh {load autosym4/default} OK {}
 testouterr_cmd sh {load autosym4@latest} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym4/1   2) autosym4/2  "
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym4/1   2) autosym4/2"
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
 
@@ -267,7 +267,7 @@ testouterr_cmd sh {is-loaded autosym5/default} OK {}
 testouterr_cmd sh {is-loaded autosym5@latest} OK {}
 testouterr_cmd sh {load autosym5/default} OK {}
 testouterr_cmd sh {load autosym5@latest} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym5/default  "
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym5/default"
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
 
@@ -292,7 +292,7 @@ testouterr_cmd sh {is-loaded autosym6/default} OK {}
 testouterr_cmd sh {is-loaded autosym6@latest} OK {}
 testouterr_cmd sh {load autosym6/default} OK {}
 testouterr_cmd sh {load autosym6@latest} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym6/1(zzz)   2) autosym6/latest  $key_sym"
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym6/1(zzz)   2) autosym6/latest$key_sym"
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
 
@@ -381,7 +381,7 @@ testouterr_cmd sh {load autosym7/default} OK {}
 testouterr_cmd sh {load autosym7@latest} OK {}
 testouterr_cmd sh {load autosym7/dir2/default} OK {}
 testouterr_cmd sh {load autosym7/dir2@latest} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym7/dir2/2  "
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym7/dir2/2"
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
 
@@ -414,6 +414,44 @@ setenv_var __MODULES_LMALTNAME autosym8/2&al|autosym8/3&as|autosym8/default&as|a
 testouterr_cmd sh {is-loaded autosym8@latest} OK {}
 unsetenv_loaded_module
 unsetenv_var __MODULES_LMALTNAME
+
+
+# autosymbol name matches an explicit symbolic version that is itself
+# targeted by a module-forbid command coupled to a module-hide --hard one:
+# the entry already found (in error) for this name short-circuits autosymbol
+# creation, yet resolution to the forbidden module is still attempted
+#
+# uses modulefiles.4 rather than modulefiles.2, so this fixture does not show
+# up in the other tests that enumerate modulefiles.2's entire content
+
+set mp_saved $mp
+set mp "$modpath.4"
+setenv_path_var MODULEPATH $mp
+
+testouterr_cmd sh {avail -t autosym10@default} OK $mp:\nautosym10/2
+testouterr_cmd sh {avail -t autosym10@latest} OK {}
+testouterr_cmd sh {avail -t autosym10/latest} OK {}
+set ans [list]
+lappend ans [list set __MODULES_LMALTNAME autosym10/2&as|autosym10/latest&as|autosym10/default]
+lappend ans [list set _LMFILES_ $mp/autosym10/2]
+lappend ans [list set LOADEDMODULES autosym10/2]
+testouterr_cmd sh {load autosym10} $ans {}
+testouterr_cmd sh {load autosym10/default} $ans {}
+testouterr_cmd sh {load autosym10@latest} ERR [err_accessdenied autosym10/latest]
+testouterr_cmd sh {load autosym10/latest} ERR [err_accessdenied autosym10/latest]
+testouterr_cmd sh {whatis autosym10@latest} ERR [err_accessdenied autosym10/latest]
+testouterr_cmd sh {is-loaded autosym10/default} ERR {}
+testouterr_cmd sh {is-loaded autosym10@latest} ERR {}
+setenv_loaded_module [list autosym10/2] [list $mp/autosym10/2]
+setenv_var __MODULES_LMALTNAME autosym10/2&as|autosym10/latest&as|autosym10/default
+testouterr_cmd sh {is-loaded autosym10/default} OK {}
+testouterr_cmd sh {is-loaded autosym10@latest} OK {}
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym10/2"
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMALTNAME
+
+set mp $mp_saved
+setenv_path_var MODULEPATH $mp
 
 
 # use in requirements
@@ -490,9 +528,9 @@ setenv_loaded_module [list autosym8/2] [list $mp/autosym8/2]
 setenv_var __MODULES_LMALTNAME autosym8/2&al|autosym8/3&as|autosym8/default&as|autosym8/latest
 testouterr_cmd sh {is-loaded autosym8/default} OK {}
 testouterr_cmd sh {is-loaded autosym8/latest} OK {}
-testouterr_cmd sh {load autosym8/latest} ERR $err_path'autosym8/latest'
+testouterr_cmd sh {load autosym8/latest} OK {}
 testouterr_cmd sh {load autosym8} OK {}
-testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym8/2  "
+testouterr_cmd sh {list} OK "$cur_loaded\n 1) autosym8/2"
 testouterr_cmd sh {avail -t autosym8/latest} OK {}
 testouterr_cmd sh {avail -t autosym8/default} OK {}
 # test requirement resolution once auto symbol is disabled

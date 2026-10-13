@@ -3,7 +3,7 @@
 # UTIL.TCL, utility procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,6 +57,28 @@ proc listTo {lang lst {esc 1}} {
    return [join $lout { }]
 }
 
+proc runEnvCommand {env_list cmd args} {
+   # set specific env
+   set saved_env_list {}
+   foreach {var val} $env_list {
+      lappend saved_env_list $var [get-env $var <unset>]
+      set ::env($var) $val
+   }
+
+   set res [runCommand $cmd {*}$args]
+
+   # restore env
+   foreach {var val} $saved_env_list {
+      if {$val eq {<unset>}} {
+         unset ::env($var)
+      } else {
+         set ::env($var) $val
+      }
+   }
+
+   return $res
+}
+
 # find command path and remember it
 proc getCommandPath {cmd} {
    return [lindex [auto_execok $cmd] 0]
@@ -72,9 +94,10 @@ proc runCommand {cmd args} {
    }
 }
 
-proc getAbsolutePath {path} {
+proc getAbsolutePath {path {from_cwd 0}} {
    # currently executing a modulefile or rc, so get the directory of this file
-   if {[currentState modulefile] ne {}} {
+   # unless resolution from current working directory is requested
+   if {!$from_cwd && [currentState modulefile] ne {}} {
       set curdir [file dirname [currentState modulefile]]
    # elsewhere get module command current working directory
    } else {
@@ -201,7 +224,7 @@ proc countChar {str char} {
       $char {}] $str]]}]
 }
 
-proc appendNoDupToList {lstname args} {
+proc lappendNoDup {lstname args} {
    set ret 0
    upvar $lstname lst
    foreach elt $args {
@@ -213,22 +236,50 @@ proc appendNoDupToList {lstname args} {
    return $ret
 }
 
-proc replaceFromList {list1 item {item2 {}}} {
-   while {[set xi [lsearch -exact $list1 $item]] >= 0} {
-      ##nagelfar ignore #2 Badly formed if statement
-      set list1 [if {![string length $item2]} {lreplace $list1 $xi $xi}\
-         {lreplace $list1 $xi $xi $item2}]
+proc replaceFromList {list1 item args} {
+   set xi 0
+   while {[set xi [lsearch -exact -start $xi $list1 $item]] != -1} {
+      set list1 [lreplace $list1 $xi $xi {*}$args]
    }
-
    return $list1
 }
 
-proc lprepend {lst_name args} {
+proc lrem {lst_name item} {
    upvar $lst_name lst
-   if {[info exists lst]} {
-      set lst [list {*}$args {*}$lst]
-   } else {
-      set lst $args
+   set lst [lsearch -inline -all -not -exact $lst $item]
+}
+
+# make lprepend rely on ledit if this command exists (Tcl 9+)
+if {[string length [info commands ledit]]} {
+   proc lprepend {lst_name args} {
+      upvar $lst_name lst
+      if {[info exists lst]} {
+         ##nagelfar ignore
+         ledit lst -1 -1 {*}$args
+      } else {
+         set lst $args
+      }
+   }
+} else {
+   proc lprepend {lst_name args} {
+      upvar $lst_name lst
+      if {[info exists lst]} {
+         set lst [list {*}$args {*}$lst]
+      } else {
+         set lst $args
+      }
+   }
+}
+
+# provide a lpop proc if this command does not exist (Tcl <9)
+# this proc only supports removing first or last item from list
+if {![string length [info commands lpop]]} {
+   ##nagelfar ignore Procedure
+   proc lpop {lst_name {idx end}} {
+      upvar $lst_name lst
+      ##nagelfar ignore Badly formed if statement
+      lassign [if {$idx eq {end}} {list 0 end-1} {list 1 end}] first last
+      set lst [lrange $lst $first $last]
    }
 }
 
@@ -270,6 +321,13 @@ proc getDiffBetweenList {list1 list2} {
    }
 
    return [list $res1 $res2]
+}
+
+# returns if at least one element in list is present several times
+proc isDupInList {arg_list} {
+   ##nagelfar ignore #2 Unknown variable
+   lappendNoDup uniq_list {*}$arg_list
+   return [expr {[llength $arg_list] != [llength $uniq_list]}]
 }
 
 # return intersection of all lists: elements present in every list
@@ -353,7 +411,19 @@ proc getCallingProcName {} {
    }
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+proc replaceFirstInStr {str old new} {
+   set start_idx [string first $old $str]
+   if {$start_idx == -1} {
+      return $str
+   }
+   set end_idx [expr {$start_idx + [string length $old] - 1}]
+   return [string replace $str $start_idx $end_idx $new]
+}
+
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

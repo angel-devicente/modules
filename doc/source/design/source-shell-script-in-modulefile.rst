@@ -103,6 +103,8 @@ Specification
 
   - if this module is unloaded and if it does not trigger the unload of the modulefile using ``source-sh``, variable will be unset as source-sh script has not increased variable reference counter
 
+- **Limitation**: Script will not get access to shell aliases, functions or completions defined in interactive mode or shell profile configurations
+
 - **Note**: environment change done through ``source-sh`` will not preserve change order occurring in sourced script, as all changes are analyzed after sourcing script
 
 - Most shell will not get the full environment content when spawned as a sub-process
@@ -181,16 +183,25 @@ Specification
 
     - to separate each output kind and then be able to split them for separate analysis
 
-- De-duplication of path entries is applied for changes on path-like environment variables
+- Path entries found in the newly prepended entries or in the newly appended entries for a variable are never de-duplicated: every occurrence is kept and passed on the corresponding ``prepend-path`` or ``append-path`` command
 
-  - If the same path entry appears several times in the newly prepended entries for a variable, the first occurrence of this entry is kept others are dropped
-  - If the same path entry appears several times in the newly appended entries for a variable, the first occurrence of this entry is kept others are dropped
-  - De-duplication is not applied for path entries:
+- The ``--duplicates`` option is added to a ``prepend-path`` or ``append-path`` command when one of the entries it adds:
 
-    - appearing in both the new prepended entries and newly appended entries
-    - appearing in newly prepended entries or newly appended entries and in entries defined prior script evaluation
+  - is already found in the variable value prior script evaluation
+  - is found several times in the newly prepended entries or in the newly appended entries
+  - is found in both the newly prepended entries and the newly appended entries
+
+  - Such an entry is genuinely meant to end up at this specific position in the resulting value
+  - Without this option, ``prepend-path`` and ``append-path``'s default de-duplication behavior would silently absorb the entry, and the ``path_entry_reorder`` configuration option could relocate it, which would not correctly reproduce the change made by the script
 
 - An environment variable equaling to the path separator character (``:``) prior script evaluation is considered as undefined prior script evaluation to avoid misleading analysis
+
+- Path-like variable change is recorded as a ``setenv`` command instead of ``prepend-path`` and ``append-path`` commands when the newly prepended and newly appended parts would each need a different delimiter character to be expressed
+
+  - Prior and after variable values are compared to find a common part between them: what is found before this common part is expressed as a ``prepend-path`` command and what is found after it as an ``append-path`` command
+  - Each of these two commands may need its own delimiter character, determined from the character found in the after value right before (for the prepended part) or right after (for the appended part) the common part, when this character is not the variable path separator
+  - When the delimiter character determined for the prepended part differs from the one determined for the appended part, describing the change as a ``prepend-path`` and an ``append-path`` command would not correctly reproduce the resulting value, as each command would independently split and de-duplicate the full variable value using its own delimiter
+  - A ``setenv`` command directly setting the after value is generated instead in this situation, to always accurately reflect the change made by the script
 
 - Environment variables made for Modules private use are filtered-out from the environment changes produced
 

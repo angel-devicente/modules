@@ -1,0 +1,7 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/hypothesis/6.90.0-GCCcore-13.2.0
+conflict hypothesis
+depends-on GCCcore/13.2.0
+depends-on Python/3.11.5-GCCcore-13.2.0
+depends-on Python-bundle-PyPI/2023.10-GCCcore-13.2.0

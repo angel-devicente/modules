@@ -1,7 +1,7 @@
 #!/usr/bin/env tclsh
 #
 # MB, make bench between modulecmd versions
-# Copyright (C) 2019-2025 Xavier Delaruelle
+# Copyright (C) 2019-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,8 +25,10 @@ Make bench between modulecmd versions
 
 Available tests:
   help, avail, avail_cache, avail2, avail2_cache, avail3, avail3_cache,
-  whatis, whatis_cache, whatis2, whatis2_cache, whatis3, whatis3_cache,
-  apropos, load, load_cache, list, unload (all tests selected by default)
+  avail4, avail4_cache, whatis, whatis_cache, whatis2, whatis2_cache,
+  whatis3, whatis3_cache, apropos, load, load_cache, load2, load2_cache,
+  load3, load3_cache, list, list2, purge, unload
+  (all tests selected by default)
 
 Modes:
   bench           Report command execution time
@@ -34,11 +36,14 @@ Modes:
 
 Options:
   -h, --help      Show this help message and exit
+  --with-lmod=<path>
+                  Compare exec time against specified Lmod command
 
 Examples:
    $::argv0
    $::argv0 profile
-   $::argv0 load unload list"
+   $::argv0 load unload list
+   $::argv0 --with-lmod=/path/to/lmod/libexec/lmod"
 }
 
 proc sgr {sgrcode str} {
@@ -49,23 +54,34 @@ proc reportError {str} {
    puts stderr "[sgr {1;31} ERROR]: $str"
 }
 
+proc reportErrorAndExit {str} {
+   reportError $str
+   exit 1
+}
+
 proc reportWarning {str} {
    puts stderr "[sgr {1;33} WARNING]: $str"
 }
 
 set benchrep 20
-set profprocnb 10
+set profprocnb 20
 set curdir [pwd]
+
+set lmod_compat_test_list [list help avail4 avail4_cache load2 load2_cache\
+   list2 purge]
 
 # time test run for a given modulecmd version
 proc bench {tag args} {
-   return [expr {round([lindex [split [time {catch {exec ./modulecmd.$tag sh\
+   ##nagelfar ignore #2 Badly formed if statement
+   set cmd_list [if {$tag eq {lmod}} {list $::lmod_cmd} {list\
+      ./modulecmd.$tag}]
+   return [expr {round([lindex [split [time {catch {exec {*}$cmd_list sh\
       {*}$args >>& /dev/null}} $::benchrep]] 0] / 1000)}]
 }
 
 # profile given modulecmd version test run
 proc profile {tag args} {
-   return [eval exec script/mlprof report$::profprocnb $tag $args]
+   return [exec script/mlprof report$::profprocnb $tag {*}$args]
 }
 
 # procedures to create cache file in modulepaths prior tests and remove them
@@ -106,6 +122,18 @@ proc runtest {mode test} {
    }
 
    foreach tag $::taglist {
+      # set Lmod-specific environment and options
+      if {$tag eq {lmod}} {
+         set lmod_test ${test}_lmod
+         if {[info exists ::testenvlist($lmod_test)]} {
+            foreach {var val} $::testenvlist($lmod_test) {
+               set ::env($var) $val
+            }
+         }
+         if {[info exists ::testoptlist($lmod_test)]} {
+            set cmdlist [concat $::testoptlist($lmod_test) $cmdlist]
+         }
+      }
       # run test if tag version is compatible with it
       if {[info exists ::testcompatlist($test)] && [string match {v[0-9]*}\
          $tag] && "v$::testcompatlist($test)" ne $tag && [lindex [lsort\
@@ -120,14 +148,31 @@ proc runtest {mode test} {
          }
       } else {
          if {$use_cache} {
-            module_cache_create $tag
+            if {$tag eq {lmod}} {
+               exec $::lmod_cmd sh avail >>& /dev/null
+            } else {
+               module_cache_create $tag
+            }
          }
-         set res [eval $mode $tag $cmdlist]
+         set res [$mode $tag {*}$cmdlist]
          if {$use_cache} {
-            module_cache_delete $tag
+            if {$tag eq {lmod}} {
+               catch {file delete {*}[glob\
+                  $::env(HOME)/.cache/lmod/spiderT.*]}
+            } else {
+               module_cache_delete $tag
+            }
          }
       }
       lappend ::testres($test) $tag $res
+      # clean Lmod-specific environment
+      if {$tag eq {lmod}} {
+         if {[info exists ::testenvlist($lmod_test)]} {
+            foreach {var val} $::testenvlist($lmod_test) {
+               unset ::env($var)
+            }
+         }
+      }
    }
 
    # clean test environment
@@ -149,33 +194,55 @@ foreach arg $argv {
          set mode bench
       }
       help - avail - avail_cache - avail2 - avail2_cache - avail3 -\
-         avail3_cache - whatis - whatis_cache - whatis2 - whatis2_cache -\
-         whatis3 - whatis3_cache - apropos - load - load_cache - list -\
-         unload {
+         avail3_cache - avail4 - avail4_cache - whatis - whatis_cache -\
+         whatis2 - whatis2_cache - whatis3 - whatis3_cache - apropos - load -\
+         load_cache - load2 - load2_cache - load3 - load3_cache -\
+         list - list2 - purge - unload {
          lappend testlist $arg
+      }
+      --with-lmod=* {
+         set lmod_cmd [string range $arg 12 end]
       }
       -h - --help {
          reportUsage
          exit 0
       }
       -* {
-         reportError "Invalid option '$arg'$hintmsg"
-         exit 1
+         reportErrorAndExit "Invalid option '$arg'$hintmsg"
       }
       default {
-         reportError "Invalid test name '$arg'$hintmsg"
-         exit 1
+         reportErrorAndExit "Invalid test name '$arg'$hintmsg"
       }
    }
+}
+# check specified lmod command exists
+if {[info exists lmod_cmd] && ![file executable $lmod_cmd]} {
+   reportErrorAndExit "Specified Lmod command is not executable"
 }
 # use default values if not set on command-line
 if {![info exists mode]} {
    set mode bench
 }
+if {[info exists lmod_cmd] && $mode ne {bench}} {
+   reportErrorAndExit "Only bench mode supported for Lmod comparison"
+}
 if {![info exists testlist]} {
-   set testlist [list help avail avail_cache avail2 avail2_cache avail3\
-      avail3_cache whatis whatis_cache whatis2 whatis2_cache whatis3\
-      whatis3_cache apropos load load_cache list unload]
+   if {[info exists lmod_cmd]} {
+      set testlist $lmod_compat_test_list
+   } else {
+      set testlist [list help avail avail_cache avail2 avail2_cache avail3\
+         avail3_cache avail4 avail4_cache whatis whatis_cache whatis2\
+         whatis2_cache whatis3 whatis3_cache apropos load load_cache load2\
+         load2_cache load3 load3_cache list list2 purge unload]
+   }
+} elseif {[info exists lmod_cmd]} {
+   foreach test $testlist {
+      if {$test ni $lmod_compat_test_list} {
+         set hint_lmod_msg "  Supported tests: $lmod_compat_test_list"
+         reportErrorAndExit "Unsupported test for Lmod\
+            comparison\n$hint_lmod_msg"
+      }
+   }
 }
 
 # fetch information from git repository to save workspace and get available
@@ -193,7 +260,7 @@ set needstash [expr {[exec git status --porcelain --untracked-files=no] ne\
 # drop releases older than 4.1 (or older than 4.5 if profile mode)
 # drop several releases (to keep some old version in comparison)
 # also drop alpha/beta releases
-set exclvers_list [list v4.2 v4.4 v4.6 v4.8 v5.0 v5.2]
+set exclvers_list [list v4.2 v4.4 v4.6 v4.8 v5.0 v5.2 v5.4 v5.5]
 set exclbef [expr {$mode eq {profile} ? {4.5} : {4.1}}]
 
 ##nagelfar implicitvarcmd {source site.exp} install_tclsh
@@ -218,10 +285,15 @@ foreach tag [exec git tag --list v*] {
    }
 }
 
-foreach tag [lsort [array names tagarray]] {
-   lappend taglist $tagarray($tag)
+if {[info exists lmod_cmd]} {
+   # only compare Lmod with latest Modules
+   lappend taglist $headref lmod
+} else {
+   foreach tag [lsort [array names tagarray]] {
+      lappend taglist $tagarray($tag)
+   }
+   lappend taglist $headref
 }
-lappend taglist $headref
 
 # save workspace
 if {$needstash} {
@@ -230,7 +302,7 @@ if {$needstash} {
 
 # check what tag need to be built
 foreach tag $taglist {
-   if {![file exists modulecmd.$tag]} {
+   if {$tag ne {lmod} && ![file exists modulecmd.$tag]} {
       lappend tagtobuildlist $tag
    }
 }
@@ -266,30 +338,102 @@ catch {unset env(__MODULES_SHARE_MODULEPATH)}
 
 # define bench tests and their arguments and environment
 set modpath $curdir/testsuite/modulefiles
-array set testsubcmdlist [list avail2 avail avail3 avail whatis2 whatis\
-   whatis3 whatis]
+array set testsubcmdlist [list avail2 avail avail3 avail avail4 avail whatis2\
+   whatis whatis3 whatis load2 load load3 load list2 list]
 array set testarglist [list avail2 load whatis2 load load load/all unload\
-   load/all]
-##nagelfar ignore Too long line
-array set testenvlist [list avail [list MODULEPATH $modpath.deep:$modpath.deps] load [list MODULEPATH $modpath] list [list MODULEPATH $modpath LOADEDMODULES load/10:load/11:load/12:load/13:load/14:load/15:load/16:load/17:load/18:load/19:load/20:load/21:load/22:load/23:load/24:load/25:load/26:load/27:load/28:load/29:load/30:load/all _LMFILES_ $modpath/load/10:$modpath/load/11:$modpath/load/12:$modpath/load/13:$modpath/load/14:$modpath/load/15:$modpath/load/16:$modpath/load/17:$modpath/load/18:$modpath/load/19:$modpath/load/20:$modpath/load/21:$modpath/load/22:$modpath/load/23:$modpath/load/24:$modpath/load/25:$modpath/load/26:$modpath/load/27:$modpath/load/28:$modpath/load/29:$modpath/load/30:$modpath/load/all __MODULES_LMALTNAME load/all&load/default&load]]
+   load/all load2 R-bundle-Bioconductor/3.18-foss-2023a-R-4.3.2 load3\
+   bigmod/1.1]
+array set testoptlist [list avail4_lmod --ignore_cache load2_lmod\
+   --ignore_cache]
+
+# the load3 bench needs a module root holding several hundred sibling
+# versions (mixing valid and invalid modulefiles, matching the shape
+# reported by sites with large modulepath directories), generated on the
+# fly rather than checked into the repository and removed once done
+set bigmoddir $modpath.bigmod/bigmod
+set need_bigmod [expr {{load3} in $testlist || {load3_cache} in $testlist}]
+if {$need_bigmod} {
+   file mkdir $bigmoddir
+   set bigmod_content {#%Module
+
+proc ModulesHelp {} {
+    puts stderr {Lorem ipsum dolor sit amet, consectetur adipiscing elit.}
+    puts stderr {Sed non risus. Suspendisse lectus tortor, dignissim sit amet,}
+    puts stderr {adipiscing nec, ultricies sed, dolor. Cras elementum ultrices diam.}
+    puts stderr {Maecenas ligula massa, varius a, semper congue, euismod non, mi.}
+    puts stderr {Proin porttitor, orci nec nonummy molestie, enim est eleifend mi,}
+    puts stderr {non fermentum diam nisl sit amet erat. Duis semper. Duis arcu massa,}
+    puts stderr {scelerisque vitae, consequat in, }
+    puts stderr {Lorem ipsum dolor sit amet, consectetur adipiscing elit.}
+    puts stderr {Sed non risus. Suspendisse lectus tortor, dignissim sit amet,}
+    puts stderr {adipiscing nec, ultricies sed, dolor. Cras elementum ultrices diam.}
+    puts stderr {Maecenas ligula massa, varius a, semper congue, euismod non, mi.}
+    puts stderr {Proin porttitor, orci nec nonummy molestie, enim est eleifend mi,}
+    puts stderr {non fermentum diam nisl sit amet erat. Duis semper. Duis arcu massa,}
+    puts stderr {scelerisque vitae, consequat in, }
+    puts stderr {Lorem ipsum dolor sit amet, consectetur adipiscing elit.}
+    puts stderr {Sed non risus. Suspendisse lectus tortor, dignissim sit amet,}
+    puts stderr {adipiscing nec, ultricies sed, dolor. Cras elementum ultrices diam.}
+    puts stderr {Maecenas ligula massa, varius a, semper congue, euismod non, mi.}
+    puts stderr {Proin porttitor, orci nec nonummy molestie, enim est eleifend mi,}
+    puts stderr {non fermentum diam nisl sit amet erat. Duis semper. Duis arcu massa,}
+    puts stderr {scelerisque vitae, consequat in, }
+}
+
+# comment code of the modulefile
+module-whatis {returns all various module-info values}
+
+# comment code of the modulefile
+setenv FOO value
+append-path BAR /path/to/directory
+setenv QUX {Lorem ipsum dolor sit amet, consectetur adipiscing elit.}
+setenv FOO2 value
+append-path BAR2 /path/to/directory
+setenv QUX2 {Lorem ipsum dolor sit amet, consectetur adipiscing elit.}
+}
+   for {set bigmodvers 1} {$bigmodvers <= 500} {incr bigmodvers} {
+      set fid [open $bigmoddir/1.$bigmodvers w]
+      puts $fid $bigmod_content
+      close $fid
+   }
+   foreach bigmodvers {50 150 250 350 450} {
+      set fid [open $bigmoddir/1.$bigmodvers.orig w]
+      puts $fid {not a modulefile}
+      close $fid
+   }
+}
+
+# load test environment recorded in external files
+foreach testenv_file [glob $curdir/testsuite/mb/testenv_*] {
+   set test [string range [file tail $testenv_file] 8 end]
+   set fid [open $testenv_file]
+   foreach testenv_line [split [read $fid] \n] {
+      set resolved_line [string map [list {$modpath} $modpath] $testenv_line]
+      lappend testenvlist($test) {*}[split $resolved_line]
+   }
+   close $fid
+}
+
+# define env for tests reusing env of other tests
 set testenvlist(avail2) $testenvlist(avail)
-set testenvlist(avail3) [list MODULEPATH $modpath.2 MODULERCFILE\
-   $curdir/testsuite/etc/modulerc.bench3 MODULES_ADVANCED_VERSION_SPEC 1\
-   MODULES_EXTENDED_DEFAULT 1]
+set testenvlist(avail4) $testenvlist(load2)
 set testenvlist(whatis) $testenvlist(avail)
 set testenvlist(whatis2) $testenvlist(avail)
 set testenvlist(whatis3) $testenvlist(avail3)
 set testenvlist(apropos) $testenvlist(avail)
 set testenvlist(unload) $testenvlist(list)
+set testenvlist(purge) $testenvlist(list2)
+set testenvlist(purge_lmod) $testenvlist(list2_lmod)
 # some tests have a minimum version requirement
 array set testcompatlist [list avail3 4.6.0 whatis3 4.6.0 avail_cache 5.3.0\
    avail2_cache 5.3.0 avail3_cache 5.3.0 whatis_cache 5.3.0 whatis2_cache\
-   5.3.0 whatis3_cache 5.3.0 load_cache 5.3.0]
+   5.3.0 whatis3_cache 5.3.0 load_cache 5.3.0 load2_cache 5.3.0 load3_cache\
+   5.3.0]
 
 # adapt output table to test mode
 if {$mode eq {profile}} {
-   set collen 45
-   set colsep {----------------------------------------------+}
+   set collen 50
+   set colsep {---------------------------------------------------+}
 } else {
    set collen 9
    set colsep {----------+}
@@ -314,9 +458,12 @@ foreach test $testlist {
          append tooutput [format "%13s |" [expr {$i == 0 ? $test : {}}]]
          foreach {tag res} $::testres($test) {
             set procname [lindex $res [expr {$i * 3}]]
+            if {[string length $procname] > 32} {
+               set procname "[string range $procname 0 28]..."
+            }
             set nbcalls [lindex $res [expr {$i * 3 + 1}]]
             set runtime [lindex $res [expr {$i * 3 + 2}]]
-            append tooutput [format "%29s: %6d %7d |" $procname $nbcalls\
+            append tooutput [format "%32s: %7d %8d |" $procname $nbcalls\
                $runtime]
          }
          append tooutput \n
@@ -333,7 +480,14 @@ foreach test $testlist {
 
 # clean built files
 foreach tag $taglist {
-   catch {file delete modulecmd.$tag lib/libtclenvmodules.so.$tag}
+   if {$tag ne {lmod}} {
+      catch {file delete modulecmd.$tag lib/libtclenvmodules.so.$tag}
+   }
+}
+
+# clean generated load3 bench modulefiles
+if {$need_bigmod} {
+   file delete -force $modpath.bigmod
 }
 catch {file delete tcl/mfinterp.tcl}
 

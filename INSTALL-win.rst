@@ -30,7 +30,7 @@ Installation instructions
    `Magicsplat Tcl/Tk for Windows`_. Follow instructions provided with the
    chosen distribution to install it.
 
-.. _ActiveTcl: https://www.activestate.com/products/tcl/
+.. _ActiveTcl: https://www.activestate.com/tcl/
 .. _Magicsplat Tcl/Tk for Windows: https://www.magicsplat.com/tcl-installer/
 
 2. Once installed, verify that the ``tclsh`` command is correctly found in
@@ -96,6 +96,24 @@ For PowerShell, you may adapt profile script to make ``envmodule`` command
 initialized when ``pwsh`` shell starts. See the PowerShell documentation on
 how to `customize your shell environment <https://learn.microsoft.com/en-us/powershell/scripting/learn/shell/creating-profiles>`_.
 
+Alternatively, if you use `Windows Terminal`_, a PowerShell or ``pwsh``
+profile can be set to initialize Modules on startup without altering the
+system-wide ``PATH`` environment variable and without running an install
+script. Once the Windows-specific distribution zipball has been unpacked to
+a directory of your choice (for instance ``C:\Program Files\Environment
+Modules``), open the Windows Terminal settings, select the profile to
+adapt and set its *Command line* to::
+
+        pwsh.exe -NoExit -Command "& Import-Module 'C:\Program Files\Environment Modules\init\pwsh.ps1'"
+
+Use ``powershell.exe`` instead of ``pwsh.exe`` to rely on the Windows
+built-in PowerShell rather than PowerShell Core, and adapt the path passed
+to ``Import-Module`` to match where the distribution zipball was unpacked.
+The ``envmodule`` command then gets initialized every time this profile
+starts.
+
+.. _Windows Terminal: https://learn.microsoft.com/en-us/windows/terminal/
+
 Modules installation is now operational and you can setup your modulefiles. By
 default, the ``modulefiles`` directory in installation directory is defined as
 a modulepath and contains few modulefile examples::
@@ -107,3 +125,9 @@ a modulepath and contains few modulefile examples::
 Documentation of the :ref:`module(1)`, :ref:`ml(1)` and :ref:`envml(1)`
 commands and :ref:`modulefile(5)` syntax can be found in the ``doc`` directory
 in installation directory.
+
+.. warning:: If both Modules and the *MSVC x86 toolchain* are installed and
+   Modules has been initialized in the current shell session, the command
+   ``ml`` will refer to the Modules version rather than the *MSVC assembler*.
+   To invoke the *MSVC assembler* while Modules is active, you must call it
+   explicitly as ``ml.exe``.

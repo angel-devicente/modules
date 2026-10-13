@@ -1,0 +1,7 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/util-linux/2.37-GCCcore-11.2.0
+conflict util-linux
+depends-on GCCcore/11.2.0
+depends-on ncurses/6.2-GCCcore-11.2.0
+depends-on zlib/1.2.11-GCCcore-11.2.0

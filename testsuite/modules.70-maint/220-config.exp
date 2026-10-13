@@ -22,6 +22,7 @@
 
 # set default configuration
 unsetenv_var MODULES_VERBOSITY
+unsetenv_var MODULES_PAGINATE
 unsetenv_var MODULES_EXTENDED_DEFAULT
 unsetenv_var MODULES_IMPLICIT_REQUIREMENT
 unsetenv_var MODULERCFILE
@@ -31,6 +32,7 @@ unsetenv_var MODULES_MCOOKIE_VERSION_CHECK
 # cache buffer size may be set if cache files have been prebuilt
 unsetenv_var MODULES_CACHE_BUFFER_BYTES
 unsetenv_var MODULES_STICKY_PURGE
+unsetenv_var MODULES_INIT_ENVVARS
 unsetenv_var MODULES_ABORT_ON_ERROR
 unsetenv_var MODULES_SOURCE_CACHE
 unsetenv_var MODULES_HIDE_AUTO_LOADED
@@ -72,6 +74,7 @@ array set configdfl [list\
     colors                    [expr {$install_termbg eq {dark} ? $valid_darkbgcolors : $valid_lightbgcolors}]\
     conflict_unload           [expr {$install_conflictunload eq {y}}]\
     contact                   root@localhost\
+    domainname                "$install_domainnamecmd"\
     editor                    "$install_editor"\
     extended_default          [expr {$install_extendeddefault eq {y}}]\
     extra_siteconfig          <undef>\
@@ -79,10 +82,14 @@ array set configdfl [list\
     home                      [regsub -all "\(\[.+?\]\)" $install_moduleshome {\\\1}]\
     icase                     $install_icase\
     ignore_cache              0\
+    ignore_cache_subcmds      {}\
     ignore_user_rc            0\
     ignored_dirs              {CVS RCS SCCS .svn .git .SYNC .sos}\
     implicit_default          [expr {$install_implicitdefault eq {y}}]\
     implicit_requirement      [expr {$install_implicitrequirement eq {y}}]\
+    init_envvars              $install_initenvvars\
+    info_extension            0\
+    linked_envvars            {}\
     list_output               $install_listoutput\
     list_terse_output         $install_listterseoutput\
     locked_configs            $install_lockedconfigs\
@@ -91,8 +98,12 @@ array set configdfl [list\
     mcookie_check             always\
     mcookie_version_check     [expr {$install_mcookieversioncheck eq {y}}]\
     ml                        [expr {$install_ml eq {y}}]\
+    modulepath_ignore         1\
     nearly_forbidden_days     $install_nearlyforbiddendays\
+    non_exportable_tags       {}\
     pager                     "$install_pagercmd"\
+    paginate                  [expr {$install_paginate eq {y}}]\
+    path_entry_reorder        [expr {$install_pathentryreorder eq {y}}]\
     protected_envvars         <undef>\
     quarantine_support        [expr {$install_quarantinesupport eq {y}}]\
     rcfile                    <undef>\
@@ -139,6 +150,7 @@ array set configvar [list\
     colors                    MODULES_COLORS\
     conflict_unload           MODULES_CONFLICT_UNLOAD\
     contact                   MODULECONTACT\
+    domainname                MODULES_DOMAINNAME\
     editor                    MODULES_EDITOR\
     extended_default          MODULES_EXTENDED_DEFAULT\
     extra_siteconfig          MODULES_SITECONFIG\
@@ -146,9 +158,13 @@ array set configvar [list\
     home                      MODULESHOME\
     icase                     MODULES_ICASE\
     ignore_cache              MODULES_IGNORE_CACHE\
+    ignore_cache_subcmds      MODULES_IGNORE_CACHE_SUBCMDS\
     ignore_user_rc            MODULES_IGNORE_USER_RC\
     implicit_default          MODULES_IMPLICIT_DEFAULT\
     implicit_requirement      MODULES_IMPLICIT_REQUIREMENT\
+    init_envvars              MODULES_INIT_ENVVARS\
+    info_extension            MODULES_INFO_EXTENSION\
+    linked_envvars            MODULES_LINKED_ENVVARS\
     list_output               MODULES_LIST_OUTPUT\
     list_terse_output         MODULES_LIST_TERSE_OUTPUT\
     logged_events             MODULES_LOGGED_EVENTS\
@@ -156,8 +172,12 @@ array set configvar [list\
     mcookie_check             MODULES_MCOOKIE_CHECK\
     mcookie_version_check     MODULES_MCOOKIE_VERSION_CHECK\
     ml                        MODULES_ML\
+    modulepath_ignore         MODULES_MODULEPATH_IGNORE\
     nearly_forbidden_days     MODULES_NEARLY_FORBIDDEN_DAYS\
+    non_exportable_tags       MODULES_NON_EXPORTABLE_TAGS\
     pager                     MODULES_PAGER\
+    paginate                  MODULES_PAGINATE\
+    path_entry_reorder        MODULES_PATH_ENTRY_REORDER\
     protected_envvars         MODULES_PROTECTED_ENVVARS\
     quarantine_support        MODULES_QUARANTINE_SUPPORT\
     rcfile                    MODULERCFILE\
@@ -206,13 +226,17 @@ array set configvalid [list\
     ignore_user_rc            {0 1}\
     implicit_default          {0 1}\
     implicit_requirement      {0 1}\
+    info_extension            {0 1}\
     list_output               {header idx variant alias indesym sym tag hidden key}\
     list_terse_output         {header idx variant alias indesym sym tag hidden key}\
     logged_events             {auto_eval requested_eval requested_cmd}\
     mcookie_check             {eval always}\
     mcookie_version_check     {0 1}\
     ml                        {0 1}\
+    modulepath_ignore         {0 1}\
     nearly_forbidden_days     {0 365}\
+    paginate                  {0 1}\
+    path_entry_reorder        {0 1}\
     quarantine_support        {0 1}\
     redirect_output           {0 1}\
     require_via               {0 1}\
@@ -261,9 +285,12 @@ array set configkind [list\
     avail_output              l\
     avail_terse_output        l\
     colors                    l\
+    init_envvars              l\
+    linked_envvars            l\
     list_output               l\
     list_terse_output         l\
     logged_events             l\
+    non_exportable_tags       l\
     protected_envvars         l\
     rcfile                    l\
     shells_with_ksh_fpath     l\
@@ -274,7 +301,7 @@ array set configkind [list\
     variant_shortcut          l\
 ]
 
-set statelist [list always_read_full_file autoinit clock_seconds cmdline commandname domainname error_count extra_siteconfig_loaded false_rendered force hiding_threshold inhibit_errreport inhibit_interp init_error_report is_stderr_tty is_win kernelversion lm_info_cached logfd logging lsb_codename lsb_id lsb_release machine nodename os osversion paginate path_separator report_format reportfd return_false shell shelltype siteconfig_loaded sub1_separator sub2_separator subcmd subcmd_args supported_shells tcl_ext_lib_loaded tcl_version term_columns usergroups username]
+set statelist [list always_read_full_file autoinit clock_seconds cmdline commandname domainname error_count extra_siteconfig_loaded false_rendered force hiding_threshold inhibit_errreport inhibit_interp init_error_report is_stderr_tty is_win kernelversion logfd logging lsb_codename lsb_id lsb_release machine nodename os osversion paginate path_separator report_format reportfd return_false shell shelltype siteconfig_loaded sub1_separator sub2_separator subcmd subcmd_args supported_shells tcl_ext_lib_loaded tcl_version term_columns usergroups username]
 
 if {[is_quick_mode]} {
     array unset configdfl
@@ -406,6 +433,12 @@ foreach param [array names configvar] {
         set val foo=%
     } elseif {$param eq {pager}} {
         set val $configdfl(pager)
+    } elseif {$param eq {domainname}} {
+        set val $configdfl(domainname)
+    } elseif {$param eq {init_envvars}} {
+        set val FOO=val
+    } elseif {$param eq {linked_envvars}} {
+        set val FOO&BAR
     } elseif {[info exists configvalid($param)]} {
         if {$configvalid($param) eq {integer}} {
             set val 5
@@ -472,18 +505,11 @@ foreach param [lsort [array names configset]] {
 }
 
 append tserr "\n\n$state_header"
-if {[auto_execok uname] eq {} || [auto_execok domainname] eq {}} {
+if {[auto_execok uname] eq {} || $domainname eq {}} {
     append tserr "(\nWARNING: Command '\\S+' cannot be found)+"
 }
 if {$lsb_cmd eq {}} {
     append tserr "(\nWARNING: Command '\\S+' cannot be found)+"
-}
-if {$group_name_fetch_failed} {
-    if {$install_libtclenvmodules eq {y}} {
-        append tserr "(\nWARNING: couldn't find name for group id \"\\S+\": Success)+"
-    } else {
-        append tserr "(\nWARNING: .*\n  .*/id: cannot find name for group ID \\S+)+"
-    }
 }
 foreach param $statelist {
     append tserr "\n$param\\s+.*"
@@ -513,13 +539,6 @@ foreach param [lsort [array names configset]] {
 }
 append tserr "\n\n$state_header"
 append tserr "(\nWARNING: Command '\\S+' cannot be found)+"
-if {$group_name_fetch_failed} {
-    if {$install_libtclenvmodules eq {y}} {
-        append tserr "(\nWARNING: couldn't find name for group id \"\\S+\": Success)+"
-    } else {
-        append tserr "(\nWARNING: Command '\\S+' cannot be found)*"
-    }
-}
 append tserr "(\nWARNING: Command '\\S+' cannot be found)*"
 foreach param $statelist {
     append tserr "\n$param\\s+.*"
@@ -550,18 +569,11 @@ foreach param [lsort [array names configset]] {
     }
 }
 append tserr "\n\n$state_header"
-if {[auto_execok uname] eq {} || [auto_execok domainname] eq {}} {
+if {[auto_execok uname] eq {} || $domainname eq {}} {
     append tserr "(\nWARNING: Command '\\S+' cannot be found)+"
 }
 if {$lsb_cmd eq {}} {
     append tserr "(\nWARNING: Command '\\S+' cannot be found)+"
-}
-if {$group_name_fetch_failed} {
-    if {$install_libtclenvmodules eq {y}} {
-        append tserr "(\nWARNING: couldn't find name for group id \"\\S+\": Success)+"
-    } else {
-        append tserr "(\nWARNING: .*\n  .*/id: cannot find name for group ID \\S+)+"
-    }
 }
 foreach param $statelist {
     append tserr "\n$param\\s+.*"

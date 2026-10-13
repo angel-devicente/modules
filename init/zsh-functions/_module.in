@@ -129,11 +129,15 @@ _module() {
       '(-V --version)'{-V,--version}'[Module version]' \
       '--dumpname[Module implementation name]' \
       '(-w --width=)'{-w,--width=}'[Set output width]' \
-      '--paginate[Pipe mesg output into a pager if stream attached to terminal]' \
-      '--no-pager[Do not pipe message output into a pager]' \
+      '(-p --paginate)'{-p,--paginate}'[Pipe mesg output into a pager if stream attached to terminal]' \
+      '(-P --no-pager)'{-P,--no-pager}'[Do not pipe message output into a pager]' \
       '(--color --color=)'{--color,--color=}'[Colorize the output]' \
       '--ignore-cache[Ignore module cache]' \
       '--ignore-user-rc[Skip evaluation of user-specific module rc file]' \
+      '--no-modulepath-ignore[Do not apply modulepath-ignore pattern definitions]' \
+      '--timer[Report execution times]' \
+      '--redirect[Send output to stdout]' \
+      '--no-redirect[Send output to stderr]' \
       '(-): :->cmd' \
       '(-)*:: :->arg' && ret=0
 
@@ -148,7 +152,7 @@ _module() {
             'try-load:Attempt to load modulefile(s), no complain'
             'rm:Remove modulefile(s)'
             'remove:Remove modulefile(s)'
-            'del:Remove modulefile(s)'
+            'delete:Remove modulefile(s)'
             'unload:Remove modulefile(s)'
             'purge:Unload all loaded modulefiles'
             'reload:Unload then load all loaded modulefiles'
@@ -175,12 +179,6 @@ _module() {
             'describe:Display information about collection'
             'savelist:List all saved collections'
             'is-saved:Test if any of the collection(s) exists'
-            'initlist:List all modules loaded from init file'
-            'initadd:Add modulefile to shell init file'
-            'initrm:Remove modulefile from shell init file'
-            'initprepend:Add to beginning of list in init file'
-            'initswitch:Switch mod1 with mod2 from init file'
-            'initclear:Clear all modulefiles from init file'
             'help:Print this or modulefile(s) help info'
             'display:Display information about modulefile(s)'
             'show:Display information about modulefile(s)'
@@ -273,7 +271,9 @@ _module() {
                   '(-t --terse)'{-t,--terse}'[Display output in terse format]' \
                   '(-j --json)'{-j,--json}'[Display output in JSON format]' \
                   '(-o --output=)'{-o,--output=}'[Define elements to output in addition to module names]' \
-                  '(-a --all)'{-a,--all}'[Include hidden modules in list]' && ret=0
+                  '(-a --all)'{-a,--all}'[Include hidden modules in list]' \
+                  '(-S --starts-with)'{-S,--starts-with}'[Search modules whose name begins with query string]' \
+                  '(-C --contains)'{-C,--contains}'[Search modules whose name contains query string]' && ret=0
                ;;
             (savelist)
                local -a opts; opts=(
@@ -283,8 +283,12 @@ _module() {
                   '--terse:Display output in terse format'
                   '-j:Display output in JSON format'
                   '--json:Display output in JSON format'
-                  '-o:Define elements to output in addition to module names'
-                  '--output=:Define elements to output in addition to module names'
+                  '-a:Include hidden modules in search'
+                  '--all:Include hidden modules in search'
+                  '-S:Search modules whose name begins with query string'
+                  '--starts-with:Search modules whose name begins with query string'
+                  '-C:Search modules whose name contains query string'
+                  '--contains:Search modules whose name contains query string'
                )
                _describe -t opts 'Switches' opts && ret=0
                ;;
@@ -294,7 +298,12 @@ _module() {
                   '(-t --terse)'{-t,--terse}'[Display output in terse format]' \
                   '(-j --json)'{-j,--json}'[Display output in JSON format]' && ret=0
                ;;
-            (stashpop|stashshow|stashrm)
+            (stashpop)
+               _arguments \
+                  '(-f --force)'{-f,--force}'[By-pass dependency consistency]' \
+                  '*::stash:{_module_stash_colls}' && ret=0
+               ;;
+            (stashshow|stashrm)
                _alternative 'avail-stashs:collections:{_module_stash_colls}' \
                   && ret=0
                ;;
@@ -302,17 +311,38 @@ _module() {
                _arguments \
                   '(-f --force)'{-f,--force}'[Skip confirmation dialog]' && ret=0
                ;;
-            (restore|save|saveshow|describe|saverm|disable|is-saved)
+            (restore)
+               _arguments \
+                  '(-f --force)'{-f,--force}'[By-pass dependency consistency]' \
+                  '*::collection:{_module_saved_colls}' && ret=0
+               ;;
+            (save|saveshow|describe|saverm|disable|is-saved)
                _alternative 'avail-colls:collections:{_module_saved_colls}' \
                   && ret=0
                ;;
-            (rm|del|remove|unload)
+            (rm|delete|remove|unload)
                _arguments \
                   '--auto[Enable automated module handling mode]' \
                   '--no-auto[Disable automated module handling mode]' \
                   '(-f --force)'{-f,--force}'[By-pass dependency consistency]' \
                   '(-i --icase)'{-i,--icase}'[Case insensitive match]' \
                   '*::modulefile:_module_loaded_mods' && ret=0
+               ;;
+            (purge)
+               _arguments \
+                  '(-f --force)'{-f,--force}'[By-pass dependency consistency]' && ret=0
+               ;;
+            (reload|update)
+               _arguments \
+                  '(-f --force)'{-f,--force}'[By-pass dependency consistency]' && ret=0
+               ;;
+            (reset)
+               _arguments \
+                  '(-f --force)'{-f,--force}'[By-pass dependency consistency]' && ret=0
+               ;;
+            (stash)
+               _arguments \
+                  '(-f --force)'{-f,--force}'[By-pass dependency consistency]' && ret=0
                ;;
             (switch|swap)
                _arguments \
@@ -346,7 +376,6 @@ _module() {
             (is-avail)
                _arguments \
                   '(-i --icase)'{-i,--icase}'[Case insensitive match]' \
-                  '(-a --all)'{-a,--all}'[Include hidden modules in search]' \
                   "*::modulefile:{_module_avail_mods $cur}" && ret=0
                ;;
             (whatis)
@@ -378,7 +407,7 @@ _module() {
                _arguments \
                   '--dump-state[Report each state value of current Modules execution]' \
                   '--reset[Unset environment variable relative to configuration key]' \
-                  '1:configuration key:(abort_on_error advanced_version_spec auto_handling avail_indepth avail_output avail_terse_output cache_buffer_bytes cache_expiry_secs collection_pin_version collection_pin_tag collection_target color colors conflict_unload contact editor extended_default extra_siteconfig hide_auto_loaded home icase ignore_cache ignore_user_rc implicit_default implicit_requirement list_output list_terse_output locked_configs logged_events logger mcookie_check mcookie_version_check ml nearly_forbidden_days pager protected_envvars quarantine_support rcfile redirect_output require_via reset_target_state run_quarantine search_match set_shell_startup shells_with_ksh_fpath silent_shell_debug source_cache spider_indepth spider_output spider_terse_output sticky_purge tag_abbrev tag_color_name tcl_linter term_background term_width unique_name_loaded unload_match_order variant_shortcut verbosity wa_277)' \
+                  '1:configuration key:(abort_on_error advanced_version_spec auto_handling avail_indepth avail_output avail_terse_output cache_buffer_bytes cache_expiry_secs collection_pin_version collection_pin_tag collection_target color colors conflict_unload contact csh_limit domainname editor extended_default extra_siteconfig hide_auto_loaded home icase ignore_cache ignore_cache_subcmds ignore_user_rc ignored_dirs implicit_default implicit_requirement init_envvars info_extension linked_envvars list_output list_terse_output locked_configs logged_events logger mcookie_check mcookie_version_check ml modulepath_ignore nearly_forbidden_days non_exportable_tags pager paginate path_entry_reorder protected_envvars quarantine_support rcfile redirect_output require_via reset_target_state run_quarantine search_match set_shell_startup shells_with_ksh_fpath silent_shell_debug siteconfig source_cache spider_indepth spider_output spider_terse_output sticky_purge tag_abbrev tag_color_name tcl_ext_lib tcl_linter term_background term_width unique_name_loaded unload_match_order variant_shortcut verbosity wa_277)' \
                   && ret=0
                ;;
             (edit)
@@ -398,6 +427,13 @@ _module() {
                   '(-f --force)'{-f,--force}'[By-pass dependency consistency]' \
                   '(-i --icase)'{-i,--icase}'[Case insensitive match]' \
                   "*::modulefile:{_module_notloaded_mods $cur}" && ret=0
+               ;;
+            (source)
+               _arguments \
+                  '--auto[Enable automated module handling mode]' \
+                  '--no-auto[Disable automated module handling mode]' \
+                  '(-f --force)'{-f,--force}'[By-pass dependency consistency]' \
+                  '*:scriptfile:_files' && ret=0
                ;;
          esac
          ;;

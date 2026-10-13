@@ -1,0 +1,5 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/gettext/0.22
+conflict gettext
+depends-on ncurses/6.4

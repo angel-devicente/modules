@@ -1,6 +1,6 @@
 #
 # SYNTAXDB_MODULERC.tcl, Nagelfar syntax database to lint modulercs
-# Copyright (C) 2022-2025 Xavier Delaruelle
+# Copyright (C) 2022-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,6 +37,7 @@ module-tag
 module-version
 module-virtual
 module-warn
+modulepath-ignore
 modulepath-label
 system
 uname
@@ -75,6 +76,7 @@ set ::syntax(module-version) {x x x*}
 set ::syntax(module-virtual) 2
 # module-warn accepts option at any position
 set ::syntax(module-warn) {p* x p* x* p*}
+set ::syntax(modulepath-ignore) {x x*}
 set ::syntax(modulepath-label) 2
 set ::syntax(system) {x x*}
 set ::syntax(uname) s

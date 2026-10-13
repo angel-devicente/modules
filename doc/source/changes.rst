@@ -442,7 +442,7 @@ The following modulefile Tcl commands appeared on Modules 4.
 | in version |                                                                 |
 +============+=================================================================+
 | 4.0        | :mfcmd:`module-info command<module-info>`, :mfcmd:`getenv`,     |
-|            | :mfcmd:`reportError`, :mfcmd:`reportWarning`                    |
+|            | :mfcmd:`report`, :mfcmd:`reportError`, :mfcmd:`reportWarning`   |
 +------------+-----------------------------------------------------------------+
 | 4.1        | :mfcmd:`module-info loaded<module-info>`, :mfcmd:`is-saved`,    |
 |            | :mfcmd:`is-used`, :mfcmd:`is-avail`, :mfcmd:`module-virtual`    |
@@ -648,6 +648,15 @@ Module Sub-Commands
  these variables. Exception is made for :envvar:`MODULEPATH` environment
  variable where the mechanism still applies.
 
+:subcmd:`purge`
+
+ Starting with version 5.7, direct and indirect requirements of retained
+ sticky and super-sticky modules are kept loaded, even if those requirements
+ are not sticky themselves. The :mconfig:`sticky_purge` configuration
+ controls reporting for their skipped unload as well as for sticky modules.
+ With :option:`--force`, sticky modules and their requirements can be
+ unloaded, but super-sticky modules and their requirements remain loaded.
+
 :subcmd:`refresh`
 
  Sub-command evaluates all loaded modulefiles and re-apply the non-persistent
@@ -764,6 +773,9 @@ Starting version 5.5, characters ``+`` and ``~`` may be part of module name or
 version as long as the string part next to these character is not a valid
 variant name.
 
+Starting version 5.7, character ``-`` is considered a version number separator
+for :mconfig:`extended_default` mechanism.
+
 Environment
 """""""""""
 
@@ -828,6 +840,24 @@ user environment is already configured.
 
 Starting version ``5.5``, support for Windows *pwsh* shell is introduced.
 
+Siteconfig hooks
+""""""""""""""""
+
+Starting version ``5.7``, the ``add-hook`` siteconfig command is introduced
+to register a procedure to run on a hook event, as a replacement for the
+``trace``/procedure-renaming techniques that bind to internal
+implementation details.
+
+The following hook events appeared on Modules 5.
+
++------------+-----------------------------------------------------------------+
+| Introduced | New hook events                                                 |
+| in version |                                                                 |
++============+=================================================================+
+| 5.7        | :mhook:`before-modulefile-eval`, :mhook:`after-modulefile-eval`,|
+|            | :mhook:`before-modulerc-eval`, :mhook:`after-modulerc-eval`     |
++------------+-----------------------------------------------------------------+
+
 Command line switches
 """""""""""""""""""""
 
@@ -844,6 +874,9 @@ The following command line switches appeared on Modules 5.
 | 5.3        | :option:`--ignore-cache`, :option:`--ignore-user-rc`            |
 +------------+-----------------------------------------------------------------+
 | 5.6        | :option:`--dumpname`                                            |
++------------+-----------------------------------------------------------------+
+| 5.7        | :option:`-p`, :option:`-P`,                                     |
+|            | :option:`--no-modulepath-ignore`                                |
 +------------+-----------------------------------------------------------------+
 
 :option:`--output`
@@ -1005,6 +1038,12 @@ The following module sub-commands appeared on Modules 5.
  Starting Modules 5.5, definition of :command:`mogui` shell alias or function
  is added on this sub-command.
 
+ Starting Modules 5.7, directory where the ``env_modules`` Python module is
+ installed (initialization directory by default, which can be changed with
+ the :instopt:`--with-pythondir` installation option) is added to
+ ``PYTHONPATH`` environment variable unless installation option
+ :instopt:`--disable-set-pythonpath<--enable-set-pythonpath>` is used.
+
 :subcmd:`lint`
 
  Starting Modules 5.6, readable modulecache files are also linted when no
@@ -1071,6 +1110,16 @@ The following environment variables appeared on Modules 5.
 |            | :envvar:`__MODULES_LMUSE`,                                      |
 |            | :envvar:`MODULES_REQUIRE_VIA`                                   |
 +------------+-----------------------------------------------------------------+
+| 5.7        | :envvar:`MODULES_PATH_ENTRY_REORDER`,                           |
+|            | :envvar:`MODULES_PAGINATE`,                                     |
+|            | :envvar:`MODULES_NON_EXPORTABLE_TAGS`,                          |
+|            | :envvar:`MODULES_INFO_EXTENSION`,                               |
+|            | :envvar:`MODULES_LINKED_ENVVARS`,                               |
+|            | :envvar:`MODULES_INIT_ENVVARS`,                                 |
+|            | :envvar:`MODULES_DOMAINNAME`,                                   |
+|            | :envvar:`MODULES_MODULEPATH_IGNORE`,                            |
+|            | :envvar:`MODULES_IGNORE_CACHE_SUBCMDS`                          |
++------------+-----------------------------------------------------------------+
 
 Modules Specific Tcl Commands
 """""""""""""""""""""""""""""
@@ -1097,6 +1146,8 @@ The following modulefile Tcl commands appeared on Modules 5.
 |            | :mfcmd:`module-warn`, :mfcmd:`haveDynamicMPATH`,                |
 |            | :mfcmd:`provide`                                                |
 +------------+-----------------------------------------------------------------+
+| 5.7        | :mfcmd:`modulepath-ignore`                                      |
++------------+-----------------------------------------------------------------+
 
 :mfcmd:`system`, :mfcmd:`is-used`
 
@@ -1108,6 +1159,9 @@ The following modulefile Tcl commands appeared on Modules 5.
  Starting version 5.1, the ``--return-value`` option is added to return
  environment variable value or its fallback when modulefile is evaluated in
  *display* mode.
+
+ Starting version 5.7, this command is also available from module rc file
+ context.
 
 :mfcmd:`prereq`, :mfcmd:`module load/try-load/load-any/switch<module>`
 
@@ -1278,6 +1332,12 @@ The following Modules configuration option has been introduced on Modules 5.
 +------------+-----------------------------------------------------------------+
 | 5.6        | :mconfig:`spider_output`, :mconfig:`spider_terse_output`,       |
 |            | :mconfig:`spider_indepth`, :mconfig:`require_via`               |
++------------+-----------------------------------------------------------------+
+| 5.7        | :mconfig:`path_entry_reorder`, :mconfig:`paginate`,             |
+|            | :mconfig:`non_exportable_tags`, :mconfig:`info_extension`,      |
+|            | :mconfig:`linked_envvars`, :mconfig:`init_envvars`,             |
+|            | :mconfig:`domainname`, :mconfig:`modulepath_ignore`,            |
+|            | :mconfig:`ignore_cache_subcmds`                                 |
 +------------+-----------------------------------------------------------------+
 
 :mconfig:`auto_handling`

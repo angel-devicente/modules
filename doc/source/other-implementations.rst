@@ -33,9 +33,10 @@ table highlights features that are unique to each implementation.
 .. list-table::
    :header-rows: 1
 
-   * - Lmod 8.7.64
-     - Modules 5.6
-   * - * Integration with *rc* shell and *json* structured output
+   * - |lmod_version|
+     - |modules_version|
+   * - * Integration with *nushell* and *rc* shells and *json* structured
+         output
        * `Lua modulefile support`_
        * `Inactive modules`_
        * Save configuration under :envvar:`XDG_CONFIG_HOME`
@@ -44,8 +45,8 @@ table highlights features that are unique to each implementation.
        * `Path entry priorities`_
        * ``--regexp`` search option
        * `settarg`_
-       * `Hook functions`_
-       * |LMOD_FILE_IGNORE_PATTERNS|_ environment variable
+       * `MarkDown support in module help and whatis`_
+       * `Load dot hidden modules without leading dot`_
      - * Integration with *cmd* and *pwsh* shells and *Tcl* language
        * :ref:`Automated module handling<MODULES_AUTO_HANDLING>`
        * :ref:`Advanced module version specifiers`
@@ -53,7 +54,6 @@ table highlights features that are unique to each implementation.
        * :ref:`Virtual modules`
        * :ref:`Sourcing modulefiles`
        * Handle modulefile outside modulepath
-       * :ref:`Quarantine mechanism`
        * :ref:`Case insensitive module load<Insensitive case>`
        * Automatic ``latest`` and ``loaded`` symbols
        * ``alias``, ``command``, ``loaded``, ``tags``, ``usergroups`` and
@@ -68,17 +68,19 @@ table highlights features that are unique to each implementation.
        * Integration with *bash-eval* and *fish* shells in :mfcmd:`source-sh`
        * :ref:`Specific modulepath for requirements`
        * :ref:`Logging activity`
-       * :command:`envml` launcher
+       * :ref:`envml<envml(1)>` launcher
+       * :ref:`Linked environment variables`
 
 .. _Lua modulefile support: https://lmod.readthedocs.io/en/latest/050_lua_modulefiles.html
 .. _Inactive modules: https://lmod.readthedocs.io/en/latest/010_user.html#module-hierarchy
 .. _Find best module: https://lmod.readthedocs.io/en/latest/060_locating.html
 .. _i18n: https://lmod.readthedocs.io/en/latest/185_localization.html
 .. _Path entry priorities: https://lmod.readthedocs.io/en/latest/077_ref_counting.html#specifying-priorities-for-path-entries
+.. _Update path entry order: https://lmod.readthedocs.io/en/latest/077_ref_counting.html
 .. _settarg: https://lmod.readthedocs.io/en/latest/310_settarg.html
 .. _Hook functions: https://lmod.readthedocs.io/en/latest/170_hooks.html#hook-functions
-.. |LMOD_FILE_IGNORE_PATTERNS| replace:: ``LMOD_FILE_IGNORE_PATTERNS``
-.. _LMOD_FILE_IGNORE_PATTERNS: https://lmod.readthedocs.io/en/latest/090_configuring_lmod.html#setting-environment-variables-or-cosmic-assign-at-startup
+.. _MarkDown support in module help and whatis: https://lmod.readthedocs.io/en/latest/106_markdown_help.html
+.. _Load dot hidden modules without leading dot: https://lmod.readthedocs.io/en/latest/079_hidden_modules.html#dot-leading-version-directories-and-lmod-dot-hidden-load-alias
 
 The following table highlights ``module`` sub-commands that are exclusive to
 either Lmod or Modules. In some cases, similar functionality exists under
@@ -88,9 +90,9 @@ at the end of this section to map these equivalents.
 .. list-table::
    :header-rows: 1
 
-   * - Lmod 8.7.64
-     - Modules 5.6
-   * - ``category``, ``overview``, ``tablelist``
+   * - |lmod_version|
+     - |modules_version|
+   * - ``category``, ``last-error``, ``overview``, ``tablelist``
      - :subcmd:`aliases`, :subcmd:`append-path`, :subcmd:`cachebuild`,
        :subcmd:`cacheclear`, :subcmd:`clear`, :subcmd:`config`,
        :subcmd:`edit`, :subcmd:`info-loaded`, :subcmd:`initadd`,
@@ -112,15 +114,14 @@ the end of this section to map these equivalents.
 .. list-table::
    :header-rows: 1
 
-   * - Lmod 8.7.64
-     - Modules 5.6
-   * - ``remove-property``
+   * - |lmod_version|
+     - |modules_version|
+   * - ``module-forbid-regex``, ``module-hide-regex``, ``remove-property``
      - :mfcmd:`getvariant`, :mfcmd:`is-saved`, :mfcmd:`is-used`,
-       :mfcmd:`lsb-release`, :mfcmd:`module-help`, :mfcmd:`module-tag`,
-       :mfcmd:`module-virtual`, :mfcmd:`module-warn`,
-       :mfcmd:`modulepath-label`, :mfcmd:`modulepath-label`, :mfcmd:`provide`,
-       :mfcmd:`reportWarning`, :mfcmd:`uncomplete`, :mfcmd:`variant`,
-       :mfcmd:`x-resource`
+       :mfcmd:`lsb-release`, :mfcmd:`module-tag`, :mfcmd:`module-warn`,
+       :mfcmd:`modulepath-ignore`, :mfcmd:`modulepath-label`,
+       :mfcmd:`provide`, :mfcmd:`reportWarning`, :mfcmd:`uncomplete`,
+       :mfcmd:`variant`, :mfcmd:`x-resource`
 
 See the :ref:`Compatibility with Lmod Tcl modulefile` section for details on
 how the implementation of the Tcl modulefile commands differ between Lmod and
@@ -133,8 +134,8 @@ implementation.
 .. list-table::
    :header-rows: 1
 
-   * - Lmod 8.7.64
-     - Modules 5.6
+   * - |lmod_version|
+     - |modules_version|
    * - `Module properties`_
      - :ref:`Module tags` 
    * - `One name rule`_
@@ -150,16 +151,22 @@ implementation.
    * - Lmod + `XALT`_
      - :ref:`Logging activity`
    * - `Hook functions`_
-     - :ref:`Override any internal procedures or set trace hook<Site-specific
-       configuration>`
+     - :ref:`Hooks`
    * - `Module hierarchy`_
      - :ref:`Requiring via module`
    * - `Autoswap`_
      - :ref:`Conflict unload MIGRATING`
+   * - `Update path entry order`_
+     - :mconfig:`path_entry_reorder` configuration option
+   * - |LMOD_FILE_IGNORE_PATTERNS|_ environment variable
+     - :mfcmd:`modulepath-ignore` environment variable
    * - |LMOD_DOWNSTREAM_CONFLICTS|_ environment variable
      - :ref:`Dependencies between modulefiles`
    * - |LMOD_QUARANTINE_VARS|_ environment variable
      - :mconfig:`protected_envvars` configuration option
+   * - Protect from changes to :envvar:`LD_PRELOAD` and
+       :envvar:`LD_LIBRARY_PATH`
+     - :ref:`Quarantine mechanism`
    * - |clearLmod|_ shell function
      - ``module`` :subcmd:`clear`
    * - |update_lmod_system_cache_files|_ script
@@ -220,6 +227,8 @@ implementation.
 .. _XALT: https://github.com/xalt/xalt
 .. _Module hierarchy: https://lmod.readthedocs.io/en/latest/080_hierarchy.html
 .. _Autoswap: https://lmod.readthedocs.io/en/latest/060_locating.html#autoswapping-rules
+.. |LMOD_FILE_IGNORE_PATTERNS| replace:: ``LMOD_FILE_IGNORE_PATTERNS``
+.. _LMOD_FILE_IGNORE_PATTERNS: https://lmod.readthedocs.io/en/latest/090_configuring_lmod.html#setting-environment-variables-or-cosmic-assign-at-startup
 .. |LMOD_DOWNSTREAM_CONFLICTS| replace:: ``LMOD_DOWNSTREAM_CONFLICTS``
 .. _LMOD_DOWNSTREAM_CONFLICTS: https://lmod.readthedocs.io/en/latest/090_configuring_lmod.html#configuration-or-cosmic-assign-at-startup
 .. |LMOD_QUARANTINE_VARS| replace:: ``LMOD_QUARANTINE_VARS``
@@ -252,7 +261,7 @@ implementations.
 * `RSModules`_: Environment Modules implementation in Rust
 
 .. _Modulecmd.py: https://github.com/tjfulle/Modulecmd.py
-.. _Pmodules: https://gitlab.psi.ch/Pmodules
+.. _Pmodules: https://github.com/Pmodules/Pmodules
 .. _RSModules: https://github.com/fretn/rsmodules
 
 If you know of a ``module`` implementation project that's not listed here,
@@ -283,3 +292,6 @@ additional tools that enhance how modulefiles are handled.
 
 If you're aware of a ``module``-related project missing from this list, feel
 free to :ref:`contact us<Community>` so we can add it.
+
+.. |modules_version| replace:: Modules 5.7.0
+.. |lmod_version| replace:: Lmod 9.4.2

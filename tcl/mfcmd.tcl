@@ -3,7 +3,7 @@
 # MFCMD.TCL, modulefile command procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -578,6 +578,9 @@ proc parseSetenvCommandArgs {mode dflbhv args} {
 proc setenv {args} {
    lassign [parseSetenvCommandArgs load set {*}$args] bhv var val
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    if {$bhv eq {set}} {
       # clean any previously defined reference counter array
       unset-env [getModshareVarName $var] 1
@@ -595,6 +598,9 @@ proc setenv {args} {
 # undo setenv in unload mode
 proc setenv-un {args} {
    lassign [parseSetenvCommandArgs unload unset {*}$args] bhv var val
+
+   # indicate env var name to configured traces
+   setState current_envvar $var
 
    # clean any existing reference counter array
    unset-env [getModshareVarName $var] 1
@@ -615,6 +621,9 @@ proc setenv-un {args} {
 # undefined for later use during the modulefile evaluation
 proc setenv-wh {args} {
    lassign [parseSetenvCommandArgs load set {*}$args] bhv var val
+
+   # indicate env var name to configured traces
+   setState current_envvar $var
 
    setEnvVarIfUndefined $var {}
    return {}
@@ -728,6 +737,9 @@ proc parseUnsetenvCommandArgs {mode dflbhv args} {
 proc unsetenv {args} {
    lassign [parseUnsetenvCommandArgs load unset {*}$args] bhv var val
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    # clean any existing reference counter array
    unset-env [getModshareVarName $var] 1
 
@@ -743,6 +755,9 @@ proc unsetenv {args} {
 # undo unsetenv in unload mode
 proc unsetenv-un {args} {
    lassign [parseUnsetenvCommandArgs unload noop {*}$args] bhv var val
+
+   # indicate env var name to configured traces
+   setState current_envvar $var
 
    switch -- $bhv {
       set {
@@ -768,6 +783,9 @@ proc unsetenv-un {args} {
 # undefined for later use during the modulefile evaluation
 proc unsetenv-wh {args} {
    lassign [parseUnsetenvCommandArgs load noop {*}$args] bhv var val
+
+   # indicate env var name to configured traces
+   setState current_envvar $var
 
    setEnvVarIfUndefined $var {}
    return {}
@@ -944,6 +962,9 @@ proc edit-path-wh {cmd args} {
    lassign [parsePathCommandArgs $cmd load noop {*}$args] separator allow_dup\
       idx_val ign_refcount val_set_is_delim glob_match bhv var path_list
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    setEnvVarIfUndefined $var {}
 
    return {}
@@ -1025,7 +1046,6 @@ proc conflict {args} {
    if {[set isfullpath [isModuleFullPath $currentModule]]} {
       set currentSModule [findModuleNameFromModulefile $currentModule]
    }
-   defineModEqProc [isIcase] [getConf extended_default]
 
    set conflict_unload [expr {[getConf conflict_unload] && [getConf\
       auto_handling]}]
@@ -1153,6 +1173,10 @@ proc parsePrereqCommandArgs {cmd args} {
    } elseif {[set mispopt [lsearch -inline -glob $prereq_list --*]] ne {}} {
       knerror "Misplaced option '$mispopt'"
    }
+
+   # parse module version specification
+   set prereq_list [parseModuleSpecification 0 0 0 0 {*}$prereq_list]
+
    return [list $tag_list $modulepath_list $optional $opt_list $prereq_list]
 }
 
@@ -1162,9 +1186,6 @@ proc prereqAnyModfileCmd {tryload auto args} {
 
    set currentModule [currentState modulename]
    set curmodnamevr [currentState modulenamevr]
-
-   # parse module version specification
-   set args [parseModuleSpecification 0 0 0 0 {*}$args]
 
    # register prereq list (sets of optional prereq are registered as list)
    # unless record inhibited for current iterp context
@@ -1190,9 +1211,9 @@ proc prereqAnyModfileCmd {tryload auto args} {
       foreach modulepath $modulepath_list {
          set matching_list [getMatchingModulepathList $modulepath]
          if {[llength $matching_list]} {
-            appendNoDupToList converted_list {*}$matching_list
+            lappendNoDup converted_list {*}$matching_list
          } else {
-            appendNoDupToList converted_list $modulepath
+            lappendNoDup converted_list $modulepath
          }
       }
       set modulepath_list $converted_list
@@ -1314,17 +1335,13 @@ proc is-saved {args} {
 
 # test at least one of the directories passed as argument is set in MODULEPATH
 proc is-used {args} {
-   set modpathlist [getModulePathList]
    foreach path $args {
-      # transform given path in an absolute path to compare with dirs
-      # registered in the MODULEPATH env var which are returned absolute.
-      set abspath [getAbsolutePath $path]
-      if {$abspath in $modpathlist} {
+      if {[getUsedModulePathEntry $path] ne {}} {
          return 1
       }
    }
    # is something used whatever it is?
-   return [expr {![llength $args] && [llength $modpathlist]}]
+   return [expr {![llength $args] && [llength [getModulePathList]]}]
 }
 
 # test at least one of the modulefiles passed as argument exists
@@ -1334,12 +1351,8 @@ proc is-avail {args} {
    set args [parseModuleSpecification 0 0 0 0 {*}$args]
    set ret 0
 
-   # disable error reporting to avoid modulefile errors
-   # to pollute result. Only if not already inhibited
-   set alreadyinhibit [getState inhibit_errreport]
-   if {!$alreadyinhibit} {
-      inhibitErrorReport
-   }
+   # disable error reporting to avoid modulefile errors to pollute result
+   inhibitErrorReport
 
    foreach mod $args {
       lassign [getPathToModule $mod] modfile modname modnamevr
@@ -1349,10 +1362,7 @@ proc is-avail {args} {
       }
    }
 
-   # re-enable only is it was disabled from this procedure
-   if {!$alreadyinhibit} {
-      setState inhibit_errreport 0
-   }
+   uninhibitErrorReport
    return $ret
 }
 
@@ -1382,7 +1392,7 @@ proc execShAndGetEnv {elt_ignored_list shell script args} {
             2>/dev/null; echo $sep; alias; echo $sep; echo $sep; pwd"
          set varre {export (\S+?)=["']?(.*?)["']?$}
          set funcre {(\S+?) \(\)\s?\n?{\s?\n(.+?)\n}$}
-         set aliasre {(\S+?)='(.*?)'$}
+         set aliasre {([^='\s]+?)='?(.*?)'$}
          set varvalmap [list {\"} \" \\\\ \\]
          set alvalmap [list {'\''} ' {'"'"'} ']
       }
@@ -1497,7 +1507,7 @@ proc execShAndGetEnv {elt_ignored_list shell script args} {
             )?([^-]\S+)(.*?)$}
          set comprevar [list match valpart1 name valpart2]
          # translate back fish-specific code
-         set varvalmap [list {'  '} : {\'} ' {\"} \" \\\\ \\]
+         set varvalmap [list {'  '} : {' '} : {\'} ' {\"} \" \\\\ \\]
          set alvalmap [list { $argv;} {}]
 
          # fish builtins change LS_COLORS variable
@@ -1655,51 +1665,76 @@ proc sh-to-mod {elt_ignored_list args} {
    foreach name $diff {
       if {$name ni $ignvarlist && ![string equal -length 10 $name\
          __MODULES_]} {
+         set idx [string first $varbef($name) $varaft($name)]
+         set doprepend [expr {$idx > 0}]
+         if {$doprepend} {
+            # check from the end to get the largest chunk to prepend
+            set idx [string last $varbef($name) $varaft($name)]
+            # get delimiter from char found between new and existing value
+            set predelim [string index $varaft($name) $idx-1]
+            set delim $predelim
+         }
+         set appdelim_idx [expr {$idx + [string length $varbef($name)]}]
+         set doappend [expr {$appdelim_idx < [string length $varaft($name)]}]
+         if {$doappend} {
+            set appdelim [string index $varaft($name) $appdelim_idx]
+            set delim $appdelim
+         }
          # new value is totally different (also consider a bare ':' as a
          # totally different value to avoid erroneous matches)
-         if {$varbef($name) eq $pathsep || [set idx [string first\
-            $varbef($name) $varaft($name)]] == -1} {
+         # if content must both be prepended and appended but each side uses a
+         # different delimiter character, consider new value totally different
+         if {$varbef($name) eq $pathsep || $idx == -1 || ($doprepend &&\
+            $doappend && $predelim ne $appdelim)} {
             lappend modcontent [list setenv $name $varaft($name)]
          } else {
+            set alllist [list]
+            # de-dup pre-existing list to correctly determine if new dup added
+            lappendNoDup alllist {*}[split $varbef($name) $delim]
+            set addmodcmd [list]
             # content should be prepended
-            if {$idx > 0} {
-               set modcmd [list prepend-path]
-               # check from the end to get the largest chunk to prepend
-               set idx [string last $varbef($name) $varaft($name)]
-               # get delimiter from char found between new and existing value
-               set delim [string index $varaft($name) $idx-1]
-               if {$delim ne $pathsep} {
-                  lappend modcmd -d $delim
-               }
-               lappend modcmd $name
-               # split value and remove duplicate entries
-               set vallist [list]
-               appendNoDupToList vallist {*}[split [string range\
-                  $varaft($name) 0 $idx-2] $delim]
+            if {$doprepend} {
+               set prelist [split [string range $varaft($name) 0 $idx-2]\
+                  $delim]
                # an empty element is added
-               if {![llength $vallist]} {
-                  lappend vallist {}
+               if {![llength $prelist]} {
+                  lappend prelist {}
                }
-               lappend modcontent [list {*}$modcmd {*}$vallist]
+               lappend alllist {*}$prelist
+               lappend addmodcmd prepend-path $prelist
             }
             # content should be appended
-            if {($idx + [string length $varbef($name)]) < [string length\
-               $varaft($name)]} {
-               set modcmd [list append-path]
-               set delim [string index $varaft($name) $idx+[string length\
-                  $varbef($name)]]
+            if {$doappend} {
+               set applist [split [string range $varaft($name) [expr\
+                  {$appdelim_idx + 1}] end] $delim]
+               # an empty element is added
+               if {![llength $applist]} {
+                  lappend applist {}
+               }
+               lappend alllist {*}$applist
+               lappend addmodcmd append-path $applist
+            }
+
+            # if a directory is found several times in prepended or appended
+            # list, or across both list, or already in pre-existing value:
+            # should not be de-duplicated by prepend-path/append-path's
+            # default behavior, nor relocated by the path_entry_reorder
+            # configuration option. a plain membership test (rather than
+            # merging pre-existing value into alllist) is required here, as
+            # merging would let lappendNoDup silently skip an entry already
+            # in alllist, hiding the very overlap this check looks for
+            set isdup [isDupInList $alllist]
+
+            foreach {cmd addlist} $addmodcmd {
+               set addcmd [list $cmd]
+               if {$isdup} {
+                  lappend addcmd --duplicates
+               }
                if {$delim ne $pathsep} {
-                  lappend modcmd -d $delim
+                  lappend addcmd -d $delim
                }
-               lappend modcmd $name
-               set vallist [list]
-               appendNoDupToList vallist {*}[split [string range\
-                  $varaft($name) [expr {$idx + [string length $varbef($name)]\
-                  + 1}] end] $delim]
-               if {![llength $vallist]} {
-                  lappend vallist {}
-               }
-               lappend modcontent [list {*}$modcmd {*}$vallist]
+               lappend addcmd $name {*}$addlist
+               lappend modcontent $addcmd
             }
          }
       }
@@ -1713,7 +1748,7 @@ proc sh-to-mod {elt_ignored_list args} {
             # define a path-like variable if path separator found in it
             # split value and remove duplicate entries
             set vallist [list]
-            appendNoDupToList vallist {*}[split $varaft($name) $pathsep]
+            lappendNoDup vallist {*}[split $varaft($name) $pathsep]
             lappend modcontent [list prepend-path $name {*}$vallist]
          }
       }
@@ -2202,6 +2237,9 @@ proc pushenv {var val} {
    # know what element to remove from stack when unloading
    prepend-path $pushvar [currentState modulename]&$val
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    return {}
 }
 
@@ -2246,11 +2284,17 @@ proc pushenv-un {var val} {
       unset-env $var 0 $val
    }
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    return {}
 }
 
 # optimized pushenv for whatis mode (same approach than setenv-wh)
 proc pushenv-wh {var val} {
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    setEnvVarIfUndefined $var {}
    return {}
 }
@@ -2267,6 +2311,133 @@ proc modulepath-indent {modpath indent} {
    reportDebug "modpath=$modpath, indent='$indent'"
 }
 
+# translate a gitignore-style pattern into its matching properties: negation
+# flag, directory-only flag and a regular expression to apply on file paths
+# relative to the pattern anchor directory. empty result if pattern is void
+proc compileIgnorePattern {pattern} {
+   set negated 0
+   if {[string index $pattern 0] eq {!}} {
+      set negated 1
+      set pattern [string range $pattern 1 end]
+   } elseif {[string equal -length 2 $pattern {\!}]} {
+      # backslash-escaped leading '!' is matched literally
+      set pattern [string range $pattern 1 end]
+   }
+   set dironly 0
+   if {[string index $pattern end] eq {/}} {
+      set dironly 1
+      set pattern [string range $pattern 0 end-1]
+   }
+   # a slash at pattern start or middle anchors it to the directory of the
+   # rc file defining it, otherwise it matches at any depth below
+   set anchored [expr {[string first / $pattern] != -1}]
+   set pattern [string trimleft $pattern /]
+   set plen [string length $pattern]
+   if {$plen == 0} {
+      return {}
+   }
+
+   set re {}
+   for {set i 0} {$i < $plen} {incr i} {
+      set c [string index $pattern $i]
+      switch -- $c {
+         * {
+            set seg_start [expr {$i == 0 || [string index $pattern [expr {$i\
+               - 1}]] eq {/}}]
+            if {[string index $pattern [expr {$i + 1}]] eq {*}} {
+               set next2 [string index $pattern [expr {$i + 2}]]
+               if {$seg_start && $next2 eq {/}} {
+                  # leading '**/' matches zero or more directories
+                  append re {(?:[^/]+/)*}
+                  incr i 2
+               } elseif {$seg_start && $next2 eq {}} {
+                  # trailing '**' matches everything inside
+                  append re .*
+                  incr i 1
+               } else {
+                  # consecutive asterisks elsewhere act as a regular one
+                  append re {[^/]*}
+                  incr i 1
+               }
+            } else {
+               append re {[^/]*}
+            }
+         }
+         ? {
+            append re {[^/]}
+         }
+         [ {
+            # copy character range, translating '!' negation prefix ('[' is
+            # matched literally if range is not closed, like git does)
+            set skip [expr {[string index $pattern [expr {$i + 1}]] eq {!} ?\
+               3 : 2}]
+            set j [string first {]} $pattern [expr {$i + $skip}]]
+            if {$j == -1} {
+               append re {\[}
+            } else {
+               set range [string range $pattern [expr {$i + 1}] [expr {$j -\
+                  1}]]
+               if {[string index $range 0] eq {!}} {
+                  set range ^[string range $range 1 end]
+               }
+               append re \[$range\]
+               set i $j
+            }
+         }
+         default {
+            if {$c eq "\\"} {
+               # backslash escapes next character which is matched literally
+               # (a trailing backslash is matched literally)
+               incr i
+               if {$i < $plen} {
+                  set c [string index $pattern $i]
+               }
+            }
+            if {[string first $c {\^$.|?*+()[]{}}] != -1} {
+               append re \\
+            }
+            append re $c
+         }
+      }
+   }
+
+   # pattern without slash matches element name at any depth
+   if {$anchored} {
+      set re ^$re\$
+   } else {
+      set re (?:^|/)$re\$
+   }
+   return [list $negated $dironly $re]
+}
+
+# register gitignore-style patterns describing modulepath content to ignore
+# when searching for modulefiles
+proc modulepath-ignore {args} {
+   if {![llength $args]} {
+      knerror {No pattern specified in argument}
+   }
+   # global and user rc files define global patterns applying to every
+   # modulepath, rc files within a modulepath anchor patterns to their
+   # directory
+   if {[isStateDefined rc_running]} {
+      set anchor {}
+   } else {
+      set rcfile [currentState modulefile]
+      if {[file tail $rcfile] ni {.modulerc .version}} {
+         knerror {modulepath-ignore command not allowed in modulefile}
+      }
+      set anchor [file dirname $rcfile]
+   }
+   foreach pattern $args {
+      set props [compileIgnorePattern $pattern]
+      # void pattern does not match anything
+      if {[llength $props]} {
+         lappend ::g_pathIgnorePatterns [list $anchor {*}$props]
+      }
+   }
+   reportDebug "anchor='$anchor', patterns='$args'"
+}
+
 proc unique-name-conflict {} {
    # skip if unique_name_loaded configuration is disabled
    if {![getConf unique_name_loaded]} {
@@ -2278,14 +2449,30 @@ proc unique-name-conflict {} {
    set root_name_list [list]
    set mod [currentState modulename]
    foreach name [list $mod {*}[getAllModuleResolvedName $mod]] {
-      appendNoDupToList root_name_list [lindex [file split $name] 0]
+      lappendNoDup root_name_list [lindex [file split $name] 0]
    }
 
    # declare conflict over all these names
    conflict {*}$root_name_list
 }
 
-proc sourceModfileCmd {itrp filename} {
+proc sourceModfileCmd {itrp args} {
+   # argument parsing: catch encoding arg but ignore it
+   switch -- [llength $args] {
+      1 {}
+      3 {
+         set option [lindex $args 0]
+         if {$option ne {-encoding}} {
+            knerror "Invalid option '$option'"
+         }
+      }
+      default {
+         knerror {wrong # args: should be "source ?-encoding? ?encodingName?\
+            fileName"}
+      }
+   }
+   set filename [lindex $args end]
+
    if {![info exists ::source_cache($filename)]} {
       set ::source_cache($filename) [readFile $filename]
    }
@@ -2378,6 +2565,17 @@ proc module-warn {args} {
    }
 }
 
+proc extensions {args} {
+   if {![llength $args]} {
+      knerror {No module specified in argument}
+   }
+   # skip alias definition for extensions cmd if info_extension is enabled
+   if {[getConf info_extension]} {
+      return
+   }
+   provide {*}$args
+}
+
 proc provide {args} {
    if {![llength $args]} {
       knerror {No module specified in argument}
@@ -2388,7 +2586,90 @@ proc provide {args} {
    }
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+proc module {command args} {
+   # resolve and check command name
+   lassign [parseModuleCommandName $command help] command cmdvalid cmdempty
+   # clear other args if no command name supplied
+   if {$cmdempty} {
+      set args {}
+   }
+   # raise error if supplied command is not known
+   if {!$cmdvalid} {
+      knerrorModule 0 "Invalid command '$command'"
+   }
+
+   # define states needed by module spec parsing and sub-command processing
+   # define if modfile should always be fully read even for validity check
+   lappendState always_read_full_file [expr {$command ni [list path paths\
+      list avail aliases edit spider]}]
+   lappendState commandname $command
+
+   # parse options, do that globally to ignore options not related to a given
+   # module sub-command (exclude them from arg list)
+   lassign [parseModuleCommandArgs 0 $command 0 0 {*}$args] show_oneperline\
+      show_mtime show_filter search_filter search_match dump_state\
+      addpath_pos not_req tag_list parsed_args
+
+   # some commands can only be called from top level, not within modulefile
+   switch -- $command {
+      path - paths - autoinit - help - prepend-path - append-path -\
+      remove-path - is-loaded - is-saved - is-used - is-avail -\
+      info-loaded - clear - sh-to-mod - edit - refresh - source - state -\
+      lint - mod-to-sh - reset - stash - stashpop - stashrm - stashshow -\
+      stashclear - stashlist - cachebuild - cacheclear - spider {
+         knerrorModule 0 "Command '$command' not supported"
+      }
+   }
+   # other commands can only be called from modulefile evaluated from
+   # command acting as top-level context (source and autoinit)
+   if {([depthState modulename] > 1 || [aboveCommandName] ni [list source\
+      autoinit]) && $command eq {config}} {
+      knerrorModule 0 "Command '$command' not supported"
+   }
+   # no requirement should be recorded this module load/unload/switch cmd
+   if {$not_req || ![getConf implicit_requirement]} {
+      lappendState inhibit_req_record [currentState evalid]
+   }
+
+   checkModuleCommandNbArgs 0 $command [llength $parsed_args]
+
+   {*}[formatModuleCommand 0 $command [currentState mode] $tag_list\
+      $addpath_pos $show_oneperline $show_mtime $show_filter $search_filter\
+      $search_match $dump_state $parsed_args]
+
+   lpopState commandname
+   lpopState always_read_full_file
+
+   if {$not_req || ![getConf implicit_requirement]} {
+      lpopState inhibit_req_record
+   }
+
+   return {}
+}
+
+# supersede append command to sync environment variable in modulefile eval
+# sub-interpreter. use "set" Tcl command to use the Tcl-internal sync trigger.
+proc appendModfileCmd {itrp var_name args} {
+   # set a variable if passed var_name is an env variable
+   if {[string range $var_name 0 3] eq {env(}} {
+      set env_var_name ::$var_name
+   } elseif {[string range $var_name 0 5] eq {::env(}} {
+      set env_var_name $var_name
+   }
+   ##nagelfar vartype env_var_name varName
+   if {[info exists env_var_name] && [info exists $env_var_name]} {
+      set value [set $env_var_name][join $args {}]
+      set cmd_op_list [list set $var_name $value]
+   } else {
+      set cmd_op_list [list _append $var_name {*}$args]
+   }
+   interp eval $itrp $cmd_op_list
+}
+
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

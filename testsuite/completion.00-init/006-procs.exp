@@ -1,0 +1,149 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		completion.00-init/%M%
+#   Revision:		%I%
+#   First Edition:	2026/08/07
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Test procedures
+#   Command:
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Defines shell-agnostic test procedures shared by every
+#			shell's completion tests: a shell-specific
+#			completion_<shell>_list procedure is expected to
+#			record the cmdline it was passed in
+#			completion_last_cmdline, which the assert procedures
+#			below use to build their test label
+#		}C%
+#
+##############################################################################
+
+# prompt used as a distinctive sentinel by every shell-specific driver, to
+# reliably tell apart the shell's own output from the test session's
+set completion_prompt {MODULESTEST> }
+
+# escape a string so it is safe to embed in a Tcl regexp as a literal
+proc completion_re_escape {str} {
+   return [regsub -all {[][$.+?*\\()&|^{}]} $str {\\&}]
+}
+
+# assert every word in 'needed' is present in the 'got' candidate list; the
+# test label is built from the cmdline last passed to completion_<shell>_list
+# plus the words looked for
+proc completion_assert_contains {got needed} {
+   global completion_last_cmdline
+
+   set label "'$completion_last_cmdline' completion contains $needed"
+   set missing {}
+   foreach word $needed {
+      if {$word ni $got} {
+         lappend missing $word
+      }
+   }
+   if {[llength $missing]} {
+      fail "$label (missing: $missing) (got: $got)"
+   } else {
+      pass $label
+   }
+}
+
+# assert no word in 'unwanted' is present in the 'got' candidate list; the
+# test label is built from the cmdline last passed to completion_<shell>_list
+# plus the words that must not appear
+proc completion_assert_not_contains {got unwanted} {
+   global completion_last_cmdline
+
+   set label "'$completion_last_cmdline' completion excludes $unwanted"
+   set found {}
+   foreach word $unwanted {
+      if {$word in $got} {
+         lappend found $word
+      }
+   }
+   if {[llength $found]} {
+      fail "$label (unexpected: $found) (got: $got)"
+   } else {
+      pass $label
+   }
+}
+
+# assert every word in 'got' matching 'pattern' (a Tcl 'string match' glob)
+# is a member of 'known'; used to check a candidate list holds no more than
+# the fetched, expected words of a given kind (eg no option flag beyond the
+# ones 'module help' documents) without having to also enumerate every other
+# kind of candidate that may legitimately appear (module names, collection
+# names, ...). The test label is built from the cmdline last passed to
+# completion_<shell>_list plus the pattern looked for
+proc completion_assert_only_known {got pattern known} {
+   global completion_last_cmdline
+
+   set label "'$completion_last_cmdline' completion has no unknown '$pattern' word"
+   set extra {}
+   foreach word $got {
+      if {[string match $pattern $word] && $word ni $known} {
+         lappend extra $word
+      }
+   }
+   if {[llength $extra]} {
+      fail "$label (unknown: $extra) (known: $known)"
+   } else {
+      pass $label
+   }
+}
+
+# assert at least one word in 'candidates' is present in the 'got' candidate
+# list; used where the exact expected word is not known in advance (eg
+# which of several plausible module names a fixture happens to offer), only
+# that completion offers a word of that kind at all. The test label is
+# built from the cmdline last passed to completion_<shell>_list plus the
+# candidate words looked for
+proc completion_assert_any {got candidates} {
+   global completion_last_cmdline
+
+   set label "'$completion_last_cmdline' completion contains any of $candidates"
+   foreach word $candidates {
+      if {$word in $got} {
+         pass $label
+         return
+      }
+   }
+   fail "$label (got: $got)"
+}
+
+# assert 'got' is exactly 'expected'; the test label is built from the
+# cmdline last passed to completion_<shell>_list/_inline plus the expected
+# value
+proc completion_assert_eq {got expected} {
+   global completion_last_cmdline
+
+   set label "'$completion_last_cmdline' completion inserts '$expected'"
+   if {$got ne $expected} {
+      fail "$label (got: '$got')"
+   } else {
+      pass $label
+   }
+}
+
+# assert a marker file was not created (used to prove no shell code
+# injected through a candidate word got executed); the test label is built
+# from the cmdline last passed to completion_<shell>_list plus the marker
+# path
+proc completion_assert_no_exec {markerpath} {
+   global completion_last_cmdline
+
+   set label "'$completion_last_cmdline' completion does not execute injected code ($markerpath)"
+   if {[file exists $markerpath]} {
+      fail "$label (marker file was created: injected code ran)"
+      file delete -force $markerpath
+   } else {
+      pass $label
+   }
+}
+
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

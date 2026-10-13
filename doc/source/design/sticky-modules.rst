@@ -48,10 +48,18 @@ Specification
     - it means stickiness applies to the module version
     - thus these versions targeted specifically with ``module-tag`` cannot be swapped by another version from same module
 
-- When a super-sticky module depends on a non-super-sticky module
+- Starting Modules 5.7, ``purge`` preserves requirements of retained sticky
+  and super-sticky modules
 
-  - If a forced ``purge`` command occurs, the dependent module will be unloaded
-  - Which let the super-sticky module with a missing dependency
+  - Direct and indirect requirements are preserved, even without a sticky tag
+  - Requirements are preserved whatever their load order relative to their
+    dependent, as a requirement may be loaded after its dependent
+  - Only strong requirements are preserved: an alternative requirement may
+    be unloaded while another loaded module still satisfies it
+  - A forced ``purge`` unloads sticky modules and can unload their
+    requirements, but preserves super-sticky modules and their requirements
+  - Before version 5.7, a forced ``purge`` could unload a non-super-sticky
+    requirement and leave a super-sticky module with a missing dependency
 
 - Starting Modules 5.2, sticky modules are unloaded
 
@@ -64,7 +72,7 @@ Specification
 - An error is reported when trying to unload a sticky or super-sticky module
 
   - As the expected unload is not performed
-  - So with the return code and message, user knows that what he/she asked for was not done
+  - So with the return code and message, user knows that what they asked for was not done
   - Same goes for the ``purge`` command: user expects no more module loaded
 
     - so an error is returned as after the command the sticky module is still loaded
@@ -73,7 +81,7 @@ Specification
 
     - the sticky module is unloaded as expected but a warning message is done
     - as the module was tagged not to be unloaded by default
-    - user should know he/she has done something specific
+    - user should know they have done something specific
 
 - Reporting an error during a ``purge`` may be considered inappropriate
 
@@ -87,6 +95,13 @@ Specification
     - when set to ``warning``, a warning message is reported, no error exit
       code
     - when set to ``silent``, no message reported, no error exit code
+
+  - Starting Modules 5.7, this configuration also applies to skipped unload
+    of requirements of retained sticky or super-sticky modules
+  - Requirement unload is reported as ``Unload of sticky module requirement
+    skipped`` or ``Unload of super-sticky module requirement skipped``
+  - If both sticky and super-sticky modules require a module, the
+    super-sticky tag takes precedence in this message
 
   - Even when ``sticky_purge`` is set to ``silent``, a warning message is
     reported when unload of sticky module is forced during a purge.

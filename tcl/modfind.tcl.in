@@ -3,7 +3,7 @@
 # MODFIND.TCL, available or loaded module find procedures
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -355,7 +355,6 @@ proc getAllModuleResolvedName {mod {flag_type 0} {modspec {}} {filter_default\
    set namelist {}
    set resmodlist {}
    set icase [isIcase]
-   defineModEqProc $icase [getConf extended_default]
 
    # get parent directories of mod
    foreach modelt [split $mod /] {
@@ -412,7 +411,7 @@ proc getAllModuleResolvedName {mod {flag_type 0} {modspec {}} {filter_default\
                } else {
                   set name_entry $resmod
                }
-               appendNoDupToList namelist $name_entry
+               lappendNoDup namelist $name_entry
 
                unset modroot
                foreach reselt [split [file dirname $resmod] /] {
@@ -420,7 +419,7 @@ proc getAllModuleResolvedName {mod {flag_type 0} {modspec {}} {filter_default\
                      append modroot /
                   }
                   append modroot $reselt
-                  appendNoDupToList resmodlist $modroot
+                  lappendNoDup resmodlist $modroot
                }
             }
          }
@@ -496,9 +495,7 @@ proc getLoadedModulePropertyEnvVarName {prop} {
 # is set. by default an empty list is returned if no MODULEPATH set
 # resolv_var param tells if environment variable references in path elements
 # should be resolved or passed as-is in result list
-# set_abs param applies an absolute path name conversion to path elements
-# if enabled
-proc getModulePathList {{behavior returnempty} {resolv_var 1} {set_abs 1}} {
+proc getModulePathList {{behavior returnempty} {resolv_var 1}} {
    if {![isEnvVarDefined MODULEPATH] && $behavior eq {exiterronundef}} {
       reportErrorAndExit {No module path defined}
    }
@@ -508,12 +505,32 @@ proc getModulePathList {{behavior returnempty} {resolv_var 1} {set_abs 1}} {
       if {$resolv_var} {
          set modpath [resolvStringWithEnv $modpath]
       }
-      if {$set_abs} {
-         set modpath [getAbsolutePath $modpath]
-      }
-      appendNoDupToList modpath_list $modpath
+      # relative modulepath refers to current working directory of module
+      # command, not to the directory of the modulefile being evaluated
+      lappendNoDup modpath_list [getAbsolutePath $modpath 1]
    }
    return $modpath_list
+}
+
+# return the MODULEPATH entry, as registered in environment variable, that
+# corresponds to given path. path is resolved as an absolute path from the
+# directory of the modulefile being evaluated and from the current working
+# directory, as a relative MODULEPATH entry refers to the latter. an empty
+# string is returned if path is not found in MODULEPATH
+# resolv_var param tells if environment variable references in MODULEPATH
+# entries should be resolved or compared as-is
+proc getUsedModulePathEntry {path {resolv_var 1}} {
+   set abspath [getAbsolutePath $path]
+   set abspath_from_cwd [getAbsolutePath $path 1]
+   foreach modpath [getEnvLoadedModulePropertyParsedList modulepath] {
+      set absmodpath [expr {$resolv_var ? [resolvStringWithEnv $modpath] :\
+         $modpath}]
+      set absmodpath [getAbsolutePath $absmodpath 1]
+      if {$absmodpath eq $abspath || $absmodpath eq $abspath_from_cwd} {
+         return $modpath
+      }
+   }
+   return {}
 }
 
 proc getModulepathLabel {modpath} {
@@ -656,28 +673,42 @@ proc getModuleTagProp {mod fpmod tag prop} {
 
 # Gather all tags applying to a given module
 proc collectModuleTags {mod} {
+   if {[info exists ::g_tagHash($mod)]} {
+      set known_tag_list $::g_tagHash($mod)
+   } else {
+      set known_tag_list {}
+   }
+   set tag_list [getMatchingTagList $mod $known_tag_list]
+   if {[llength $tag_list]} {
+      setModuleTag $mod {*}$tag_list
+   }
+}
+
+proc getMatchingTagList {mod {known_tag_list {}}} {
+   set tag_list {}
    set modroot [getModuleRootFromVersSpec $mod]
    # look if mod matches one of the module specs applying to mod root
    if {[info exists ::g_moduleTagRoot($modroot)]} {
       for {set i 0} {$i < [llength $::g_moduleTagRoot($modroot)]} {incr i} {
          set tag [lindex $::g_moduleTagRoot($modroot) $i]
-         # skip already known tag
-         if {![info exists ::g_tagHash($mod)] || $tag ni $::g_tagHash($mod)} {
+         if {$tag ni $tag_list} {
             foreach {tmodspec tprops} [lindex\
                $::g_moduleTagRootSpec($modroot) $i] {
                # add tag if one modspec matches mod
                if {[modEq $tmodspec $mod eqstart 1 0 1]} {
-                  setModuleTag $mod $tag
+                  lappend known_tag_list $tag
+                  lappend tag_list $tag
                   break
                }
             }
          }
       }
    }
+   return $tag_list
 }
 
 proc setModuleTag {mod args} {
-   appendNoDupToList ::g_tagHash($mod) {*}$args
+   lappendNoDup ::g_tagHash($mod) {*}$args
 }
 
 proc setModuleAndVariantsTag {mod mod_with_vr args} {
@@ -688,7 +719,7 @@ proc setModuleAndVariantsTag {mod mod_with_vr args} {
 }
 
 proc setModuleExtraTag {mod args} {
-   appendNoDupToList ::g_extraTagHash($mod) {*}$args
+   lappendNoDup ::g_extraTagHash($mod) {*}$args
 }
 
 proc setModuleAndVariantsExtraTag {mod mod_with_vr args} {
@@ -701,7 +732,7 @@ proc setModuleAndVariantsExtraTag {mod mod_with_vr args} {
 proc unsetModuleTag {mod args} {
    if {[info exists ::g_tagHash($mod)]} {
       lassign [getDiffBetweenList $::g_tagHash($mod) $args] diff_list
-      if {[llength $diff_list]} {
+      if {[llength $args] && [llength $diff_list]} {
          set ::g_tagHash($mod) $diff_list
       } else {
          unset ::g_tagHash($mod)
@@ -719,7 +750,7 @@ proc unsetModuleAndVariantsTag {mod mod_with_vr args} {
 proc unsetModuleExtraTag {mod args} {
    if {[info exists ::g_extraTagHash($mod)]} {
       lassign [getDiffBetweenList $::g_extraTagHash($mod) $args] diff_list
-      if {[llength $diff_list]} {
+      if {[llength $args] && [llength $diff_list]} {
          set ::g_extraTagHash($mod) $diff_list
       } else {
          unset ::g_extraTagHash($mod)
@@ -738,11 +769,19 @@ proc getTagList {mod {fpmod {}} {sort 1}} {
    set tag_list {}
    # get tags applied over module full path designation
    if {$fpmod ne {} && [info exists ::g_moduleTagFullPath($fpmod)]} {
-      appendNoDupToList tag_list {*}$::g_moduleTagFullPath($fpmod)
+      lappendNoDup tag_list {*}$::g_moduleTagFullPath($fpmod)
    }
+   # recompute tags applying from module specification if mod is loaded but
+   # not the same modulefile. tags applying to loaded mod are recorded in
+   # g_tagHash but should not apply to same mod from a different modulepath
+   # do not make this distinction if modulefile is not provided
+   # directly check on g_loadedModules array to avoid triggering env check
+   if {[string length $fpmod] && [info exists ::g_loadedModules($mod)] &&\
+      $fpmod ne [getModulefileFromLoadedModule $mod]} {
+      lappendNoDup tag_list {*}[getMatchingTagList $mod]
    # get collected tags applied on short designation
-   if {[info exists ::g_tagHash($mod)]} {
-      appendNoDupToList tag_list {*}$::g_tagHash($mod)
+   } elseif {[info exists ::g_tagHash($mod)]} {
+      lappendNoDup tag_list {*}$::g_tagHash($mod)
    }
    if {[llength $tag_list]} {
       if {$sort} {
@@ -755,9 +794,10 @@ proc getTagList {mod {fpmod {}} {sort 1}} {
 
 # return tags applying to mod that can be exported
 proc getExportTagList {mod {fpmod {}}} {
-   # remove loaded/hidden tags from the list to register
+   # remove loaded, hidden and user-defined non exportable tags from the list
+   # to register
    lassign [getDiffBetweenList [getTagList $mod $fpmod 0] [list loaded\
-      hidden]] ret
+      hidden {*}[getConfList non_exportable_tags]]] ret
    return $ret
 }
 
@@ -1183,10 +1223,11 @@ proc getPathToModule {mod {indir {}} {report_issue 1} {look_loaded no}\
    # or to find a closest match (used when switching with single name arg)
    } elseif {$look_loaded ne {no}} {
       switch -- $look_loaded {
-         match {set getLoadedNameProc getLoadedMatchingName}
+         exact {set getLoadedNameProc getLoadedExactName}
+         match {set getLoadedNameProc getLoadedEqstartName}
          close {set getLoadedNameProc getLoadedWithClosestName}
       }
-      if {[set lm [$getLoadedNameProc $mod]] ne {}} {
+      if {[set lm [$getLoadedNameProc $mod $indir]] ne {}} {
          set vrlist [getVariantList $lm 1]
          set retlist [list [getModulefileFromLoadedModule $lm] $lm]
       } else {
@@ -1212,12 +1253,10 @@ proc getPathToModule {mod {indir {}} {report_issue 1} {look_loaded no}\
          exiterronundef]}]
       # remove excluded directories (already searched)
       foreach dir $excdir {
-         set dir_list [replaceFromList $dir_list $dir]
+         lrem dir_list $dir
       }
 
       set icase [isIcase]
-      defineGetEqArrayKeyProc $icase [getConf extended_default] [getConf\
-         implicit_default]
 
       # Now search for $mod in module paths
       set modspec $mod
@@ -1315,8 +1354,6 @@ proc getPathToModule {mod {indir {}} {report_issue 1} {look_loaded no}\
 }
 
 proc isModuleLoaded {mod} {
-   cacheCurrentModules
-
    return [info exists ::g_loadedModules($mod)]
 }
 
@@ -1340,8 +1377,6 @@ proc getModulepathFromLoadedOrLoadingModule {mod} {
 }
 
 proc isModulefileLoaded {modfile} {
-   cacheCurrentModules
-
    return [info exists ::g_loadedModuleFiles($modfile)]
 }
 
@@ -1389,8 +1424,17 @@ proc isModuleRefreshQualified {mod} {
    return $::g_loadedModulesRefresh($mod)
 }
 
-proc setLoadedModule {mod modfile uasked modvr refresh} {
+proc getLoadedModulePosition {mod} {
+   if {[info exists ::g_loadedModulePosition($mod)]} {
+      return $::g_loadedModulePosition($mod)
+   } else {
+      return -1
+   }
+}
+
+proc setLoadedModule {mod modfile uasked modvr refresh {build_dep_chain 1}} {
    set ::g_loadedModules($mod) $modfile
+   set ::g_loadedModulePosition($mod) [array size ::g_loadedModules]
    # a loaded modfile may correspond to multiple loaded virtual modules
    lappend ::g_loadedModuleFiles($modfile) $mod
 
@@ -1401,30 +1445,34 @@ proc setLoadedModule {mod modfile uasked modvr refresh} {
    # is module qualified for refresh evaluation
    set ::g_loadedModulesRefresh($mod) $refresh
 
-   # build dependency chain
-   setModuleDependency $mod
+   # build information to more efficiently get matching loaded module
+   setLoadedByModroot $mod
+
+   if {$build_dep_chain} {
+      setModuleDependency $mod
+   }
 }
 
 proc unsetLoadedModule {mod modfile} {
    unset ::g_loadedModules($mod)
+   unset ::g_loadedModulePosition($mod)
    # a loaded modfile may correspond to multiple loaded virtual modules
    if {[llength $::g_loadedModuleFiles($modfile)] == 1} {
       unset ::g_loadedModuleFiles($modfile)
    } else {
-      set ::g_loadedModuleFiles($modfile) [replaceFromList\
-         $::g_loadedModuleFiles($modfile) $mod]
+      lrem ::g_loadedModuleFiles($modfile) $mod
    }
 
    unset ::g_loadedModulesRefresh($mod)
 
-   # update dependencies
+   unsetLoadedByModroot $mod
    unsetModuleDependency $mod
 }
 
 # return the currently loaded module whose name is the closest to the
 # name passed as argument. if no loaded module match at least one part
 # of the passed name, an empty string is returned.
-proc getLoadedWithClosestName {name} {
+proc getLoadedWithClosestName {name modulepath_list} {
    set ret {}
    set retmax 1
 
@@ -1450,10 +1498,6 @@ proc getLoadedWithClosestName {name} {
    }
 
    if {[info exists nametosplit]} {
-      cacheCurrentModules
-      set icase [isIcase]
-      defineModStartNbProc $icase
-      defineModEqProc $icase [getConf extended_default]
       # compare name to each currently loaded module name
       ##nagelfar ignore Found constant
       foreach mod [getEnvLoadedModulePropertyParsedList name] {
@@ -1485,12 +1529,20 @@ proc getLoadedWithClosestName {name} {
    return $ret
 }
 
+proc getLoadedExactName {name modulepath_list} {
+   return [getLoadedMatchingName $name {} 0 {} $modulepath_list eqspec]
+}
+
+proc getLoadedEqstartName {name modulepath_list} {
+   return [getLoadedMatchingName $name {} 0 {} $modulepath_list]
+}
+
 # return the currently loaded module whose name is equal or include the name
 # passed as argument. if no loaded module match, an empty string is returned.
 # loading: look at currently loading modules instead of loaded if loading == 1
 # lmlist: only take into account passed loaded module list not all loaded mods
 proc getLoadedMatchingName {name {behavior {}} {loading 0} {lmlist {}}\
-   {modulepath_list {}}} {
+   {modulepath_list {}} {eqtest eqstart}} {
    set ret {}
    set retmax 0
    # get default behavior from unload_match_order config
@@ -1503,18 +1555,18 @@ proc getLoadedMatchingName {name {behavior {}} {loading 0} {lmlist {}}\
       set isModulefileLoaded isModulefileLoading
       set getModuleFromLoadedModulefile getModuleFromLoadingModulefile
       set isLoadedMatchSpecificPath isLoadingMatchSpecificPath
-      set getLoadedModuleList [list getLoadingModuleList]
    } else {
       ##nagelfar ignore #4 Found constant
       set isModulefileLoaded isModulefileLoaded
       set getModuleFromLoadedModulefile getModuleFromLoadedModulefile
       set isLoadedMatchSpecificPath isLoadedMatchSpecificPath
-      set getLoadedModuleList [list getEnvLoadedModulePropertyParsedList name]
    }
 
    # fetch currently loaded/loading module name is no list provided
    if {![llength $lmlist]} {
-      set lmlist [{*}$getLoadedModuleList]
+      ##nagelfar ignore #2 Badly formed if statement
+      set lmlist [if {$loading} {getLoadingModuleList}\
+         {getLoadedMatchingModroot $name}]
    }
 
    # if module is passed as full modulefile path name, look at lmfile names
@@ -1541,7 +1593,6 @@ proc getLoadedMatchingName {name {behavior {}} {loading 0} {lmlist {}}\
          }
       }
    } elseif {$name ne {}} {
-      defineModEqProc [isIcase] [getConf extended_default] [expr {!$loading}]
       # compare name to each currently loaded/loading module name, if multiple
       # mod match name:
       foreach mod $lmlist {
@@ -1557,7 +1608,7 @@ proc getLoadedMatchingName {name {behavior {}} {loading 0} {lmlist {}}\
          if {![$isLoadedMatchSpecificPath $mod $modulepath_list]} {
             continue
          }
-         if {[modEq $name $matchmod eqstart 1 [expr {$loading ? 1 : 2}] 1]} {
+         if {[modEq $name $matchmod $eqtest 1 [expr {$loading ? 1 : 2}] 1]} {
             switch -- $behavior {
                returnlast {
                   # the last loaded module will be returned
@@ -1583,13 +1634,23 @@ proc getLoadedMatchingName {name {behavior {}} {loading 0} {lmlist {}}\
 
 # return if loaded mod is part of modulepath from specified constrained list
 proc isLoadedMatchSpecificPath {mod modulepath_list} {
+   set searchid $mod:$modulepath_list
+   if {[info exists ::g_isLoadedMatchSpecificPathMemCache($searchid)]} {
+      return $::g_isLoadedMatchSpecificPathMemCache($searchid)
+   }
    set mod_file [getModulefileFromLoadedModule $mod]
-   return [isModulefileMatchSpecificPath $mod_file $modulepath_list]
+   set ::g_isLoadedMatchSpecificPathMemCache($searchid)\
+      [isModulefileMatchSpecificPath $mod_file $modulepath_list]
 }
 
 proc isLoadingMatchSpecificPath {mod modulepath_list} {
+   set searchid $mod:$modulepath_list
+   if {[info exists ::g_isLoadingMatchSpecificPathMemCache($searchid)]} {
+      return $::g_isLoadingMatchSpecificPathMemCache($searchid)
+   }
    set mod_file [getModulefileFromLoadingModule $mod]
-   return [isModulefileMatchSpecificPath $mod_file $modulepath_list]
+   set ::g_isLoadingMatchSpecificPathMemCache($searchid)\
+      [isModulefileMatchSpecificPath $mod_file $modulepath_list]
 }
 
 proc isModulefileMatchSpecificPath {mod_file modulepath_list} {
@@ -1604,8 +1665,7 @@ proc setLoadedSourceSh {mod args} {
    foreach arg $args {
       # each arg is a list with source-sh call string at index 0 and resulting
       # modulefile commands at all later index positions
-      set shtomodargs [lindex $arg 0]
-      set modcontent [lrange $arg 1 end]
+      set modcontent [lassign $arg shtomodargs]
       if {![llength [getLoadedSourceShScriptContent $mod $shtomodargs]]} {
          # filter alias/function/complete definition not to record them
          set shtomod_entry [list $shtomodargs]
@@ -1658,12 +1718,42 @@ proc getLoadedSourceShScriptContent {mod script} {
 }
 
 proc setLoadedConflict {mod args} {
-   appendNoDupToList ::g_loadedModuleConflict($mod) {*}$args
+   lappendNoDup ::g_loadedModuleConflict($mod) {*}$args
+   setLoadedConflictByModroot $mod {*}$args
+}
+
+proc setLoadedConflictByModroot {mod args} {
+   foreach con_spec $args {
+      # record lower case mod root if icase is enabled
+      set con_mod_root [getModuleRootFromVersSpecLowerIfIcase $con_spec]
+      lappend ::g_loadedConflictByModroot($con_mod_root) $mod $con_spec
+      lappendNoDup ::g_modrootByLoadedConflict($mod) $con_mod_root
+   }
 }
 
 proc unsetLoadedConflict {mod} {
    if {[info exists ::g_loadedModuleConflict($mod)]} {
       unset ::g_loadedModuleConflict($mod)
+   }
+   unsetLoadedConflictByModroot $mod
+}
+
+proc unsetLoadedConflictByModroot {mod} {
+   if {[info exists ::g_modrootByLoadedConflict($mod)]} {
+      foreach mod_root $::g_modrootByLoadedConflict($mod) {
+         set with_con_spec_list {}
+         foreach {with_mod con_spec} $::g_loadedConflictByModroot($mod_root) {
+            if {$with_mod ne $mod} {
+               lappend with_con_spec_list $with_mod $con_spec
+            }
+         }
+         if {[llength $with_con_spec_list]} {
+            set ::g_loadedConflictByModroot($mod_root) $with_con_spec_list
+         } else {
+            unset ::g_loadedConflictByModroot($mod_root)
+         }
+      }
+      unset ::g_modrootByLoadedConflict($mod)
    }
 }
 
@@ -1673,40 +1763,45 @@ proc getLoadedConflict {mod} {
    }
 }
 
+proc getLoadedConflictMatchingModroot {mod} {
+   set with_con_spec_list {}
+   set mod_root_list [getLoadedAllModroot $mod]
+   foreach mod_root $mod_root_list {
+      if {[info exists ::g_loadedConflictByModroot($mod_root)]} {
+         lappend with_con_spec_list {*}$::g_loadedConflictByModroot($mod_root)
+      }
+   }
+   return $with_con_spec_list
+}
+
 proc getModuleLoadedConflict {mod {modulepath_list {}}} {
    set mod_con_list {}
-   defineModEqProc [isIcase] [getConf extended_default] 1
    # get module short name if loaded by its full pathname
-   if {[set isfullpath [isModuleFullPath $mod]]} {
-      set smod [findModuleNameFromModulefile $mod]
+   ##nagelfar ignore #2 Badly formed if statement
+   set mod_name [if {[isModuleFullPath $mod]} {findModuleNameFromModulefile\
+      $mod} {return -level 0 $mod}]
+
+   # is some loaded or loading modules correspond to conflict defined by mod
+   if {[info exists ::g_loadedModuleConflict($mod)]} {
+      foreach with_mod $::g_loadedModuleConflict($mod) {
+         # skip own reflexive conflict (look at mod main and alternative
+         # names) and those already known
+         if {![modEq $with_mod $mod_name eqstart 1 2 1] && ([set\
+            lm_mod_list [getLoadedMatchingName $with_mod returnall]] ne {}\
+            || [set lm_mod_list [getLoadedMatchingName $with_mod returnall\
+            1]] ne {})} {
+            # multiple loaded module may match conflict declared name
+            lappendNoDup mod_con_list {*}$lm_mod_list
+         }
+      }
    }
 
-   # check if any loaded module has declared a conflict
-   foreach mod_con [array names ::g_loadedModuleConflict] {
-      # look if some loaded or loading modules correspond to conflict defined
-      # by mod
-      if {$mod_con eq $mod || ($isfullpath && $mod_con eq $smod)} {
-         foreach withmod $::g_loadedModuleConflict($mod_con) {
-            # skip own reflexive conflict (look at mod main and alternative
-            # names) and those already known
-            if {![modEq $withmod $mod eqstart 1 2 1] && (!$isfullpath ||\
-               ![modEq $withmod $smod eqstart 1 2 1]) && ([set lm_mod_list\
-               [getLoadedMatchingName $withmod returnall]] ne {} || [set\
-               lm_mod_list [getLoadedMatchingName $withmod returnall 1]] ne\
-               {})} {
-               # multiple loaded module may match conflict declared name
-               appendNoDupToList mod_con_list {*}$lm_mod_list
-            }
-         }
-      # other loaded module declared conflicts (skipping those already known)
-      } elseif {$mod_con ni $mod_con_list} {
-         foreach withmod $::g_loadedModuleConflict($mod_con) {
-            # check if mod or one of its alt name match conflict
-            if {[modEq $withmod $mod eqstart 1 2 1] || ($isfullpath &&\
-               [modEq $withmod $smod eqstart 1 2 1])} {
-               lappend mod_con_list $mod_con
-               break
-            }
+   # check if any other loaded module has declared a conflict with mod
+   foreach {with_mod con_spec} [getLoadedConflictMatchingModroot $mod] {
+      # skip already found and own reflexive conflict
+      if {$with_mod ni $mod_con_list && $with_mod ne $mod} {
+         if {[modEq $con_spec $mod_name eqstart 1 2 1]} {
+            lappend mod_con_list $with_mod
          }
       }
    }
@@ -1721,7 +1816,7 @@ proc getModuleLoadedConflict {mod {modulepath_list {}}} {
 }
 
 proc setLoadedPrereq {mod args} {
-   appendNoDupToList ::g_loadedModulePrereq($mod) {*}$args
+   lappendNoDup ::g_loadedModulePrereq($mod) {*}$args
 }
 
 proc unsetLoadedPrereq {mod} {
@@ -1737,7 +1832,7 @@ proc getLoadedPrereq {mod} {
 }
 
 proc setLoadedPrereqPath {mod args} {
-   appendNoDupToList ::g_loadedModulePrereqPath($mod) {*}$args
+   lappendNoDup ::g_loadedModulePrereqPath($mod) {*}$args
 }
 
 proc unsetLoadedPrereqPath {mod} {
@@ -1763,15 +1858,13 @@ proc setLoadedAltname {mod args} {
    foreach arg $args {
       switch -- [lindex $arg 0] {
          al {
-            appendNoDupToList ::g_loadedModuleAliasAltname($mod) [lindex $arg\
-               1]
+            lappendNoDup ::g_loadedModuleAliasAltname($mod) [lindex $arg 1]
          }
          as {
-            appendNoDupToList ::g_loadedModuleAutoAltname($mod) [lindex $arg\
-               1]
+            lappendNoDup ::g_loadedModuleAutoAltname($mod) [lindex $arg 1]
          }
          default {
-            appendNoDupToList ::g_loadedModuleAltname($mod) [lindex $arg 0]
+            lappendNoDup ::g_loadedModuleAltname($mod) [lindex $arg 0]
          }
       }
    }
@@ -1821,6 +1914,51 @@ proc getLoadedAltname {mod {typelist {sym alias autosym}} {with_type 0}} {
       }
    }
    return $ret
+}
+
+proc getLoadedAllModroot {mod} {
+   set name_list [list $mod {*}[getLoadedAltname $mod]]
+   # get module short name if it is loaded as fullpath and modulepath is used
+   if {[isModuleFullPath $mod]} {
+      set name [findModuleNameFromModulefile $mod]
+      if {[string length $name]} {
+         lappend name_list $name
+      }
+   }
+   set mod_root_list {}
+   foreach name $name_list {
+      # mod root recorded lower case if icase is enabled
+      lappendNoDup mod_root_list [getModuleRootFromVersSpecLowerIfIcase $name]
+   }
+   return $mod_root_list
+}
+
+# get all names of loaded module "mod" and set structure to find all root name
+# this loaded module matches. use this information to more efficiently get
+# matching loaded module: only fully test match with modules matching the root
+# name of search query
+proc setLoadedByModroot {mod} {
+   set mod_root_list [getLoadedAllModroot $mod]
+   foreach mod_root $mod_root_list {
+      lappend ::g_loadedByModroot($mod_root) $mod
+   }
+   # set special structure to easily unset main one on module unload
+   set ::g_modrootByLoaded($mod) $mod_root_list
+}
+
+proc getLoadedMatchingModroot {name} {
+   # mod root recorded lower case if icase is enabled
+   set mod_root [getModuleRootFromVersSpecLowerIfIcase $name]
+   if {[info exists ::g_loadedByModroot($mod_root)]} {
+      return $::g_loadedByModroot($mod_root)
+   }
+}
+
+proc unsetLoadedByModroot {mod} {
+   foreach mod_root $::g_modrootByLoaded($mod) {
+      lrem ::g_loadedByModroot($mod_root) $mod
+   }
+   unset ::g_modrootByLoaded($mod)
 }
 
 proc setLoadedVariant {mod args} {
@@ -1884,7 +2022,7 @@ proc getAndParseModuleWithVariant {mod vr_list} {
 }
 
 proc setLoadedUse {mod args} {
-   appendNoDupToList ::g_loadedModuleUse($mod) {*}$args
+   lappendNoDup ::g_loadedModuleUse($mod) {*}$args
 }
 
 proc unsetLoadedUse {mod} {
@@ -1897,6 +2035,20 @@ proc getLoadedUse {mod} {
    if {[info exists ::g_loadedModuleUse($mod)]} {
       return $::g_loadedModuleUse($mod)
    }
+}
+
+proc getViaListModuleForModulepath {modpath} {
+   set via_list {}
+   while {[string length [set via [getViaModuleForModulepath $modpath]]]} {
+      lappend via_list $via
+      set new_modpath [getViaModuleModulepath $via]
+      # stop if via is enabling its own modulepath
+      if {$modpath eq $new_modpath} {
+         break
+      }
+      set modpath $new_modpath
+   }
+   return [lreverse $via_list]
 }
 
 proc getViaModuleForModulepath {modpath} {
@@ -1916,6 +2068,23 @@ proc getModuleUsingModulepath {modpath} {
       if {$modpath in $::g_loadedModuleUse($mod)} {
          return $mod
       }
+   }
+}
+
+proc setViaModuleModulepath {mod modpath} {
+   # global array only used during spider, no need to integrate into push/pop
+   # restore mechanisms
+   set ::g_viaModuleModulepath($mod) $modpath
+}
+
+proc getViaModuleModulepath {mod} {
+   # get modulepath of via module if loaded
+   if {[isModuleLoaded $mod]} {
+      return [getModulepathFromLoadedOrLoadingModule $mod]
+   }
+   # otherwise return via modulepath collected during spider processing
+   if {[info exists ::g_viaModuleModulepath($mod)]} {
+      return $::g_viaModuleModulepath($mod)
    }
 }
 
@@ -2110,7 +2279,7 @@ proc setModuleConflictViolation {mod modconlist} {
    set ::g_conflictViolation($mod) $modconlist
    # also update violation state for loaded mod conflicting with mod
    foreach lmmod $modconlist {
-      if {[appendNoDupToList ::g_conflictViolation($lmmod) $mod]} {
+      if {[lappendNoDup ::g_conflictViolation($lmmod) $mod]} {
          reportDebug "set/update conflict violation state for '$lmmod'"
       }
    }
@@ -2150,8 +2319,8 @@ proc setModuleDependency {mod} {
       foreach {prereq_mod_item bef_loaded_mod_match aft_loaded_mod_match}\
          $prereq_item_match_aftmatch_list {
          if {[string length $bef_loaded_mod_match]} {
-            appendNoDupToList lmprelist $bef_loaded_mod_match
-            appendNoDupToList lmnpolist $bef_loaded_mod_match
+            lappendNoDup lmprelist $bef_loaded_mod_match
+            lappendNoDup lmnpolist $bef_loaded_mod_match
          } else {
             reportDebug "set an unmet requirement on '$prereq_mod_item' for\
                '$mod'"
@@ -2161,7 +2330,7 @@ proc setModuleDependency {mod} {
 
          # is requirement loaded after mod (in *No Particular Order*)
          if {[string length $aft_loaded_mod_match]} {
-            appendNoDupToList lmnpolist $aft_loaded_mod_match
+            lappendNoDup lmnpolist $aft_loaded_mod_match
          }
       }
 
@@ -2302,8 +2471,7 @@ proc unsetModuleDependency {mod} {
             } else {
                set hashdep [list $mod]
             }
-            set ::g_dependHash($lmmod) [replaceFromList\
-               $::g_dependHash($lmmod) $hashdep]
+            lrem ::g_dependHash($lmmod) $hashdep
             if {![llength $::g_dependHash($lmmod)]} {
                unset ::g_dependHash($lmmod)
             }
@@ -2325,8 +2493,7 @@ proc unsetModuleDependency {mod} {
             } else {
                set hashdep [list $mod]
             }
-            set ::g_dependNPOHash($lmmod) [replaceFromList\
-               $::g_dependNPOHash($lmmod) $hashdep]
+            lrem ::g_dependNPOHash($lmmod) $hashdep
             if {![llength $::g_dependNPOHash($lmmod)]} {
                unset ::g_dependNPOHash($lmmod)
             }
@@ -2351,13 +2518,11 @@ proc unsetModuleDependency {mod} {
    # unset eventual registered unmet dependencies
    if {[info exists ::g_moduleUnmetDep($mod)]} {
       foreach ummod $::g_moduleUnmetDep($mod) {
-         if {[info exists ::g_unmetDepHash($ummod)]} {
-            set idx [lsearch -exact $::g_unmetDepHash($ummod) $mod]
-            set ::g_unmetDepHash($ummod) [lreplace $::g_unmetDepHash($ummod)\
-               $idx $idx+1]
-            if {![llength $::g_unmetDepHash($ummod)]} {
-               unset ::g_unmetDepHash($ummod)
-            }
+         set idx [lsearch -exact $::g_unmetDepHash($ummod) $mod]
+         set ::g_unmetDepHash($ummod) [lreplace $::g_unmetDepHash($ummod)\
+            $idx $idx+1]
+         if {![llength $::g_unmetDepHash($ummod)]} {
+            unset ::g_unmetDepHash($ummod)
          }
       }
       reportDebug "unset unmet requirements for '$mod'"
@@ -2374,6 +2539,35 @@ proc unsetModuleDependency {mod} {
          setModuleDependency $lmmod
       }
    }
+}
+
+# get from provided loaded module list the one before and the one after
+# provided loaded position. loaded before will be the lastly loaded before or
+# the firstly loaded before, depending on ret_last_bef argument
+proc getLoadedBeforeAndAfter {loaded_mod_list mod_idx ret_last_bef} {
+   set bef_mod {}
+   set aft_mod {}
+   foreach loaded_mod $loaded_mod_list {
+      set loaded_mod_idx [getLoadedModulePosition $loaded_mod]
+      # if mod is loading (idx=-1), no after mod match
+      # if mod has a requirement on itself, add it to the before list
+      if {$mod_idx == -1 || $loaded_mod_idx <= $mod_idx} {
+         # record first or last loaded before mod (depends on ret_last_bef)
+         if {![info exists bef_idx] ||\
+            ($ret_last_bef && $loaded_mod_idx > $bef_idx) ||\
+            (!$ret_last_bef && $loaded_mod_idx < $bef_idx)} {
+            set bef_mod $loaded_mod
+            set bef_idx $loaded_mod_idx
+         }
+      } else {
+         # record first loaded after mod
+         if {![info exists aft_idx] || $loaded_mod_idx < $aft_idx} {
+            set aft_mod $loaded_mod
+            set aft_idx $loaded_mod_idx
+         }
+      }
+   }
+   return [list $bef_mod $aft_mod]
 }
 
 # return the list of prereqs of a loaded or loading module and the associated
@@ -2395,48 +2589,27 @@ proc getLoadedModulePrereqListAndLoadedMatch {mod} {
       return
    }
 
-   set loaded_mod_list [getEnvLoadedModulePropertyParsedList name]
-   set mod_load_idx [lsearch -exact $loaded_mod_list $mod]
-   # consider mod as the lastly loaded if not found in module list
-   if {$mod_load_idx == -1} {
-      set mod_load_idx [llength $loaded_mod_list]
-   }
-
-   # distinguish modules loaded before or after passed loaded mod
-   set bef_loaded_mod_list [lrange $loaded_mod_list 0 $mod_load_idx]
-   set aft_loaded_mod_list [lrange $loaded_mod_list $mod_load_idx+1 end]
-   # reverse list to get closest match if returning lastly loaded module
-   if {[getConf unload_match_order] eq {returnlast}} {
-      set bef_loaded_mod_list [lreverse $bef_loaded_mod_list]
-   }
-
-   defineModEqProc [isIcase] [getConf extended_default] 1
+   set mod_idx [getLoadedModulePosition $mod]
+   # do we need lastly loaded before or firsly loaded before
+   set ret_last_bef [expr {[getConf unload_match_order] eq {returnlast}}]
 
    foreach prereq $prereq_list {
       set prereq_path_list [getLoadedPrereqPath $mod $prereq]
       set prereq_match_aftmatch [list $prereq $prereq_path_list]
 
       foreach prereq_mod_item $prereq {
-         # look at modules loaded before to find requirements
-         set bef_loaded_mod_match {}
-         foreach loaded_mod $bef_loaded_mod_list {
+         # get all loaded modules matching requirement
+         set loaded_mod_match_list {}
+         # compare with loaded mods matching root instead of all loaded mods
+         foreach loaded_mod [getLoadedMatchingModroot $prereq_mod_item] {
             if {[isLoadedMatchSpecificPath $loaded_mod $prereq_path_list] &&\
                [modEq $prereq_mod_item $loaded_mod eqstart 1 2 1]} {
-               set bef_loaded_mod_match $loaded_mod
-               break
+               lappend loaded_mod_match_list $loaded_mod
             }
          }
-
-         # modules loaded afterward are unmet dependencies as dependent have
-         # not been reloaded after them
-         set aft_loaded_mod_match {}
-         foreach loaded_mod $aft_loaded_mod_list {
-            if {[isLoadedMatchSpecificPath $loaded_mod $prereq_path_list] &&\
-               [modEq $prereq_mod_item $loaded_mod eqstart 1 2 1]} {
-               set aft_loaded_mod_match $loaded_mod
-               break
-            }
-         }
+         # find before and after matching loaded mod
+         lassign [getLoadedBeforeAndAfter $loaded_mod_match_list $mod_idx\
+            $ret_last_bef] bef_loaded_mod_match aft_loaded_mod_match
 
          lappend prereq_match_aftmatch $prereq_mod_item $bef_loaded_mod_match\
             $aft_loaded_mod_match
@@ -2447,20 +2620,9 @@ proc getLoadedModulePrereqListAndLoadedMatch {mod} {
 
    # add via module requirement if enabled and if any
    if {[llength $via_mod_list]} {
-      set bef_loaded_mod_match {}
-      foreach loaded_mod $bef_loaded_mod_list {
-         if {$loaded_mod in $via_mod_list} {
-            set bef_loaded_mod_match $loaded_mod
-            break
-         }
-      }
-      set aft_loaded_mod_match {}
-      foreach loaded_mod $aft_loaded_mod_list {
-         if {$loaded_mod in $via_mod_list} {
-            set aft_loaded_mod_match $loaded_mod
-            break
-         }
-      }
+      lassign [getLoadedBeforeAndAfter $via_mod_list $mod_idx $ret_last_bef]\
+         bef_loaded_mod_match aft_loaded_mod_match
+
       # use "<VIA>" string as prereq specification, this value is used for
       # unsatisfied requirement, which does not exist for via requirement
       lappend prereq_match_aftmatch_list [list <VIA> {} <VIA>\
@@ -2474,7 +2636,6 @@ proc getLoadedModulePrereqListAndLoadedMatch {mod} {
 # its requirement chain satisfy their loading constraints (prereq & conflict)
 proc areModuleConstraintsSatisfied {{mod {}} {nporeq 0}} {
    set ret 1
-   cacheCurrentModules
 
    # are requirements loaded after their dependent included or not
    if {$nporeq} {
@@ -2509,7 +2670,7 @@ proc areModuleConstraintsSatisfied {{mod {}} {nporeq 0}} {
          ##nagelfar ignore #2 Suspicious variable name
          if {[info exists ${reqListVar}($depmod)]} {
             foreach lmmodlist [set ${reqListVar}($depmod)] {
-               appendNoDupToList fulllist {*}$lmmodlist
+               lappendNoDup fulllist {*}$lmmodlist
             }
          }
       }
@@ -2518,120 +2679,119 @@ proc areModuleConstraintsSatisfied {{mod {}} {nporeq 0}} {
    return $ret
 }
 
-proc cacheCurrentModules {{exitonerr 1}} {
-   # parse loaded modules information only once, global arrays are updated
-   # afterwards when module commands update loaded modules state
-   if {![isStateDefined lm_info_cached]} {
-      setState lm_info_cached 1
-      # mark specific as well as generic modules as loaded
-      set i 0
-      set modfilelist [getEnvLoadedModulePropertyParsedList file]
-      set modlist [getEnvLoadedModulePropertyParsedList name]
-      set refreshlist [getEnvLoadedModulePropertyParsedList refresh]
+# parse loaded modules information (should be called only once)
+proc cacheCurrentModules {} {
+   # mark specific as well as generic modules as loaded
+   set i 0
+   set modfilelist [getEnvLoadedModulePropertyParsedList file]
+   set modlist [getEnvLoadedModulePropertyParsedList name]
+   set refreshlist [getEnvLoadedModulePropertyParsedList refresh]
 
-      if {[llength $modlist] == [llength $modfilelist]} {
-         # cache declared variant of loaded modules
-         foreach modvrspec [getEnvLoadedModulePropertyParsedList variant] {
-            setLoadedVariant {*}$modvrspec
-            # prepare modvr designation of loaded mod needed in next steps
-            set mod [lindex $modvrspec 0]
-            set vrlist [getVariantList $mod 6]
-            set modvr [list $mod {*}$vrlist]
-            set modvrarr($mod) $modvr
-         }
-
-         # cache declared tags of loaded modules
-         foreach modtag [getEnvLoadedModulePropertyParsedList tag] {
-            set tag_list [lassign $modtag mod]
-            if {[info exists modvrarr($mod)]} {
-               set mod_with_vr $modvrarr($mod)
-            } else {
-               set mod_with_vr {}
-            }
-            setModuleAndVariantsTag $mod $mod_with_vr {*}$tag_list
-         }
-         foreach modtag [getEnvLoadedModulePropertyParsedList extratag] {
-            set tag_list [lassign $modtag mod]
-            if {[info exists modvrarr($mod)]} {
-               set mod_with_vr $modvrarr($mod)
-            } else {
-               set mod_with_vr {}
-            }
-            setModuleAndVariantsExtraTag $mod $mod_with_vr {*}$tag_list
-         }
-         foreach modstickyrule [getEnvLoadedModulePropertyParsedList\
-            stickyrule] {
-            set mod [lindex $modstickyrule 0]
-            foreach modtagspeclist [lrange $modstickyrule 1 end] {
-               set modspec_list [lassign $modtagspeclist modtag]
-               foreach modspec $modspec_list {
-                  lassign [parseModuleSpecification 0 0 0 0 {*}$modspec]\
-                     parsed_modspec
-                  # record tag definition on given module specification
-                  setModspecTag $parsed_modspec $modtag
-               }
-            }
-         }
-
-         # cache declared alternative names of loaded modules
-         foreach modalt [getEnvLoadedModulePropertyParsedList altname] {
-            setLoadedAltname {*}$modalt
-         }
-
-         # cache declared source-sh of loaded modules
-         foreach modsrcsh [getEnvLoadedModulePropertyParsedList sourcesh] {
-            setLoadedSourceSh {*}$modsrcsh
-         }
-
-         # cache declared conflict of loaded modules
-         foreach modcon [getEnvLoadedModulePropertyParsedList conflict] {
-            # parse module version specification to record translation
-            foreach modconelt [lrange $modcon 1 end] {
-               parseModuleSpecification 0 0 0 0 {*}$modconelt
-            }
-            setLoadedConflict {*}$modcon
-         }
-
-         # cache declared prereq of loaded modules, prior to setLoadedModule
-         # which triggers dependency chain build
-         foreach modpre [getEnvLoadedModulePropertyParsedList prereq] {
-            # parse module version specification to record translation
-            foreach modpreeltlist [lrange $modpre 1 end] {
-               foreach modpreelt $modpreeltlist {
-                  parseModuleSpecification 0 0 0 0 {*}$modpreelt
-               }
-            }
-            setLoadedPrereq {*}$modpre
-         }
-         foreach modpre_path [getEnvLoadedModulePropertyParsedList\
-            prereqpath] {
-            setLoadedPrereqPath {*}$modpre_path
-         }
-
-         foreach moduse [getEnvLoadedModulePropertyParsedList use] {
-            setLoadedUse {*}$moduse
-         }
-
-         foreach mod $modlist {
-            # get all tags also recorded on mod and vr designation
-            if {[info exists modvrarr($mod)]} {
-               set modvr $modvrarr($mod)
-            } else {
-               set modvr {}
-            }
-            setLoadedModule $mod [lindex $modfilelist $i] [expr\
-               {![isModuleTagged $mod auto-loaded 1]}] $modvr [expr {$mod in\
-               $refreshlist}]
-            incr i
-         }
-
-         reportDebug "$i loaded"
-      } else {
-         set errproc [expr {$exitonerr ? {reportErrorAndExit} :\
-            {reportError}}]
-         $errproc "Loaded environment state is\
-            inconsistent\nLOADEDMODULES=$modlist\n_LMFILES_=$modfilelist"
+   if {[llength $modlist] == [llength $modfilelist]} {
+      # cache declared variant of loaded modules
+      foreach modvrspec [getEnvLoadedModulePropertyParsedList variant] {
+         setLoadedVariant {*}$modvrspec
+         # prepare modvr designation of loaded mod needed in next steps
+         set mod [lindex $modvrspec 0]
+         set vrlist [getVariantList $mod 6]
+         set modvr [list $mod {*}$vrlist]
+         set modvrarr($mod) $modvr
       }
+
+      # cache declared tags of loaded modules
+      foreach modtag [getEnvLoadedModulePropertyParsedList tag] {
+         set tag_list [lassign $modtag mod]
+         if {[info exists modvrarr($mod)]} {
+            set mod_with_vr $modvrarr($mod)
+         } else {
+            set mod_with_vr {}
+         }
+         setModuleAndVariantsTag $mod $mod_with_vr {*}$tag_list
+      }
+      foreach modtag [getEnvLoadedModulePropertyParsedList extratag] {
+         set tag_list [lassign $modtag mod]
+         if {[info exists modvrarr($mod)]} {
+            set mod_with_vr $modvrarr($mod)
+         } else {
+            set mod_with_vr {}
+         }
+         setModuleAndVariantsExtraTag $mod $mod_with_vr {*}$tag_list
+      }
+      foreach modstickyrule [getEnvLoadedModulePropertyParsedList\
+         stickyrule] {
+         set mod [lindex $modstickyrule 0]
+         foreach modtagspeclist [lrange $modstickyrule 1 end] {
+            set modspec_list [lassign $modtagspeclist modtag]
+            foreach modspec $modspec_list {
+               lassign [parseModuleSpecification 0 0 0 0 {*}$modspec]\
+                  parsed_modspec
+               # record tag definition on given module specification
+               setModspecTag $parsed_modspec $modtag
+            }
+         }
+      }
+
+      # cache declared alternative names of loaded modules
+      foreach modalt [getEnvLoadedModulePropertyParsedList altname] {
+         setLoadedAltname {*}$modalt
+      }
+
+      # cache declared source-sh of loaded modules
+      foreach modsrcsh [getEnvLoadedModulePropertyParsedList sourcesh] {
+         setLoadedSourceSh {*}$modsrcsh
+      }
+
+      # cache declared conflict of loaded modules
+      foreach modcon [getEnvLoadedModulePropertyParsedList conflict] {
+         # parse module version specification to record translation
+         foreach modconelt [lrange $modcon 1 end] {
+            parseModuleSpecification 0 0 0 0 {*}$modconelt
+         }
+         setLoadedConflict {*}$modcon
+      }
+
+      # cache declared prereq of loaded modules, prior to setLoadedModule
+      # which triggers dependency chain build
+      foreach modpre [getEnvLoadedModulePropertyParsedList prereq] {
+         # parse module version specification to record translation
+         foreach modpreeltlist [lrange $modpre 1 end] {
+            foreach modpreelt $modpreeltlist {
+               parseModuleSpecification 0 0 0 0 {*}$modpreelt
+            }
+         }
+         setLoadedPrereq {*}$modpre
+      }
+      foreach modpre_path [getEnvLoadedModulePropertyParsedList prereqpath] {
+         setLoadedPrereqPath {*}$modpre_path
+      }
+
+      foreach moduse [getEnvLoadedModulePropertyParsedList use] {
+         setLoadedUse {*}$moduse
+      }
+
+      foreach mod $modlist {
+         # get all tags also recorded on mod and vr designation
+         if {[info exists modvrarr($mod)]} {
+            set modvr $modvrarr($mod)
+         } else {
+            set modvr {}
+         }
+         setLoadedModule $mod [lindex $modfilelist $i] [expr\
+            {![isModuleTagged $mod auto-loaded 1]}] $modvr [expr {$mod in\
+            $refreshlist}] 0
+         incr i
+      }
+
+      # all positions and mod root search structure are required prior
+      # building dependency chains
+      foreach mod $modlist {
+         setModuleDependency $mod
+      }
+
+      reportDebug "$i loaded"
+   } else {
+      reportErrorAndExit "Loaded environment state is\
+         inconsistent\nLOADEDMODULES=$modlist\n_LMFILES_=$modfilelist"
    }
 }
 
@@ -2790,6 +2950,65 @@ proc doesModuleHaveSym {mod} {
       $::g_symbolHash($mod) $::g_hiddenSymHash($mod)] 0]])}]
 }
 
+# test given file path against every ignore pattern recorded: last matching
+# pattern decides whether element is ignored. patterns registered from
+# global or user rc files anchor at the root of the walked modulepath
+proc isPathIgnored {modpath fpelt {isdir 0}} {
+   if {$isdir} {
+      # directories whose name matches ignored_dirs configuration option
+      # are always ignored: negated patterns cannot re-include them and
+      # disabling modulepath_ignore option does not withdraw them from
+      # this check
+      if {![info exists ::g_ignoredDirsArr]} {
+         array set ::g_ignoredDirsArr {}
+         foreach igndir [getConf ignored_dirs] {
+            set ::g_ignoredDirsArr($igndir) 1
+         }
+      }
+      if {[info exists ::g_ignoredDirsArr([file tail $fpelt])]} {
+         return 1
+      }
+   } else {
+      set tail [file tail $fpelt]
+      # rc files are exempt from ignore patterns as they drive the walk
+      # itself (a directory bearing such a name is matched like any other
+      # directory)
+      if {$tail in {.modulerc .version}} {
+         return 0
+      }
+      # backup or version control files are always ignored, like
+      # directories matching ignored_dirs configuration option
+      switch -glob -- $tail {
+         *~ - *,v - \#*\# {
+            return 1
+         }
+      }
+   }
+   if {![info exists ::g_pathIgnorePatterns] || ![getConf\
+      modulepath_ignore]} {
+      return 0
+   }
+   set res 0
+   foreach entry $::g_pathIgnorePatterns {
+      lassign $entry anchor negated dironly re
+      if {$dironly && !$isdir} {
+         continue
+      }
+      if {$anchor eq {}} {
+         set anchor $modpath
+      }
+      # only apply pattern to elements lying below its anchor directory
+      set rel_start [expr {[string length $anchor] + 1}]
+      if {![string equal -length $rel_start $anchor/ $fpelt]} {
+         continue
+      }
+      if {[regexp -- $re [string range $fpelt $rel_start end]]} {
+         set res [expr {!$negated}]
+      }
+   }
+   return $res
+}
+
 # get list of elements located in a directory passed as argument. a flag is
 # set after each element to know if it is considered hidden or not. a
 # fetch_dotversion argument controls whether .version file should be looked at
@@ -2850,10 +3069,75 @@ proc findModulesInMemCache {searchid} {
    return [list $match_searchid $mod_list]
 }
 
+# when 'mod_name' is 'stop_mod''s own parent directory, narrow the received
+# list of this directory's element paths (rc files, already evaluated and
+# withdrawn by the caller, are not part of it) down to only what is needed
+# to tell whether stop_mod is the implicit 'default'/'latest' version of
+# that directory: only the dictionary range from stop_mod up to either the
+# first higher element that is itself valid and not hidden (stop_mod is
+# then known not to be default/latest) or the highest element if none
+# qualifies. List is returned untouched in any other case: this is not
+# stop_mod's own directory, stop_mod does not exist in it, or it is not
+# itself a valid modulefile, in which case there is nothing to optimize
+proc trimElemListForStopmod {dir mod_name stop_mod elt_list} {
+   if {![string length $stop_mod] || $mod_name ne [file dirname\
+      $stop_mod]} {
+      return $elt_list
+   }
+
+   set stop_elt $dir/$stop_mod
+   if {$stop_elt ni $elt_list || [lindex [checkValidModule $stop_elt] 0]\
+      ne {true}} {
+      return $elt_list
+   }
+
+   set tail_list {}
+   foreach elt $elt_list {
+      lappend tail_list [file tail $elt]
+   }
+
+   # sort this directory's plain elements and look, starting from the
+   # highest one down to stop_mod, for the first element that is itself
+   # valid and not hidden: whether or not it turns out to be stop_mod
+   # itself, it is this directory's true implicit default/latest, needed
+   # as-is by the caller to correctly resolve it for every module in this
+   # directory, not just stop_mod. Only the elements from that point up to
+   # the highest one need to be kept to reflect it, plus stop_mod's own
+   # element if it lies below that point
+   set stop_tail [file tail $stop_mod]
+   set sorted_tails [lsort -dictionary $tail_list]
+   set stop_idx [lsearch -exact $sorted_tails $stop_tail]
+   set top_idx $stop_idx
+   for {set ti [expr {[llength $sorted_tails] - 1}]} {$ti > $stop_idx}\
+      {incr ti -1} {
+      set fp_tail [lindex $sorted_tails $ti]
+      set fp_elt $dir/$mod_name/$fp_tail
+      if {[file isdirectory $fp_elt]} {
+         # a nested version directory: its own validity cannot be settled
+         # without recursing into it, give up trying to stop early, keep
+         # everything untouched like usual
+         return $elt_list
+      }
+      if {![isPathIgnored $dir $fp_elt] && [lindex [checkValidModule\
+         $fp_elt] 0] eq {true} && ![isModuleHidden $mod_name/$fp_tail\
+         $stop_mod 0 $fp_elt]} {
+         set top_idx $ti
+         break
+      }
+   }
+
+   # only keep stop_mod and highest element in returned list
+   set trimmed_list [list $stop_elt]
+   if {$top_idx > $stop_idx} {
+      lappend trimmed_list $dir/$mod_name/[lindex $sorted_tails $top_idx]
+   }
+   return $trimmed_list
+}
+
 # Walk through provided list of directories and files to find modules
 proc findModulesFromDirsAndFiles {dir full_list depthlvl fetch_mtime\
    res_arrname {indir_arrname {}} {hidden_listname {}} {fknown_arrname {}}\
-   {dknown_arrname {}}} {
+   {dknown_arrname {}} {stop_mod {}}} {
    # link to variables/arrays from upper context
    upvar $res_arrname mod_list
    if {$indir_arrname ne {}} {
@@ -2869,10 +3153,30 @@ proc findModulesFromDirsAndFiles {dir full_list depthlvl fetch_mtime\
       upvar $dknown_arrname dknown_arr
    }
 
-   foreach igndir [getConf ignored_dirs] {
-      set ignored_dirs($igndir) 1
+   # evaluate modulepath root rc file prior walking: it may define path
+   # ignore patterns and it is not part of the walked list when only the
+   # limited access elements from a cache file are walked down
+   global g_rcfilesSourced
+   set top_rc_file $dir/.modulerc
+   if {![info exists g_rcfilesSourced($top_rc_file)] && [file readable\
+      $top_rc_file]} {
+      execute-modulerc $top_rc_file .modulerc .modulerc
+      set g_rcfilesSourced($top_rc_file) 1
    }
+
    array set mod_list {}
+
+   # also evaluate rc files already recorded in transmitted result list
+   # (entries coming from an evaluated cache file): these files are not
+   # walked through, as readable when cache was built, but the patterns
+   # they may define apply to the walk down of limited access elements
+   foreach elt [lsort [array names mod_list]] {
+      if {[lindex $mod_list($elt) 0] eq {modulerc} && ![info exists\
+         g_rcfilesSourced($dir/$elt)]} {
+         execute-modulerc $dir/$elt $elt $elt
+         set g_rcfilesSourced($dir/$elt) 1
+      }
+   }
    for {set i 0} {$i < [llength $full_list]} {incr i 1} {
       set element [lindex $full_list $i]
       set tail [file tail $element]
@@ -2881,38 +3185,100 @@ proc findModulesFromDirsAndFiles {dir full_list depthlvl fetch_mtime\
       set moddepthlvl [llength [file split $modulename]]
       # check if element is a directory if we do not already know if it is a
       # dir or a file from transmitted structures
-      if {[info exists dknown_arr($modulename)] || (![info exists\
-         fknown_arr($modulename)] && [file isdirectory $element])} {
-         if {![info exists ignored_dirs($tail)]} {
-            if {[catch {
-               set elt_list [getFilesInDirectory $element 1]
-            } errMsg]} {
-               set mod_list($modulename) [list accesserr [parseAccessIssue\
-                  $element] $element]
-            } else {
-               # Add each element in the current directory to the list
-               foreach {fpelt hid} $elt_list {
-                  lappend full_list $fpelt
-                  # Flag hidden files
-                  if {$hid} {
-                     set hidden_list($fpelt) 1
-                  }
+      set is_elt_dir [expr {[info exists dknown_arr($modulename)] ||\
+         (![info exists fknown_arr($modulename)] && [file isdirectory\
+         $element])}]
+      # skip element matching an ignore pattern as if it does not exist
+      if {[isPathIgnored $dir $element $is_elt_dir]} {
+         continue
+      }
+      if {$is_elt_dir} {
+         if {[catch {
+            set elt_list [getFilesInDirectory $element 1]
+         } errMsg]} {
+            set mod_list($modulename) [list accesserr [parseAccessIssue\
+               $element] $element]
+         } else {
+            array unset elt_arr
+            array set elt_arr $elt_list
+
+            # evaluate and record this directory's rc files right away
+            # then withdraw them from element array: the hiding or ignore
+            # rules they may define are needed to trim element list for
+            # stop_mod and to filter the elements walked next
+            foreach fptail {.modulerc .version} {
+               set fpelt $element/$fptail
+               if {![info exists elt_arr($fpelt)]} {
+                  continue
                }
+               unset elt_arr($fpelt)
+               # apply same depth restriction on .version files than walk
+               # loop recording below
+               if {$fptail eq {.version} && $depthlvl != 0 &&\
+                  ($moddepthlvl + 1) != $depthlvl} {
+                  continue
+               }
+               set fpmod $modulename/$fptail
+               if {![info exists g_rcfilesSourced($fpelt)]} {
+                  execute-modulerc $fpelt $fpmod $fpmod
+                  set g_rcfilesSourced($fpelt) 1
+               }
+               set mod_list($fpmod) [list modulerc]
+            }
+
+            # narrow element list down to what is needed to correctly tell
+            # whether stop_mod is the implicit default/latest version of
+            # this directory, when this is stop_mod's own directory (left
+            # untouched in any other case). Remaining element paths are
+            # lexically sorted, as sub-directories are fetched in the
+            # order they are walked in, which rc file evaluation order
+            # depends on
+            set trimmed_list [trimElemListForStopmod $dir $modulename\
+               $stop_mod [lsort [array names elt_arr]]]
+
+            # Flag hidden files among elements kept for the walk
+            foreach fpelt $trimmed_list {
+               if {$elt_arr($fpelt)} {
+                  set hidden_list($fpelt) 1
+               }
+            }
+
+            # Add each element in the current directory to the list right
+            # after current position to walk depth-first: rc files of any
+            # sub-directory are this way evaluated prior those of the
+            # directories lying next to or deeper than this sub-directory
+            # (an append would lead to a breadth-first walk, evaluating
+            # the rc files of all first-level directories prior any
+            # deeper one). Tcl 8.5 requires at least one element on linsert
+            if {[llength $trimmed_list]} {
+               set full_list [linsert $full_list [expr {$i + 1}]\
+                  {*}$trimmed_list]
             }
          }
       } else {
          switch -glob -- $tail {
             .modulerc {
+               # rc file has normally been evaluated when its directory
+               # content was fetched: evaluate it here otherwise, when it
+               # is walked directly (limited access rc file from cache)
+               if {![info exists g_rcfilesSourced($element)]} {
+                  execute-modulerc $element $modulename $modulename
+                  set g_rcfilesSourced($element) 1
+               }
                set mod_list($modulename) [list modulerc]
             }
             .version {
                # skip .version file from different depth level than search
                # targets if no in depth mode is enabled
                if {$depthlvl == 0 || $moddepthlvl == $depthlvl} {
+                  if {![info exists g_rcfilesSourced($element)]} {
+                     execute-modulerc $element $modulename $modulename
+                     set g_rcfilesSourced($element) 1
+                  }
                   set mod_list($modulename) [list modulerc]
                }
             }
-            .modulecache - *~ - *,v - \#*\# { }
+            .modulecache { }
             default {
                # skip modfile in no in depth mode search if it does not relate
                # to targeted depth level and one valid modfile has already be
@@ -2948,13 +3314,15 @@ proc findModulesFromDirsAndFiles {dir full_list depthlvl fetch_mtime\
    }
 }
 
-# finds all module-related files matching mod in the module path dir
-proc findModules {dir mod depthlvl fetch_mtime} {
+# finds all module-related files matching mod in the module path dir.
+# 'stop_mod' helps optimize the search when looking for an exact existing
+# modulefile
+proc findModules {dir mod depthlvl fetch_mtime {stop_mod {}}} {
    reportDebug "finding '$mod' in $dir (depthlvl=$depthlvl,\
       fetch_mtime=$fetch_mtime)"
 
    # generated search id (for cache search/save) by compacting given args
-   set searchid $dir:$mod:$depthlvl:$fetch_mtime
+   set searchid $dir:$mod:$depthlvl:$fetch_mtime:$stop_mod
 
    # look at memory cache for a compatible result
    lassign [findModulesInMemCache $searchid] cache_searchid cache_list
@@ -2988,12 +3356,16 @@ proc findModules {dir mod depthlvl fetch_mtime} {
             lappend full_list $fpelt
          }
       }
+      # walk root elements in lexical order to evaluate the rc files found
+      # down each of them in a deterministic order (see walk loop)
+      set full_list [lsort $full_list]
    }]} {
       return {}
    }
 
    # walk through list of dirs and files to find modules
-   findModulesFromDirsAndFiles $dir $full_list $depthlvl $fetch_mtime mod_list
+   findModulesFromDirsAndFiles $dir $full_list $depthlvl $fetch_mtime\
+      mod_list {} {} {} {} $stop_mod
 
    reportDebug "found [array names mod_list]"
 
@@ -3007,8 +3379,7 @@ proc findModules {dir mod depthlvl fetch_mtime} {
 
 proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
    global g_sourceAlias g_sourceVersion g_sourceVirtual g_rcAlias\
-      g_moduleAlias g_rcVersion g_moduleVersion g_rcVirtual g_moduleVirtual\
-      g_rcfilesSourced
+      g_moduleAlias g_rcVersion g_moduleVersion g_rcVirtual g_moduleVirtual
 
    reportDebug "get '$mod' in $dir (fetch_mtime=$fetch_mtime, search=$search,\
       filter=$filter)"
@@ -3078,6 +3449,18 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
       set add_rc_defs 1
       array set found_list {}
    } else {
+      # an exact 'name/version' query (no wildcard/contains, no result
+      # filtering), possibly along with a variant or an extra match search
+      # specifier, resolved in a single-module context (unlike a listing
+      # one, e.g. avail/whatis/search) lets findModules shortcut its
+      # directory search (see there); left empty in any other case
+      set stop_mod {}
+      set modnamevers [getModuleNameAndVersFromVersSpec $mod]
+      if {$resctx && $earlyfilter && $filter eq {} && [getCmpSpecFromVersSpec\
+         $mod] eq {eq} && $querydepth == 1} {
+         set stop_mod $modnamevers
+      }
+
       # find modules by searching mod root name in order to catch all module
       # related entries to correctly computed auto symbols afterward
 
@@ -3099,7 +3482,8 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
       # unless EMS need to be performed (findModules should fetch everything)
       set depthlvl [expr {$indepth || $ems_required ? 0 : $querydepth + 1}]
 
-      array set found_list [findModules $dir $findmod $depthlvl $fetch_mtime]
+      array set found_list [findModules $dir $findmod $depthlvl\
+         $fetch_mtime $stop_mod]
    }
 
    # Phase #1: consolidate every kind of entries (directory, modulefile,
@@ -3108,15 +3492,14 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
    array set err_list {}
    array set versmod_list {}
 
-   foreach elt [lsort [array names found_list]] {
+   # no need to process entries in a sorted order here anymore, as rc files
+   # are not evaluated in this loop but during modulepath walk (they are
+   # still returned by findModules as cachebuild and lint sub-commands need
+   # them)
+   foreach elt [array names found_list] {
       switch -- [lindex $found_list($elt) 0] {
          modulerc {
-            # process rc files them remove them from found_list
-            if {![info exists g_rcfilesSourced($dir/$elt)]} {
-               execute-modulerc $dir/$elt $elt $elt
-               # Keep track of already sourced rc files not to run them again
-               set g_rcfilesSourced($dir/$elt) 1
-            }
+            # withdraw already evaluated rc files
             unset found_list($elt)
          }
          modulefile {
@@ -3137,9 +3520,6 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
          set found_list($vers) [list version $versmod]
 
          # build module symbol list
-         lappend versmod_list($versmod) $vers
-      # add global/user rc def to module symbol list in any cases
-      } elseif {!$add_rc_defs && [info exists g_rcVersion($vers)]} {
          lappend versmod_list($versmod) $vers
       }
    }
@@ -3184,8 +3564,6 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
 
    # Phase #2: early filtering of non-matching elements
 
-   defineModEqProc $icase [getConf extended_default]
-
    if {$earlyfilter} {
       foreach elt [array names found_list] {
          if {![modEq $modroot $elt eqstart]} {
@@ -3206,7 +3584,6 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
    # Phase #4: filter-out dynamically hidden or expired elements
 
    # define module name and version comparison procs
-   defineModStartNbProc $icase
    defineModEqStaticProc $icase [getConf extended_default] $mod
 
    # remove hidden elements unless they are (or their symbols) targeted by
@@ -3273,7 +3650,7 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
          {version}} {
          set direlt $elt
          while {[set pardir [file dirname $direlt]] ne {.}} {
-            appendNoDupToList dir_list($pardir) [file tail $direlt]
+            lappendNoDup dir_list($pardir) [file tail $direlt]
             set direlt $pardir
          }
       }
@@ -3474,8 +3851,7 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
             # will be treated after unset dir (due to decreasing sort) if it
             # needs to get in turn unset
             if {[set pardir [file dirname $elt]] ne {.}} {
-               set fdir_list($pardir) [replaceFromList $fdir_list($pardir)\
-                  [file tail $elt]]
+               lrem fdir_list($pardir) [file tail $elt]
             }
          } else {
             # record directory properties
@@ -3536,10 +3912,6 @@ proc getModules {dir {mod {}} {fetch_mtime 0} {search {}} {filter {}}} {
    # is different than avail/spider
    if {[currentState commandname] in {avail spider} && $dir ni [getState\
       tags_collected_in]} {
-      # load tags from loaded modules in the global structure prior collecting
-      # tags found during this getModules evaluation
-      cacheCurrentModules 0
-
       foreach elt [array names mod_list] {
          switch -- [lindex $mod_list($elt) 0] {
             alias - modulefile - virtual {
@@ -3570,7 +3942,10 @@ proc getMatchingAnyModules {dir pattern_list fetch_mtime search filter} {
    return $mod_list
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

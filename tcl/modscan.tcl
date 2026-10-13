@@ -1,7 +1,7 @@
 ##########################################################################
 
 # MODSCAN.TCL, modulefile scan and extra match search procedures
-# Copyright (C) 2022-2025 Xavier Delaruelle
+# Copyright (C) 2022-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,6 +47,9 @@ proc variant-sc {itrp args} {
 proc setenv-sc {args} {
    lassign [parseSetenvCommandArgs load set {*}$args] bhv var val
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    recordScanModuleElt $var setenv envvar
 
    setEnvVarIfUndefined $var {}
@@ -56,6 +59,9 @@ proc setenv-sc {args} {
 proc edit-path-sc {cmd args} {
    lassign [parsePathCommandArgs $cmd load noop {*}$args] separator allow_dup\
       idx_val ign_refcount val_set_is_delim glob_match bhv var path_list
+
+   # indicate env var name to configured traces
+   setState current_envvar $var
 
    recordScanModuleElt $var $cmd envvar
 
@@ -71,12 +77,18 @@ proc edit-path-sc {cmd args} {
 proc pushenv-sc {var val} {
    recordScanModuleElt $var pushenv envvar
 
+   # indicate env var name to configured traces
+   setState current_envvar $var
+
    setEnvVarIfUndefined $var {}
    return {}
 }
 
 proc unsetenv-sc {args} {
    lassign [parseUnsetenvCommandArgs load noop {*}$args] bhv var val
+
+   # indicate env var name to configured traces
+   setState current_envvar $var
 
    recordScanModuleElt $var unsetenv envvar
 
@@ -127,6 +139,19 @@ proc family-sc {name} {
    recordScanModuleElt $name family provided-alias
 }
 
+proc extensions-sc {args} {
+   if {![llength $args]} {
+      knerror {No module specified in argument}
+   }
+   set elt_list [list provide]
+   if {![getConf info_extension]} {
+      lappend elt_list provided-alias
+   }
+   foreach alias $args {
+      recordScanModuleElt $alias {*}$elt_list
+   }
+}
+
 proc provide-sc {args} {
    if {![llength $args]} {
       knerror {No module specified in argument}
@@ -138,27 +163,27 @@ proc provide-sc {args} {
 
 proc prereq-sc {args} {
    lassign [parsePrereqCommandArgs prereq {*}$args] tag_list modulepath_list\
-      optional opt_list args
+      optional opt_list modspec_list
 
-   foreach modspec [parseModuleSpecification 0 0 0 0 {*}$args] {
+   foreach modspec $modspec_list {
       recordScanModuleElt $modspec prereq prereq-any depends-on-any require
    }
 }
 
 proc prereq-all-sc {args} {
    lassign [parsePrereqCommandArgs prereq-all {*}$args] tag_list\
-      modulepath_list optional opt_list args
+      modulepath_list optional opt_list modspec_list
 
-   foreach modspec [parseModuleSpecification 0 0 0 0 {*}$args] {
+   foreach modspec $modspec_list {
       recordScanModuleElt $modspec prereq-all depends-on require
    }
 }
 
 proc always-load-sc {args} {
    lassign [parsePrereqCommandArgs always-load {*}$args] tag_list\
-      modulepath_list optional opt_list args
+      modulepath_list optional opt_list modspec_list
 
-   foreach modspec [parseModuleSpecification 0 0 0 0 {*}$args] {
+   foreach modspec $modspec_list {
       recordScanModuleElt $modspec always-load require
    }
 }
@@ -174,9 +199,9 @@ proc module-sc {command args} {
    # ignore sub-commands that do not either load or unload
    if {$command in {load load-any switch try-load unload use}} {
       # parse options to distinguish them from module version spec
-      lassign [parseModuleCommandArgs 0 $command 0 {*}$args] show_oneperline\
-         show_mtime show_filter search_filter search_match dump_state\
-         addpath_pos not_req tag_list args
+      lassign [parseModuleCommandArgs 0 $command 0 0 {*}$args]\
+         show_oneperline show_mtime show_filter search_filter search_match\
+         dump_state addpath_pos not_req tag_list args
       set modspeclist [parseModuleSpecification 0 0 0 0 {*}$args]
 
       # no require/incompat extra specifier alias if --not-req option is set
@@ -391,24 +416,9 @@ proc insertProvidedAliases {modpath res_arrname} {
 proc scanExtraMatchSearch {modpath mod res_arrname} {
    upvar $res_arrname found_list
 
-   # get extra match query properties
-   set spec_vr_list [getVariantListFromVersSpec $mod]
-   set check_variant [llength $spec_vr_list]
-   lassign [getSplitExtraListFromVersSpec $mod] spec_tag_list spec_xt_list
-   set check_extra [llength $spec_xt_list]
-
-   # no scan evaluation if extra match search not needed
-   if {!$check_variant && !$check_extra && ![isEltInReport variant 0] &&\
-      ![isEltInReport provided-alias 0]} {
-      return
-   }
-
    # disable error reporting to avoid modulefile errors (not coping with
    # scan evaluation for instance) to pollute result
-   set alreadyinhibit [getState inhibit_errreport]
-   if {!$alreadyinhibit} {
-      inhibitErrorReport
-   }
+   inhibitErrorReport
    # evaluate all modules found in scan mode to gather content information
    lappendState mode scan
 
@@ -427,10 +437,7 @@ proc scanExtraMatchSearch {modpath mod res_arrname} {
    }
 
    lpopState mode
-   # re-enable error report only is it was disabled from this procedure
-   if {!$alreadyinhibit} {
-      setState inhibit_errreport 0
-   }
+   uninhibitErrorReport
 }
 
 # perform extra match search on currently being built module search result
@@ -446,11 +453,6 @@ proc filterExtraMatchSearch {modpath mod res_arrname versmod_arrname} {
    set check_extra [llength $spec_xt_list]
    set check_tag [llength $spec_tag_list]
    set filter_res [expr {$check_variant || $check_extra || $check_tag}]
-
-   if {$check_tag} {
-      # load tags from loaded mods prior collecting tags found during rc eval
-      cacheCurrentModules 0
-   }
 
    set unset_list {}
    set keep_list {}
@@ -522,7 +524,10 @@ proc filterExtraMatchSearch {modpath mod res_arrname versmod_arrname} {
    }
 }
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

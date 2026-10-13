@@ -48,6 +48,8 @@ libdir32 := @libdir32@
 # enable or not some specific definition
 setmanpath := @setmanpath@
 appendmanpath := @appendmanpath@
+setpythonpath := @setpythonpath@
+appendpythonpath := @appendpythonpath@
 setbinpath := @setbinpath@
 appendbinpath := @appendbinpath@
 setmodulespath := @setmodulespath@
@@ -63,6 +65,12 @@ initconfin := @initconfin@
 builddoc := @builddoc@
 # able to use manpath cmd to get currently set manpath
 usemanpath := @usemanpath@
+# compress ChangeLog file
+compressedchangelog := @compressedchangelog@
+
+# domainname setup
+domainname := @domainname@
+domainnameopts := @domainnameopts@
 
 # logger setup
 loggedevents := @loggedevents@
@@ -70,6 +78,7 @@ logger := @logger@
 loggeropts := @loggeropts@
 
 # pager setup
+paginate := @paginate@
 pager := @pager@
 pageropts := @pageropts@
 
@@ -158,10 +167,19 @@ variantshortcut := @variantshortcut@
 # editor
 editor := @editor@
 
+# path change behavior
+pathentryreorder := @pathentryreorder@
+
+# environment variable configurations
+initenvvars := @initenvvars@
+
 # shell completion location
 bashcompletiondir := @bashcompletiondir@
 fishcompletiondir := @fishcompletiondir@
 zshcompletiondir := @zshcompletiondir@
+
+# python module location
+pythondir := @pythondir@
 
 # linter setup
 nagelfaraddons  := @nagelfaraddons@

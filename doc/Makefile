@@ -33,12 +33,14 @@ else
 ECHO_GEN2 = \#
 endif
 
-ALL_RST := $(wildcard $(SOURCE_DIR)/*.rst $(SOURCE_DIR)/cookbook/*.rst\
-	$(SOURCE_DIR)/design/*.rst)
+ALL_RST := $(filter-out $(SOURCE_DIR)/latex_index.rst, $(wildcard $(SOURCE_DIR)/*.rst\
+	$(SOURCE_DIR)/cookbook/*.rst $(SOURCE_DIR)/design/*.rst))
 ALL_TXT := $(patsubst $(SOURCE_DIR)/%,$(BUILD_DIR)/%,$(patsubst %.rst,%.txt,$(ALL_RST)))
 ALL_HTML := $(patsubst $(SOURCE_DIR)/%,$(BUILD_DIR)/%,$(patsubst %.rst,%.html,$(ALL_RST)))
 ALL_MAN := $(BUILD_DIR)/module.1 $(BUILD_DIR)/ml.1 $(BUILD_DIR)/envml.1\
-	$(BUILD_DIR)/modulefile.5
+	$(BUILD_DIR)/modulecmd.1 $(BUILD_DIR)/modulefile.5
+ALL_TEX := $(BUILD_DIR)/latex/modules.tex
+ALL_PDF := $(BUILD_DIR)/latex/modules.pdf
 
 all: man txt
 
@@ -54,6 +56,8 @@ man: $(ALL_MAN)
 ifneq ($(builddoc),p)
 txt: $(ALL_TXT)
 html: $(ALL_HTML)
+latex: $(ALL_TEX)
+latexpdf: $(ALL_PDF)
 else
 # limit txt targets to documents that have been prebuilt
 txt: $(BUILD_DIR)/changes.txt $(BUILD_DIR)/MIGRATING.txt \
@@ -101,7 +105,8 @@ $(BUILD_DIR)/%.txt: $(SOURCE_DIR)/%.rst $(SOURCE_DIR)/version.py
 	$(ECHO_GEN2) $(ECHO_DIR_PREFIX)$(BUILD_DIR)/*.txt
 	$(SPHINXBUILD) $(SPHINXOPTS) -b text "$(SOURCE_DIR)" "$(BUILD_DIR)"
 
-$(BUILD_DIR)/module.1.in $(BUILD_DIR)/modulefile.5 $(BUILD_DIR)/ml.1 $(BUILD_DIR)/envml.1: $(ALL_RST) $(SOURCE_DIR)/version.py
+$(BUILD_DIR)/module.1.in $(BUILD_DIR)/modulefile.5 $(BUILD_DIR)/ml.1 $(BUILD_DIR)/modulecmd.1 $(BUILD_DIR)/envml.1: $(ALL_RST) $(SOURCE_DIR)/version.py
+	$(ECHO_GEN2) $(ECHO_DIR_PREFIX)$(BUILD_DIR)/modulecmd.1
 	$(ECHO_GEN2) $(ECHO_DIR_PREFIX)$(BUILD_DIR)/envml.1
 	$(ECHO_GEN2) $(ECHO_DIR_PREFIX)$(BUILD_DIR)/ml.1
 	$(ECHO_GEN2) $(ECHO_DIR_PREFIX)$(BUILD_DIR)/module.1.in
@@ -112,6 +117,14 @@ endif
 
 $(BUILD_DIR)/module.1: $(BUILD_DIR)/module.1.in
 	$(translate-in-script)
+
+$(BUILD_DIR)/latex/modules.tex: $(SOURCE_DIR)/version.py
+	$(ECHO_GEN2) $(ECHO_DIR_PREFIX)$@
+	$(SPHINXBUILD) $(SPHINXOPTS) -b latex "$(SOURCE_DIR)" "$(BUILD_DIR)/latex"
+
+$(BUILD_DIR)/latex/modules.pdf: $(BUILD_DIR)/latex/modules.tex
+	$(ECHO_GEN2) $(ECHO_DIR_PREFIX)$@
+	$(MAKE) -C "$(BUILD_DIR)/latex" all-pdf
 
 install: man txt
 	$(INSTALL_DIR) '$(DESTDIR)$(mandir)/man1' '$(DESTDIR)$(mandir)/man5'
@@ -126,6 +139,7 @@ ifeq ($(docinstall),y)
 endif
 	$(INSTALL_DATA) $(BUILD_DIR)/module.1 '$(DESTDIR)$(mandir)/man1/'
 	$(INSTALL_DATA) $(BUILD_DIR)/ml.1 '$(DESTDIR)$(mandir)/man1/'
+	$(INSTALL_DATA) $(BUILD_DIR)/modulecmd.1 '$(DESTDIR)$(mandir)/man1/'
 	$(INSTALL_DATA) $(BUILD_DIR)/envml.1 '$(DESTDIR)$(mandir)/man1/'
 	$(INSTALL_DATA) $(BUILD_DIR)/modulefile.5 '$(DESTDIR)$(mandir)/man5/'
 
@@ -141,6 +155,7 @@ ifeq ($(docinstall),y)
 endif
 	rm -f '$(DESTDIR)$(mandir)/man1/module.1'
 	rm -f '$(DESTDIR)$(mandir)/man1/ml.1'
+	rm -f '$(DESTDIR)$(mandir)/man1/modulecmd.1'
 	rm -f '$(DESTDIR)$(mandir)/man1/envml.1'
 	rm -f '$(DESTDIR)$(mandir)/man5/modulefile.5'
 	rmdir '$(DESTDIR)$(mandir)/man1' '$(DESTDIR)$(mandir)/man5'
@@ -162,4 +177,4 @@ V = 1
 endif
 # let verbose by default the install/clean/test and other specific non-build targets
 $(V).SILENT: ../version.inc $(SOURCE_DIR)/version.py $(ALL_HTML) $(ALL_TXT) \
-	$(BUILD_DIR)/module.1.in $(ALL_MAN)
+	$(BUILD_DIR)/module.1.in $(ALL_MAN) $(ALL_TEX) $(ALL_PDF)

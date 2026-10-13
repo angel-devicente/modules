@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/scikit-build/0.17.6-GCCcore-12.3.0
+conflict scikit-build
+depends-on GCCcore/12.3.0
+depends-on Python/3.11.3-GCCcore-12.3.0

@@ -1,0 +1,10 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/PROJ/9.0.0-GCCcore-11.3.0
+conflict PROJ
+depends-on GCCcore/11.3.0
+depends-on SQLite/3.38.3-GCCcore-11.3.0
+depends-on LibTIFF/4.3.0-GCCcore-11.3.0
+depends-on cURL/7.83.0-GCCcore-11.3.0
+depends-on XZ/5.2.5-GCCcore-11.3.0
+depends-on nlohmann_json/3.10.5-GCCcore-11.3.0

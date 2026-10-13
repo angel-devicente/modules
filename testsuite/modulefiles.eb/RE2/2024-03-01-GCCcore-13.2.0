@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/RE2/2024-03-01-GCCcore-13.2.0
+conflict RE2
+depends-on GCCcore/13.2.0
+depends-on Abseil/20240116.1-GCCcore-13.2.0

@@ -89,13 +89,19 @@ catch {unset env(__MODULES_SHARE_FPATH)}
 catch {unset env(LESS)}
 catch {unset env(PAGER)}
 catch {unset env(MODULES_PAGER)}
+setenv_var MODULES_PAGINATE 1
 
 # clean any logger configuration
 unsetenv_var MODULES_LOGGED_EVENTS
 unsetenv_var MODULES_LOGGER
 
-# clean any protected variable configuration
+# clean any domainname configuration
+unsetenv_var MODULES_DOMAINNAME
+
+# clean any environment variable-specific configuration
+setenv_var MODULES_INIT_ENVVARS {}
 unsetenv_var MODULES_PROTECTED_ENVVARS
+unsetenv_var MODULES_LINKED_ENVVARS
 
 # clean any output redirection configuration
 unsetenv_var MODULES_REDIRECT_OUTPUT
@@ -123,6 +129,8 @@ unsetenv_var MODULES_NEARLY_FORBIDDEN_DAYS
 
 # clean any tag abbreviation list
 unsetenv_var MODULES_TAG_ABBREV
+
+unsetenv_var MODULES_NON_EXPORTABLE_TAGS
 
 # clear specific tag name color setup
 setenv_var MODULES_TAG_COLOR_NAME {}
@@ -161,11 +169,13 @@ unsetenv_var MODULES_RESET_TARGET_STATE
 
 # clean any cache configuration
 unsetenv_var MODULES_IGNORE_CACHE
+unsetenv_var MODULES_IGNORE_CACHE_SUBCMDS
 unsetenv_var MODULES_CACHE_BUFFER_BYTES
 unsetenv_var MODULES_CACHE_EXPIRY_SECS
 
 # clean any user rc configuration
 unsetenv_var MODULES_IGNORE_USER_RC
+unsetenv_var MODULES_MODULEPATH_IGNORE
 
 # clean any additional siteconfig set
 catch {unset env(MODULES_SITECONFIG)}
@@ -187,6 +197,12 @@ catch {unset env(MODULES_COLLECTION_TARGET)}
 # clean any versioning configuration
 catch {unset env(MODULE_VERSION)}
 catch {unset env(MODULE_VERSION_STACK)}
+
+# ensure that tests doesn't run with Lmod path order
+unsetenv_var MODULES_PATH_ENTRY_REORDER
+
+# clean any module extension config
+unsetenv_var MODULES_INFO_EXTENSION
 
 set env(MODULERCFILE) "$env(TESTSUITEDIR)/etc/empty"
 set ORIG_MODULERCFILE $env(MODULERCFILE)

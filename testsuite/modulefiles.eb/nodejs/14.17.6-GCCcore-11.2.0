@@ -1,0 +1,7 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/nodejs/14.17.6-GCCcore-11.2.0
+conflict nodejs
+depends-on GCCcore/11.2.0
+depends-on ICU/69.1-GCCcore-11.2.0
+depends-on OpenSSL/1.1

@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/protobuf/23.0-GCCcore-12.2.0
+conflict protobuf
+depends-on GCCcore/12.2.0
+depends-on Abseil/20230125.2-GCCcore-12.2.0

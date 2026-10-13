@@ -1,6 +1,7 @@
 /modulecmd.tcl
-/ChangeLog.gz
+/ChangeLog*
 /README
+/GEMINI.md
 /Makefile.inc
 /version.inc
 /modules.log
@@ -9,6 +10,10 @@
 /install.sum
 /lint.log
 /lint.sum
+/completion.log
+/completion.sum
+/cookbook.log
+/cookbook.sum
 /icdiff
 /.noicdiff
 /miniconda3
@@ -52,6 +57,11 @@
 /testsuite/example/initrc-1
 /testsuite/example/initrc
 /testsuite/.config
+/testsuite/completion-use-fixture
+/testsuite/completion-home
+/testsuite/cookbook-sandbox
+/testsuite/completion-inject-fixture
+/testsuite/completion-injection-marker
 /doc/build
 /doc/source/version.py
 /doc/demo/*/*.svg
@@ -60,6 +70,11 @@
 /modules-*.tar.bz2
 /modules-*-win
 /modules-*-win.zip
+# ignore local settings directories of AI coding assistants
+/.claude
+/.codex
+/.gemini
+/.vibe
 # ignore vim swap files
 *.swp
 *.swo

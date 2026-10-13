@@ -3,7 +3,7 @@
 # MAIN.TCL, main procedures and code
 # Copyright (C) 2002-2004 Mark Lakata
 # Copyright (C) 2004-2017 Kent Mein
-# Copyright (C) 2016-2025 Xavier Delaruelle
+# Copyright (C) 2016-2026 Xavier Delaruelle
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -54,20 +54,18 @@ proc aboveCommandName {} {
    return [lindex [getState commandname] end-1]
 }
 
-proc ongoingCommandName {commandName} {
-   return [expr {[lsearch -exact [getState commandname] $commandName] != -1}]
+# get top-level command name, with ml frontend translated onto the
+# underlying load or unload sub-command it currently processes
+proc topCommandName {} {
+   set subcmd [topState commandname]
+   if {$subcmd eq {ml}} {
+      set subcmd [topState eval_context]
+   }
+   return $subcmd
 }
 
-# Know if we are currently at the top evaluation level: (1) at the modulecmd
-# level (module command written by user in terminal or script) or (2) during
-# the evaluation of rc or modulefile by a source or autoinit sub-command
-# triggered from modulecmd level or (3) during the evaluation of global rc
-# file. (2) and (3) are considered "extended" top evaluation contexts.
-proc isTopEvaluation {{extended 1}} {
-   return [expr {([depthState modulename] == 0 && [currentState eval_context]\
-      in {{} load unload swload swunload}) || ($extended && [depthState\
-      modulename] == 1 && ([aboveCommandName] in {source autoinit} ||\
-      [isStateDefined rc_running]))}]
+proc ongoingCommandName {commandName} {
+   return [expr {[lsearch -exact [getState commandname] $commandName] != -1}]
 }
 
 # analyze/translate command name passed to module
@@ -121,7 +119,7 @@ proc parseModuleCommandName {command defaultcmd} {
 }
 
 # analyze arg list passed to a module cmd to set options
-proc parseModuleCommandArgs {topcall cmd ignerr args} {
+proc parseModuleCommandArgs {topcall cmd ignerr ml_spec args} {
    set show_oneperline 0
    set show_mtime 0
    set show_filter {}
@@ -329,6 +327,17 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
       }
    }
 
+   # parse module version specification
+   if {$cmd in {avail paths whatis load unload switch help test display path\
+      is-avail edit try-load load-any list lint mod-to-sh source spider}} {
+      # some cmds allow to express variant without module name
+      set allow_noname_spec [expr {$cmd in {avail list paths whatis spider}}]
+      # some cmds allow extra specifier in query
+      set allow_xt_spec [expr {$cmd in {avail paths whatis spider}}]
+      set otherargs [parseModuleSpecification $ml_spec $allow_noname_spec\
+         $allow_xt_spec 0 {*}$otherargs]
+   }
+
    reportDebug "(show_oneperline=$show_oneperline, show_mtime=$show_mtime,\
       show_filter=$show_filter, search_filter=$search_filter,\
       search_match=$search_match, dump_state=$dump_state,\
@@ -338,20 +347,151 @@ proc parseModuleCommandArgs {topcall cmd ignerr args} {
       $search_match $dump_state $addpath_pos $not_req $tag_list $otherargs]
 }
 
-proc module {command args} {
-   # guess if called from top level
-   set topcall [isTopEvaluation 0]
-   set tryhelpmsg [expr {$topcall ? "\nTry 'module --help' for more\
-      information." : {}}]
-   if {$topcall} {
-      set msgprefix {}
-   } else {
-      set msgprefix {module: }
+proc checkModuleCommandNbArgs {topcall command nb_args} {
+   if {[switch -- $command {
+      unload - source - display - initadd - initprepend - initrm - test -\
+      is-avail - try-load - load-any {
+         expr {!$nb_args}
+      }
+      refresh - reload - aliases - purge - initlist - initclear - autoinit -\
+         reset - stash - stashclear - stashlist - cacheclear {
+         expr {$nb_args}
+      }
+      switch {
+         expr {!$nb_args || $nb_args > 2}
+      }
+      path - paths - info-loaded - edit {
+         expr {$nb_args != 1}
+      }
+      search - save - restore - saverm - saveshow - clear - state - stashpop\
+         - stashrm - stashshow {
+         expr {$nb_args > 1}
+      }
+      initswitch {
+         expr {$nb_args != 2}
+      }
+      prepend-path - append-path - remove-path - sh-to-mod - mod-to-sh {
+         expr {$nb_args < 2}
+      }
+      config {
+         expr {$nb_args > 2}
+      }
+      default {
+         expr {0 == 1}
+      }
+   }]} {
+      knerrorModule $topcall "Unexpected number of args for '$command'\
+         command"
    }
+}
 
-   # get mode, set to load if called from top level
-   set mode [expr {$topcall ? {load} : [currentState mode]}]
+# define module sub-command procedure to launch and its associated options
+proc formatModuleCommand {topcall command mode tag_list addpath_pos\
+   show_oneperline show_mtime show_filter search_filter search_match\
+   dump_state parsed_args} {
+   set cmd_proc_name cmdModule[switch -- $command {
+      load - try-load - load-any {
+         return -level 0 IntLoad
+      }
+      unload {
+         return -level 0 IntUnload
+      }
+      switch {
+         return -level 0 IntSwitch
+      }
+      initadd - initprepend - initswitch - initrm - initlist - initclear {
+         return -level 0 Init
+      }
+      sh-to-mod {
+         return -level 0 ShToMod
+      }
+      mod-to-sh {
+         return -level 0 ModToSh
+      }
+      prepend-path - append-path - remove-path - is-loaded - is-saved -\
+      is-used - is-avail {
+         return -level 0 Resurface
+      }
+      info-loaded {
+         return -level 0 Resurface
+      }
+      whatis {
+         return -level 0 Search
+      }
+      default {
+         return -level 0 [string toupper $command 0 0]
+      }}]
 
+   set cmd_opts [switch -- $command {
+      load - try-load - load-any {
+         list $topcall $command $mode $tag_list
+      }
+      unload {
+         list $mode
+      }
+      switch {
+         list $mode $tag_list
+      }
+      use {
+         list $mode $addpath_pos
+      }
+      unuse {
+         list $mode
+      }
+      source {
+         list load
+      }
+      avail {
+         list $show_oneperline $show_mtime $show_filter $search_filter\
+            $search_match [getModulePathList exiterronundef]
+      }
+      spider {
+         list $show_oneperline $show_mtime $show_filter $search_filter\
+            $search_match
+      }
+      list - savelist {
+         list $show_oneperline $show_mtime $search_match
+      }
+      config {
+         list $dump_state
+      }
+      stashlist {
+         list $show_oneperline $show_mtime
+      }
+      whatis {
+         list {}
+      }
+      info-loaded {
+         list module-info loaded
+      }
+      prepend-path - append-path - remove-path - is-loaded - is-saved -\
+      is-used - is-avail {
+         list $command
+      }
+      initadd - initprepend - initswitch - initrm - initlist - initclear {
+         list [string range $command 4 end]
+      }}]
+
+   return [list $cmd_proc_name {*}$cmd_opts {*}$parsed_args]
+}
+
+# define the dynamic procedures that compare module specifications and parse
+# loaded environment if enabled
+proc initModCmpProcsAndLoadedEnv {parse_loaded_env} {
+      set icase [isIcase]
+      set extdfl [getConf extended_default]
+      defineModStartNbProc $icase
+      defineModEqProc $icase $extdfl
+      defineModVersCmpProc $icase $extdfl
+      defineGetEqArrayKeyProc [getConf implicit_default]
+      defineParseModuleSpecificationProc [getConf advanced_version_spec]
+
+      if {$parse_loaded_env} {
+         cacheCurrentModules
+      }
+}
+
+proc moduleTop {command args} {
    # resolve and check command name
    lassign [parseModuleCommandName $command help] command cmdvalid cmdempty
    # clear other args if no command name supplied
@@ -360,7 +500,7 @@ proc module {command args} {
    }
    # raise error if supplied command is not known
    if {!$cmdvalid} {
-      knerror "${msgprefix}Invalid command '$command'$tryhelpmsg"
+      knerrorModule 1 "Invalid command '$command'"
    }
 
    # define states needed by module spec parsing and sub-command processing
@@ -369,195 +509,32 @@ proc module {command args} {
       list avail aliases edit spider]}]
    lappendState commandname $command
 
+   initModCmpProcsAndLoadedEnv [expr {$command ni {append-path cachebuild\
+      cacheclear clear config initadd initclear initlist initprepend initrm\
+      initswitch is-saved is-used prepend-path remove-path savelist saverm\
+      saveshow sh-to-mod stashlist stashrm stashclear stashshow state use\
+      unuse}}]
+
    # parse options, do that globally to ignore options not related to a given
    # module sub-command (exclude them from arg list)
-   lassign [parseModuleCommandArgs $topcall $command 0 {*}$args]\
-      show_oneperline show_mtime show_filter search_filter search_match\
-      dump_state addpath_pos not_req tag_list parsed_args
+   lassign [parseModuleCommandArgs 1 $command 0 0 {*}$args] show_oneperline\
+      show_mtime show_filter search_filter search_match dump_state\
+      addpath_pos not_req tag_list parsed_args
 
-   # parse module version specification
-   defineParseModuleSpecificationProc [getConf advanced_version_spec]
-   if {$command in [list avail paths whatis load unload switch help test\
-      display path is-avail edit try-load load-any list lint mod-to-sh\
-      source spider]} {
-      # some cmds allow to express variant without module name
-      set allow_noname_spec [expr {$command in {avail list paths whatis\
-         spider}}]
-      # some cmds allow extra specifier in query
-      set allow_xt_spec [expr {$command in {avail paths whatis spider}}]
-      set parsed_args [parseModuleSpecification 0 $allow_noname_spec\
-         $allow_xt_spec 0 {*}$parsed_args]
-   }
+   checkModuleCommandNbArgs 1 $command [llength $parsed_args]
 
-   if {!$topcall} {
-      # some commands can only be called from top level, not within modulefile
-      switch -- $command {
-         path - paths - autoinit - help - prepend-path - append-path -\
-         remove-path - is-loaded - is-saved - is-used - is-avail -\
-         info-loaded - clear - sh-to-mod - edit - refresh - source - state -\
-         lint - mod-to-sh - reset - stash - stashpop - stashrm - stashshow -\
-         stashclear - stashlist - cachebuild - cacheclear - spider {
-            knerror "${msgprefix}Command '$command' not supported$tryhelpmsg"
-         }
-      }
-      # other commands can only be called from modulefile evaluated from
-      # command acting as top-level context (source and autoinit)
-      if {([depthState modulename] > 1 || [aboveCommandName] ni [list source\
-         autoinit]) && $command eq {config}} {
-         knerror "${msgprefix}Command '$command' not supported$tryhelpmsg"
-      }
-      # no requirement should be recorded this module load/unload/switch cmd
-      if {$not_req || ![getConf implicit_requirement]} {
-         lappendState inhibit_req_record [currentState evalid]
-      }
-   }
+   logEvent requested_cmd {command} $command arguments $args
+   # Find and execute any global rc file found
+   runModulerc
 
-   # argument number check
-   switch -- $command {
-      unload - source - display - initadd - initprepend - initrm - test -\
-      is-avail - try-load - load-any {
-         if {![llength $parsed_args]} {
-            set argnberr 1
-         }
-      }
-      refresh - reload - aliases - purge - initlist - initclear - autoinit -\
-         reset - stash - stashclear - stashlist - cacheclear {
-         if {[llength $parsed_args]} {
-            set argnberr 1
-         }
-      }
-      switch {
-         if {![llength $parsed_args] || [llength $parsed_args] > 2} {
-            set argnberr 1
-         }
-      }
-      path - paths - info-loaded - edit {
-         if {[llength $parsed_args] != 1} {
-            set argnberr 1
-         }
-      }
-      search - save - restore - saverm - saveshow - clear - state - stashpop\
-         - stashrm - stashshow {
-         if {[llength $parsed_args] > 1} {
-            set argnberr 1
-         }
-      }
-      initswitch {
-         if {[llength $parsed_args] != 2} {
-            set argnberr 1
-         }
-      }
-      prepend-path - append-path - remove-path - sh-to-mod - mod-to-sh {
-         if {[llength $parsed_args] < 2} {
-            set argnberr 1
-         }
-      }
-      config {
-         if {[llength $parsed_args] > 2} {
-            set argnberr 1
-         }
-      }
-   }
-   if {[info exists argnberr]} {
-      knerror "Unexpected number of args for '$command' command$tryhelpmsg"
-   }
+   {*}[formatModuleCommand 1 $command load $tag_list $addpath_pos\
+      $show_oneperline $show_mtime $show_filter $search_filter $search_match\
+      $dump_state $parsed_args]
 
-   if {$topcall} {
-      logEvent requested_cmd {command} $command arguments $args
-      # Find and execute any global rc file found
-      runModulerc
-   }
-
-   # define procedure to launch and associated options
-   set cmdopts [list]
-   switch -- $command {
-      load - try-load - load-any {
-         set cmdprocsuffix IntLoad
-      }
-      unload {
-         set cmdprocsuffix IntUnload
-      }
-      switch {
-         set cmdprocsuffix IntSwitch
-      }
-      initadd - initprepend - initswitch - initrm - initlist - initclear {
-         set cmdprocsuffix Init
-         lappend cmdopts [string range $command 4 end]
-      }
-      sh-to-mod {
-         set cmdprocsuffix ShToMod
-      }
-      mod-to-sh {
-         set cmdprocsuffix ModToSh
-      }
-      prepend-path - append-path - remove-path - is-loaded - is-saved -\
-      is-used - is-avail {
-         set cmdprocsuffix Resurface
-         lappend cmdopts $command
-      }
-      info-loaded {
-         set cmdprocsuffix Resurface
-         lappend cmdopts module-info loaded
-      }
-      whatis {
-         set cmdprocsuffix Search
-         lappend cmdopts {}
-      }
-      default {
-         set cmdprocsuffix [string toupper $command 0 0]
-      }
-   }
-   set cmdprocname cmdModule$cmdprocsuffix
-   switch -- $command {
-      load - try-load - load-any {
-         lappend cmdopts $topcall $command $mode $tag_list
-      }
-      unload {
-         lappend cmdopts $mode
-      }
-      switch {
-         lappend cmdopts $mode $tag_list
-      }
-      use {
-         lappend cmdopts $mode $addpath_pos
-      }
-      unuse {
-         lappend cmdopts $mode
-      }
-      source {
-         lappend cmdopts load
-      }
-      avail {
-         lappend cmdopts $show_oneperline $show_mtime $show_filter\
-            $search_filter $search_match [getModulePathList exiterronundef]
-      }
-      spider {
-         lappend cmdopts $show_oneperline $show_mtime $show_filter\
-            $search_filter $search_match
-      }
-      list - savelist {
-         lappend cmdopts $show_oneperline $show_mtime $search_match
-      }
-      config {
-         lappend cmdopts $dump_state
-      }
-      stashlist {
-         lappend cmdopts $show_oneperline $show_mtime
-      }
-   }
-
-   $cmdprocname {*}$cmdopts {*}$parsed_args
    lpopState commandname
    lpopState always_read_full_file
 
-   if {!$topcall && ($not_req || ![getConf implicit_requirement])} {
-      lpopState inhibit_req_record
-   }
-
-   # if called from top level render settings if any
-   if {$topcall} {
-      renderSettings
-   }
+   renderSettings
 
    return {}
 }
@@ -565,7 +542,7 @@ proc module {command args} {
 proc ml {args} {
    # filter out all known options from argument list to guess command name
    # without them in the way
-   lassign [parseModuleCommandArgs 1 ml 1 {*}$args] show_oneperline\
+   lassign [parseModuleCommandArgs 1 ml 1 0 {*}$args] show_oneperline\
       show_mtime show_filter search_filter search_match dump_state\
       addpath_pos not_req tag_list fargs
 
@@ -587,23 +564,23 @@ proc ml {args} {
    # directly call module procedure if sub-command spotted as first argument
    # or no argument supplied
    if {$cmdvalid} {
-      module $command {*}$margs
+      moduleTop $command {*}$margs
    } else {
       # define if modfile should always be fully read even for validity check
       lappendState always_read_full_file 1
       lappendState commandname ml
 
-      # parse specified module and get list of mods to unload and mods to load
-      defineParseModuleSpecificationProc [getConf advanced_version_spec]
-      lassign [parseModuleSpecification 1 0 0 0 {*}$fargs] modunlist modlolist
+      initModCmpProcsAndLoadedEnv 1
 
       # main procedure has already raised error for badly written argument
       # like '-' or '--', but we need here to replay module-specific argument
       # parsing to raise error if some arg are not allowed on unload/load cmd
-      set mlcmd [expr {[llength $modunlist] ? {unload} : {load}}]
-      lassign [parseModuleCommandArgs 1 $mlcmd 0 {*}$args] show_oneperline\
+      lassign [parseModuleCommandArgs 1 load 0 1 {*}$args] show_oneperline\
          show_mtime show_filter search_filter search_match dump_state\
          addpath_pos not_req tag_list fargs
+
+      # split result to get list of mods to unload and mods to load
+      lassign $fargs modunlist modlolist
 
       logEvent requested_cmd {command} ml arguments $args
 
@@ -658,7 +635,11 @@ if {[catch {
    ##nagelfar ignore +2 Too long line
    @libtclenvmodules@if {[file readable [getConf tcl_ext_lib]]} {
    @libtclenvmodules@   reportDebug "Load Tcl extension library ([getConf tcl_ext_lib])"
-   @libtclenvmodules@   load [file normalize [getConf tcl_ext_lib]] Envmodules
+   @libtclenvmodules@   if {[catch {
+   @libtclenvmodules@      load [file normalize [getConf tcl_ext_lib]] Envmodules
+   @libtclenvmodules@   } errMsg]} {
+   @libtclenvmodules@      reportErrorAndExit $errMsg
+   @libtclenvmodules@   }
    @libtclenvmodules@   setState tcl_ext_lib_loaded 1
    @libtclenvmodules@}
    # use fallback procs if extension library is not loaded
@@ -735,10 +716,18 @@ if {[catch {
             --dumpname {
                set show_name 1
             }
+            -p {
+               # means paginate if set as an option (before specifying subcmd)
+               if {![llength $otherargv]} {
+                  set asked_paginate 1
+               } else {
+                  lappend otherargv $arg
+               }
+            }
             --paginate {
                set asked_paginate 1
             }
-            --no-pager {
+            -P - --no-pager {
                set asked_paginate 0
             }
             --redirect {
@@ -801,10 +790,10 @@ if {[catch {
                   lappend extraargv $arg
                }
             }
-            -a - --append - -append - --all - -p - --prepend - -prepend -\
-            --delim - -delim - --delim=* - -delim=* - --duplicates - --index\
-            - --notuasked - --indepth - --no-indepth - --dump-state -\
-            --reset - --tag - --tag=* - --glob - --show_hidden {
+            -a - --append - -append - --all - --prepend - -prepend - --delim\
+            - -delim - --delim=* - -delim=* - --duplicates - --index -\
+            --notuasked - --indepth - --no-indepth - --dump-state - --reset -\
+            --tag - --tag=* - --glob - --show_hidden {
                # command-specific switches interpreted later on
                lappend otherargv $arg
             }
@@ -821,6 +810,9 @@ if {[catch {
             }
             --ignore-user-rc {
                set asked_ignore_user_rc 1
+            }
+            --no-modulepath-ignore {
+               set asked_modulepath_ignore 0
             }
             --timer {
                setState timer 1
@@ -903,7 +895,7 @@ if {[catch {
    if {[getState subcmd] eq {ml}} {
       set execcmdlist [list ml {*}$otherargv]
    } else {
-      set execcmdlist [list module [getState subcmd] {*}$otherargv]
+      set execcmdlist [list moduleTop [getState subcmd] {*}$otherargv]
    }
 
    # now options are known initialize error report (start pager if enabled)
@@ -912,25 +904,19 @@ if {[catch {
    # put back quarantine variables in env, if quarantine mechanism supported
    if {[info exists env(__MODULES_QUARANTINE_SET)] &&\
       $env(__MODULES_QUARANTINE_SET) eq {1}} {
-      foreach var [split [getConf run_quarantine]] {
-         # check variable name is valid
-         if {[regexp {^[A-Za-z_][A-Za-z0-9_]*$} $var]} {
-            set quarvar __MODULES_QUAR_${var}
-            # put back value
-            if {[info exists env($quarvar)]} {
-               reportDebug "Release '$var' environment variable from\
-                  quarantine ($env($quarvar))"
-               set env($var) $env($quarvar)
-               unset env($quarvar)
-            # or unset env var if no value found in quarantine
-            } elseif {[info exists env($var)]} {
-               reportDebug "Unset '$var' environment variable after\
-                  quarantine"
-               unset env($var)
-            }
-         } elseif {[string length $var]} {
-            reportWarning "Bad variable name set in MODULES_RUN_QUARANTINE\
-               ($var)"
+      foreach var [getQuarantineVarList 1] {
+         set quarvar __MODULES_QUAR_${var}
+         # put back value
+         if {[info exists env($quarvar)]} {
+            reportDebug "Release '$var' environment variable from\
+               quarantine ($env($quarvar))"
+            set env($var) $env($quarvar)
+            unset env($quarvar)
+         # or unset env var if no value found in quarantine
+         } elseif {[info exists env($var)]} {
+            reportDebug "Unset '$var' environment variable after\
+               quarantine"
+            unset env($var)
          }
       }
    }
@@ -967,7 +953,10 @@ if {[catch {
 
 flushAndExit
 
-# ;;; Local Variables: ***
-# ;;; mode:tcl ***
-# ;;; End: ***
+# ;;; Local Variables:
+# ;;; Mode: tcl-mode
+# ;;; tcl-indent-level: 3
+# ;;; tcl-continued-indent-level: 3
+# ;;; indent-tabs-mode: nil
+# ;;; End:
 # vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

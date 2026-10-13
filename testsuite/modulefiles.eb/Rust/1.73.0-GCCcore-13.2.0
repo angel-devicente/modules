@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/Rust/1.73.0-GCCcore-13.2.0
+conflict Rust
+depends-on GCCcore/13.2.0
+depends-on OpenSSL/1.1

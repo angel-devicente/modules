@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libfabric/1.13.2-GCCcore-11.2.0
+conflict libfabric
+depends-on GCCcore/11.2.0
+depends-on numactl/2.0.14-GCCcore-11.2.0

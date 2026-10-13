@@ -23,6 +23,33 @@
 set mp $modpath.2
 set mpre [regsub -all "\(\[.+?\]\)" $mp {\\\1}]
 
+foreach path_entry_reorder {0 1} {
+
+setenv_var MODULES_PATH_ENTRY_REORDER $path_entry_reorder
+
+# reset state accumulated by a previous run through this loop, so each
+# path_entry_reorder value is tested from the same clean starting point
+foreach var [array names env -glob FOO*] {
+    unsetenv_var $var
+}
+foreach var [array names env -glob __MODULES_*] {
+    unsetenv_var $var
+}
+unsetenv_var TESTSUITE_SHTOMOD_NOVAR
+unsetenv_var TESTSUITE_SHTOMOD_NOPATH
+unsetenv_var TESTSUITE_SHTOMOD_NOFUNC
+unsetenv_var TESTSUITE_SHTOMOD_NOALIAS
+unsetenv_var TESTSUITE_SHTOMOD_NOCOMP
+unsetenv_var TESTSUITE_SHTOMOD_NOCD
+unsetenv_var TESTSUITE_SHTOMOD_PATHDUP
+unsetenv_var TESTSUITE_SHTOMOD_MODULE
+unsetenv_var TESTSUITE_SHTOMOD_UNSETALFUNCCOMP
+unsetenv_var TESTSUITE_SHTOMOD_FUZZYOUT1
+unsetenv_var TESTSUITE_SOURCESH_ESCCHAR
+unsetenv_var MODULES_SET_SHELL_STARTUP
+unsetenv_var MODULES_CMD
+unsetenv_loaded_module
+
 # setup specific environment
 setenv_path_var MODULEPATH $mp
 
@@ -201,13 +228,13 @@ set ans [list]
 lappend ans [list set FOOPATHDUPEM :/path/to/dir1:/path/to/dir1:/path/to/dir2:/path/to/dir1:/path/to/dir3::/path/to/dir3]
 lappend ans [list unset __MODULES_SHARE_FOOPATHDUPEM]
 lappend ans [list set __MODULES_SHARE_FOOPATHDUPMIX ":2:/path/to/dir3:2"]
-lappend ans [list set FOOPATHDUPMIX :/path/to/dir1:/path/to/dir1\ /path/to/dir2\ /path/to/dir1:/path/to/dir3]
+lappend ans [list set FOOPATHDUPMIX :/path/to/dir1:/path/to/dir1\ /path/to/dir2\ /path/to/dir1:/path/to/dir3:/path/to/dir3:]
 lappend ans [list set FOOPATH /path/to/dir1:/path/to/dir2:/path/to/dir3]
 lappend ans [list set __MODULES_LMREFRESH source-sh/1:source-sh/2:source-sh/3]
 lappend ans [list set _LMFILES_ $mp/source-sh/1:$mp/source-sh/2:$mp/source-sh/3]
 lappend ans [list set LOADEDMODULES source-sh/1:source-sh/2:source-sh/3]
 lappend ans [list set FOOPATHDUP "/path/to/dir1:/path/to/dir1:/path/to/dir2:/path/to/dir1:/path/to/dir3:/path/to dir4:/path/to/dir3"]
-lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|chdir\ $mp\|prepend-path\ FOOPATH\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHCB\ /path/to/dir1\ /path/to/d\\\{r2\ /path/to/dir3\|prepend-path\ FOOPATHDUP\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \{/path/to\ dir4\}\|prepend-path\ FOOPATHDUPEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHDUPMIX\ \{\}\ /path/to/dir1\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir1\}\ /path/to/dir3\|prepend-path\ FOOPATHDUPSP\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to\}\ \{dir4\ /path/to/dir3\}\|prepend-path\ FOOPATHEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHWC\ /path/to/dir1\ /path/to/d\*r2\ /path/to/dir3\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOO\ value\|setenv\ FOOCB\ va\\\{ue\|setenv\ FOOEM\ \{\}\|setenv\ FOOPATHDUPSPEM\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to/dir3\ \}\|setenv\ FOOPATHSP\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\}\|setenv\ FOOPATHSPEM\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \}\|setenv\ FOOSP\ \{value\ \}\|setenv\ FOOWC\ va\*ue:source-sh/2\&sh\ testsuite/example/mini-sh-to-mod.sh\|prepend-path\ FOOPATH\ /path/to/mini\|set-alias\ almini\ \{\}\|setenv\ FOOMINI\ value:source-sh/3\&bash\ testsuite/example/sh-to-mod.sh\|append-path\ FOOPATHDUPMIX\ /path/to/dir3\ \{\}\|chdir\ $mp\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOOPATH\ /path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir3\|setenv\ FOOPATHDUP\ \{/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>/path/to\ dir4\<EnvModEscPS\>/path/to/dir3\}\|setenv\ FOOPATHDUPEM\ \<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>\<EnvModEscPS\>/path/to/dir3]
+lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|chdir\ $mp\|prepend-path\ FOOPATH\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHCB\ /path/to/dir1\ /path/to/d\\\{r2\ /path/to/dir3\|prepend-path\ FOOPATHDUP\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \{/path/to\ dir4\}\|prepend-path\ FOOPATHDUPEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHDUPMIX\ \{\}\ /path/to/dir1\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir1\}\ /path/to/dir3\|prepend-path\ FOOPATHDUPSP\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to\}\ \{dir4\ /path/to/dir3\}\|prepend-path\ FOOPATHEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHWC\ /path/to/dir1\ /path/to/d\*r2\ /path/to/dir3\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOO\ value\|setenv\ FOOCB\ va\\\{ue\|setenv\ FOOEM\ \{\}\|setenv\ FOOPATHDUPSPEM\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to/dir3\ \}\|setenv\ FOOPATHSP\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\}\|setenv\ FOOPATHSPEM\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \}\|setenv\ FOOSP\ \{value\ \}\|setenv\ FOOWC\ va\*ue:source-sh/2\&sh\ testsuite/example/mini-sh-to-mod.sh\|prepend-path\ FOOPATH\ /path/to/mini\|set-alias\ almini\ \{\}\|setenv\ FOOMINI\ value:source-sh/3\&bash\ testsuite/example/sh-to-mod.sh\|append-path\ --duplicates\ FOOPATHDUPMIX\ /path/to/dir3\ \{\}\|chdir\ $mp\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOOPATH\ /path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir3\|setenv\ FOOPATHDUP\ \{/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>/path/to\ dir4\<EnvModEscPS\>/path/to/dir3\}\|setenv\ FOOPATHDUPEM\ \<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>\<EnvModEscPS\>/path/to/dir3]
 lappend ans [list alias alsp {echo f\"o; echo b\\\"r; echo f\'o}]
 lappend ans [list alias alfoo {echo $(grep "report .Modules " ../../modulecmd.tcl | tr -d \\ 2>/dev/null | awk '{print $3}')}]
 lappend ans [list alias alcb echo\ f\{o]
@@ -231,16 +258,16 @@ setenv_var FOOPATHDUP "/path/to/dir1:/path/to/dir1:/path/to/dir2:/path/to/dir1:/
 unsetenv_var __MODULES_SHARE_FOOPATHDUPEM
 unsetenv_var __MODULES_SHARE_FOOPATH
 unsetenv_var __MODULES_SHARE_FOOPATHDUP
-setenv_path_var FOOPATHDUPMIX :/path/to/dir1:/path/to/dir1\ /path/to/dir2\ /path/to/dir1:/path/to/dir3
+setenv_path_var FOOPATHDUPMIX :/path/to/dir1:/path/to/dir1\ /path/to/dir2\ /path/to/dir1:/path/to/dir3:/path/to/dir3:
 setenv_var FOOPATH /path/to/dir1:/path/to/dir2:/path/to/dir3
 setenv_var FOOPATHDUPEM :/path/to/dir1:/path/to/dir1:/path/to/dir2:/path/to/dir1:/path/to/dir3::/path/to/dir3
-setenv_var __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|chdir\ $mp\|prepend-path\ FOOPATH\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHCB\ /path/to/dir1\ /path/to/d\\\{r2\ /path/to/dir3\|prepend-path\ FOOPATHDUP\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \{/path/to\ dir4\}\|prepend-path\ FOOPATHDUPEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHDUPMIX\ \{\}\ /path/to/dir1\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir1\}\ /path/to/dir3\|prepend-path\ FOOPATHDUPSP\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to\}\ \{dir4\ /path/to/dir3\}\|prepend-path\ FOOPATHEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHWC\ /path/to/dir1\ /path/to/d\*r2\ /path/to/dir3\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOO\ value\|setenv\ FOOCB\ va\\\{ue\|setenv\ FOOEM\ \{\}\|setenv\ FOOPATHDUPSPEM\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to/dir3\ \}\|setenv\ FOOPATHSP\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\}\|setenv\ FOOPATHSPEM\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \}\|setenv\ FOOSP\ \{value\ \}\|setenv\ FOOWC\ va\*ue:source-sh/2\&sh\ testsuite/example/mini-sh-to-mod.sh\|prepend-path\ FOOPATH\ /path/to/mini\|set-alias\ almini\ \{\}\|setenv\ FOOMINI\ value:source-sh/3\&bash\ testsuite/example/sh-to-mod.sh\|append-path\ FOOPATHDUPMIX\ /path/to/dir3\ \{\}\|chdir\ $mp\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOOPATH\ /path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir3\|setenv\ FOOPATHDUP\ \{/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>/path/to\ dir4\<EnvModEscPS\>/path/to/dir3\}\|setenv\ FOOPATHDUPEM\ \<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>\<EnvModEscPS\>/path/to/dir3
+setenv_var __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|chdir\ $mp\|prepend-path\ FOOPATH\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHCB\ /path/to/dir1\ /path/to/d\\\{r2\ /path/to/dir3\|prepend-path\ FOOPATHDUP\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \{/path/to\ dir4\}\|prepend-path\ FOOPATHDUPEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHDUPMIX\ \{\}\ /path/to/dir1\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir1\}\ /path/to/dir3\|prepend-path\ FOOPATHDUPSP\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to\}\ \{dir4\ /path/to/dir3\}\|prepend-path\ FOOPATHEM\ \{\}\ /path/to/dir1\ /path/to/dir2\ /path/to/dir3\|prepend-path\ FOOPATHWC\ /path/to/dir1\ /path/to/d\*r2\ /path/to/dir3\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOO\ value\|setenv\ FOOCB\ va\\\{ue\|setenv\ FOOEM\ \{\}\|setenv\ FOOPATHDUPSPEM\ \{/path/to/dir1\ /path/to/dir1\ /path/to/dir2\ /path/to/dir1\ /path/to/dir3\ /path/to/dir3\ \}\|setenv\ FOOPATHSP\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\}\|setenv\ FOOPATHSPEM\ \{/path/to/dir1\ /path/to/dir2\ /path/to/dir3\ \}\|setenv\ FOOSP\ \{value\ \}\|setenv\ FOOWC\ va\*ue:source-sh/2\&sh\ testsuite/example/mini-sh-to-mod.sh\|prepend-path\ FOOPATH\ /path/to/mini\|set-alias\ almini\ \{\}\|setenv\ FOOMINI\ value:source-sh/3\&bash\ testsuite/example/sh-to-mod.sh\|append-path\ --duplicates\ FOOPATHDUPMIX\ /path/to/dir3\ \{\}\|chdir\ $mp\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOOPATH\ /path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir3\|setenv\ FOOPATHDUP\ \{/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>/path/to\ dir4\<EnvModEscPS\>/path/to/dir3\}\|setenv\ FOOPATHDUPEM\ \<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>\<EnvModEscPS\>/path/to/dir3
 
 set ans [list]
 lappend ans [list set _LMFILES_ $mp/source-sh/2:$mp/source-sh/3]
 lappend ans [list set LOADEDMODULES source-sh/2:source-sh/3]
 lappend ans [list unset FOOPATHDUP]
-lappend ans [list set __MODULES_LMSOURCESH source-sh/2\&sh\ testsuite/example/mini-sh-to-mod.sh\|prepend-path\ FOOPATH\ /path/to/mini\|set-alias\ almini\ \{\}\|setenv\ FOOMINI\ value:source-sh/3\&bash\ testsuite/example/sh-to-mod.sh\|append-path\ FOOPATHDUPMIX\ /path/to/dir3\ \{\}\|chdir\ $mp\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOOPATH\ /path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir3\|setenv\ FOOPATHDUP\ \{/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>/path/to\ dir4\<EnvModEscPS\>/path/to/dir3\}\|setenv\ FOOPATHDUPEM\ \<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>\<EnvModEscPS\>/path/to/dir3]
+lappend ans [list set __MODULES_LMSOURCESH source-sh/2\&sh\ testsuite/example/mini-sh-to-mod.sh\|prepend-path\ FOOPATH\ /path/to/mini\|set-alias\ almini\ \{\}\|setenv\ FOOMINI\ value:source-sh/3\&bash\ testsuite/example/sh-to-mod.sh\|append-path\ --duplicates\ FOOPATHDUPMIX\ /path/to/dir3\ \{\}\|chdir\ $mp\|set-alias\ alcb\ \{\}\|set-alias\ alem\ \{\}\|set-alias\ alfoo\ \{\}\|set-alias\ alsp\ \{\}\|set-function\ funccb\ \{\}\|set-function\ funcfoo\ \{\}\|set-function\ funcnl\ \{\}\|set-function\ funcsp\ \{\}\|set-function\ funcwc\ \{\}\|setenv\ FOOPATH\ /path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir3\|setenv\ FOOPATHDUP\ \{/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>/path/to\ dir4\<EnvModEscPS\>/path/to/dir3\}\|setenv\ FOOPATHDUPEM\ \<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir2\<EnvModEscPS\>/path/to/dir1\<EnvModEscPS\>/path/to/dir3\<EnvModEscPS\>\<EnvModEscPS\>/path/to/dir3]
 lappend ans [list unset FOOPATHEM]
 lappend ans [list unset FOOPATHSP]
 lappend ans [list unset FOOPATHCB]
@@ -366,7 +393,6 @@ testouterr_cmd sh {display source-sh/4.3} ERR $tserr_disp2
 set tserr_disp3 "-------------------------------------------------------------------
 $mp/source-sh/5.0:
 
-append-path	FOOPATHDUPMIX /path/to/dir3 {}
 chdir		$mp
 set-alias\talcb {echo\ f\{o}
 set-alias\talem {}
@@ -387,7 +413,6 @@ set-function\tfuncwc {
     echo sou*sh}
 prepend-path	FOOPATH /path/to/mini
 set-alias	almini {echo mini}
-append-path	FOOPATHDUPMIX /path/to/dir3 {}
 chdir		$mp
 set-alias\talcb {echo\ f\{o}
 set-alias\talem {}
@@ -413,7 +438,6 @@ testouterr_cmd sh {display source-sh/5.0} OK $tserr_disp3
 set tserr_disp4 "-------------------------------------------------------------------
 $mp/source-sh/5.1:
 
-append-path	FOOPATHDUPMIX /path/to/dir3 {}
 chdir		$mp
 set-alias\talcb {echo\ f\{o}
 set-alias\talem {}
@@ -436,7 +460,6 @@ setenv		FOOARG1 arg1
 setenv		FOOARG2 arg2
 prepend-path	FOOPATH /path/to/mini
 set-alias	almini {echo mini}
-append-path	FOOPATHDUPMIX /path/to/dir3 {}
 chdir		$mp
 set-alias\talcb {echo\ f\{o}
 set-alias\talem {}
@@ -526,7 +549,7 @@ $mp/source-sh/5.0:
 
 chdir		$mp
 prepend-path	FOOPATH /path/to/dir1 /path/to/dir2 /path/to/dir3
-prepend-path	FOOPATHCB /path/to/dir1 /path/to/d{r2 /path/to/dir3
+prepend-path	FOOPATHCB /path/to/dir1 /path/to/d\{r2 /path/to/dir3
 prepend-path	FOOPATHDUP /path/to/dir1 /path/to/dir2 /path/to/dir3 {/path/to dir4}
 prepend-path	FOOPATHDUPEM {} /path/to/dir1 /path/to/dir2 /path/to/dir3
 prepend-path	FOOPATHDUPMIX {} /path/to/dir1 {/path/to/dir1 /path/to/dir2 /path/to/dir1} /path/to/dir3
@@ -551,7 +574,7 @@ set-function\tfuncsp {
 set-function\tfuncwc {
     echo sou*sh}
 setenv		FOO value
-setenv		FOOCB va{ue
+setenv		FOOCB va\{ue
 setenv		FOOEM {}
 setenv		FOOPATHDUPSPEM {/path/to/dir1 /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 /path/to/dir3 }
 setenv		FOOPATHSP {/path/to/dir1 /path/to/dir2 /path/to/dir3}
@@ -561,7 +584,7 @@ setenv		FOOWC va*ue
 prepend-path	FOOPATH /path/to/mini
 set-alias	almini {echo mini}
 setenv		FOOMINI value
-append-path	FOOPATHDUPMIX /path/to/dir3 {}
+append-path	--duplicates FOOPATHDUPMIX /path/to/dir3 {}
 chdir		$mp
 set-alias\talcb {echo\ f\{o}
 set-alias\talem {}
@@ -591,7 +614,7 @@ $mp/source-sh/5.1:
 
 chdir		$mp
 prepend-path	FOOPATH /path/to/dir1 /path/to/dir2 /path/to/dir3
-prepend-path	FOOPATHCB /path/to/dir1 /path/to/d{r2 /path/to/dir3
+prepend-path	FOOPATHCB /path/to/dir1 /path/to/d\{r2 /path/to/dir3
 prepend-path	FOOPATHDUP /path/to/dir1 /path/to/dir2 /path/to/dir3 {/path/to dir4}
 prepend-path	FOOPATHDUPEM {} /path/to/dir1 /path/to/dir2 /path/to/dir3
 prepend-path	FOOPATHDUPMIX {} /path/to/dir1 {/path/to/dir1 /path/to/dir2 /path/to/dir1} /path/to/dir3
@@ -618,7 +641,7 @@ set-function\tfuncwc {
 setenv		FOO value
 setenv		FOOARG1 arg1
 setenv		FOOARG2 arg2
-setenv		FOOCB va{ue
+setenv		FOOCB va\{ue
 setenv		FOOEM {}
 setenv		FOOPATHDUPSPEM {/path/to/dir1 /path/to/dir1 /path/to/dir2 /path/to/dir1 /path/to/dir3 /path/to/dir3 }
 setenv		FOOPATHSP {/path/to/dir1 /path/to/dir2 /path/to/dir3}
@@ -628,7 +651,7 @@ setenv		FOOWC va*ue
 prepend-path	FOOPATH /path/to/mini
 set-alias	almini {echo mini}
 setenv		FOOMINI value
-append-path	FOOPATHDUPMIX /path/to/dir3 {}
+append-path	--duplicates FOOPATHDUPMIX /path/to/dir3 {}
 chdir		$mp
 set-alias\talcb {echo\ f\{o}
 set-alias\talem {}
@@ -1001,7 +1024,7 @@ set tserr_disp3 "---------------------------------------------------------------
 $mp/source-sh/5.0:
 
 setenv		FOO value
-setenv		FOOCB va{ue
+setenv		FOOCB va\{ue
 setenv		FOOEM {}
 setenv		FOOSP {value }
 setenv		FOOWC va*ue
@@ -1601,6 +1624,16 @@ setenv_var TESTSUITE_SHTOMOD_MODULE 1
 setenv_var MODULES_SET_SHELL_STARTUP 0
 setenv_var MODULES_CMD [file normalize $env(TESTSUITEDIR)/../modulecmd.tcl]
 
+# prepare things if PYTHONPATH is configured by autoinit
+if {[is_conf_enabled setpythonpath]} {
+    unsetenv_var PYTHONPATH
+    if {[string first { } $install_pythondir] != -1} {
+        set pythondirenc "{$install_pythondir}"
+    } else {
+        set pythondirenc $install_pythondir
+    }
+}
+
 set lmsourceshpath {}
 # setup simpler MANPATH value for tests if autoinit adds Modules man location to MANPATH
 if {$install_setmanpath eq {y}} {
@@ -1684,9 +1717,20 @@ if {$is_modules_defined} {
     set extraans {}
 }
 if {$install_versioning eq {y}} {
-lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ testsuite\ yes$extraans]
+    if {[is_conf_enabled setpythonpath]} {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ PYTHONPATH\ $pythondirenc\|setenv\ testsuite\ yes$extraans]
+    } else {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ testsuite\ yes$extraans]
+    }
 } else {
-lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ testsuite\ yes$extraans]
+    if {[is_conf_enabled setpythonpath]} {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ PYTHONPATH\ $pythondirenc\|setenv\ testsuite\ yes$extraans]
+    } else {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ testsuite\ yes$extraans]
+    }
+}
+if {[is_conf_enabled setpythonpath]} {
+    lappend ans [list set PYTHONPATH $install_pythondir]
 }
 if {$install_versioning eq {y}} {
 lappend ans [list set MODULE_VERSION $install_version]
@@ -1739,8 +1783,11 @@ if {$install_versioning eq {y}} {
     append tserr "setenv\t\tMODULE_VERSION $install_version
 setenv\t\tMODULE_VERSION_STACK $install_version\n"
 }
-append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar
-setenv\t\ttestsuite yes$extratserr
+append tserr "setenv\t\tMODULES_COLLECTION_TARGET bar"
+if {[is_conf_enabled setpythonpath]} {
+    append tserr "\nsetenv\t\tPYTHONPATH $pythondirenc"
+}
+append tserr "\nsetenv\t\ttestsuite yes$extratserr
 module-whatis\tsource-sh/1
 -------------------------------------------------------------------"
 testouterr_cmd sh {display source-sh/1} OK $tserr
@@ -1780,9 +1827,20 @@ lappend ans [list set _LMFILES_ $mp/source-sh/1]
 lappend ans [list set LOADEDMODULES source-sh/1]
 lappend ans [list set MODULES_COLLECTION_TARGET bar]
 if {$install_versioning eq {y}} {
-lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    if {[is_conf_enabled setpythonpath]} {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ PYTHONPATH\ $pythondirenc$extraans]
+    } else {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    }
 } else {
-lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    if {[is_conf_enabled setpythonpath]} {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ PYTHONPATH\ $pythondirenc$extraans]
+    } else {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    }
+}
+if {[is_conf_enabled setpythonpath]} {
+    lappend ans [list set PYTHONPATH $install_pythondir]
 }
 if {$install_versioning eq {y}} {
 lappend ans [list set MODULE_VERSION $install_version]
@@ -1818,9 +1876,20 @@ lappend ans [list set _LMFILES_ $modpath/setenv/1.0:$mp/source-sh/1]
 lappend ans [list set LOADEDMODULES setenv/1.0:source-sh/1]
 lappend ans [list set MODULES_COLLECTION_TARGET bar]
 if {$install_versioning eq {y}} {
-lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    if {[is_conf_enabled setpythonpath]} {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ PYTHONPATH\ $pythondirenc$extraans]
+    } else {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULE_VERSION\ $install_version\|setenv\ MODULE_VERSION_STACK\ $install_version\|setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    }
 } else {
-lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    if {[is_conf_enabled setpythonpath]} {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar\|setenv\ PYTHONPATH\ $pythondirenc$extraans]
+    } else {
+        lappend ans [list set __MODULES_LMSOURCESH source-sh/1\&bash\ testsuite/example/sh-to-mod.sh\|${lmsourceshpath}setenv\ MODULES_COLLECTION_TARGET\ bar$extraans]
+    }
+}
+if {[is_conf_enabled setpythonpath]} {
+    lappend ans [list set PYTHONPATH $install_pythondir]
 }
 if {$install_versioning eq {y}} {
 lappend ans [list set MODULE_VERSION $install_version]
@@ -1919,6 +1988,8 @@ unsetenv_var TESTSUITE_SHTOMOD_UNSETALFUNCCOMP
 
 } elseif {$verbose} {
     send_user "\tSkip tests relying on an excepted siteconfig file installed\n"
+}
+
 }
 
 

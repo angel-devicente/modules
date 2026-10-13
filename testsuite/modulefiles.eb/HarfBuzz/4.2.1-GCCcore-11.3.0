@@ -1,0 +1,9 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/HarfBuzz/4.2.1-GCCcore-11.3.0
+conflict HarfBuzz
+depends-on GCCcore/11.3.0
+depends-on GLib/2.72.1-GCCcore-11.3.0
+depends-on ICU/71.1-GCCcore-11.3.0
+depends-on cairo/1.17.4-GCCcore-11.3.0
+depends-on freetype/2.12.1-GCCcore-11.3.0

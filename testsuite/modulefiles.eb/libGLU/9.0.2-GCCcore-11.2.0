@@ -1,0 +1,6 @@
+#%Module
+module-whatis {Description: module name and version}
+set root /software/libGLU/9.0.2-GCCcore-11.2.0
+conflict libGLU
+depends-on GCCcore/11.2.0
+depends-on Mesa/21.1.7-GCCcore-11.2.0

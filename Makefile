@@ -4,7 +4,7 @@
 	install-testmodspath-empty install-testmodspath-wild \
 	install-testmoguicmd uninstall-testconfig uninstall dist dist-tar \
 	dist-gzip dist-bzip2 dist-win srpm rpm clean distclean test-deps test \
-	testinstall testlint
+	testinstall testlint testcompletion testcookbook
 
 # commands to install files
 INSTALL = install
@@ -13,7 +13,8 @@ INSTALL_DATA = $(INSTALL) -m 644
 INSTALL_PROGRAM = $(INSTALL) -m 755
 
 # download command and its options
-WGET := wget --retry-connrefused --waitretry=20 --timeout=20 --tries=3
+CURL := curl --location --remote-name --retry 3 --retry-connrefused \
+	--retry-delay 20 --max-time 20
 
 # definitions for code coverage
 NAGELFAR_DLSRC1 := http://downloads.sourceforge.net/nagelfar/
@@ -46,8 +47,8 @@ MODULECMD := $(MODULECMDTEST)
 endif
 
 # definitions for enhanced diff tool (to review test results)
-ICDIFF_DLSRC := https://raw.githubusercontent.com/jeffkaufman/icdiff/release-2.0.4/
-ICDIFF_CHECKSUM := 597bd4cda393803e5991c43b78cab3b3
+ICDIFF_DLSRC := https://raw.githubusercontent.com/jeffkaufman/icdiff/release-2.0.10/
+ICDIFF_CHECKSUM := 1a9b7b2e8589f1e2ade4ead1750b5339
 
 # source definitions shared across the Makefiles of this project
 ifneq ($(wildcard Makefile.inc),Makefile.inc)
@@ -55,7 +56,13 @@ ifneq ($(wildcard Makefile.inc),Makefile.inc)
 endif
 include Makefile.inc
 
-INSTALL_PREREQ := modulecmd.tcl ChangeLog.gz README script/add.modules \
+ifeq ($(compressedchangelog),y)
+CHANGELOG := ChangeLog.gz
+else
+CHANGELOG := ChangeLog
+endif
+
+INSTALL_PREREQ := modulecmd.tcl $(CHANGELOG) README script/add.modules \
 	script/modulecmd
 TEST_PREREQ := $(MODULECMD)
 ifeq ($(COVERAGE),y)
@@ -71,9 +78,9 @@ TEST_PREREQ += lib/libtestutil-closedir$(SHLIB_SUFFIX) \
 	lib/libtestutil-getgroups$(SHLIB_SUFFIX) \
 	lib/libtestutil-0getgroups$(SHLIB_SUFFIX) \
 	lib/libtestutil-dupgetgroups$(SHLIB_SUFFIX) \
-	lib/libtestutil-getgrgid$(SHLIB_SUFFIX) \
 	lib/libtestutil-time$(SHLIB_SUFFIX) \
-	lib/libtestutil-mktime$(SHLIB_SUFFIX)
+	lib/libtestutil-mktime$(SHLIB_SUFFIX) \
+	lib/libtestutil-tcl_loadfile$(SHLIB_SUFFIX)
 endif
 endif
 
@@ -140,7 +147,7 @@ else
 ifeq ($(wildcard .git) $(wildcard version.inc.in),.git version.inc.in)
 GIT_CURRENT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
 GIT_CURRENT_DESC := $(shell git describe --tags 2>/dev/null)
-GIT_CURRENT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+GIT_CURRENT_BRANCH := $(notdir $(shell git rev-parse --abbrev-ref HEAD))
 
 MODULES_RELEASE := $(subst v,,$(GIT_CURRENT_TAG))
 ifeq ($(MODULES_RELEASE),)
@@ -230,6 +237,20 @@ ifeq ($(appendbinpath),y)
 else
   setappendbinpath := prepend
 endif
+ifeq ($(setpythonpath),y)
+  setsetpythonpath :=
+else
+  setsetpythonpath := \#
+endif
+ifeq ($(appendpythonpath),y)
+  setappendpythonpath := append
+else
+  setappendpythonpath := prepend
+endif
+# env_modules python module is installed in initdir if no specific location
+ifeq ($(pythondir),)
+  pythondir := $(initdir)
+endif
 ifeq ($(setmanpath),y)
   setsetmanpath :=
 else
@@ -296,6 +317,12 @@ ifneq ($(loggeropts),)
   loggercmd := $(logger) $(loggeropts)
 else
   loggercmd := $(logger)
+endif
+
+ifneq ($(domainnameopts),)
+  domainnamecmd := $(domainname) $(domainnameopts)
+else
+  domainnamecmd := $(domainname)
 endif
 
 ifeq ($(color),y)
@@ -394,6 +421,18 @@ else
   setwa277 := 0
 endif
 
+ifeq ($(paginate),y)
+  setpaginate := 1
+else
+  setpaginate := 0
+endif
+
+ifeq ($(pathentryreorder),y)
+  setpathentryreorder := 1
+else
+  setpathentryreorder := 0
+endif
+
 ifneq ($(tcllinteropts),)
   tcllintercmd := $(tcllinter) $(tcllinteropts)
 else
@@ -428,6 +467,8 @@ sed -e 's|@prefix@|$(prefix)|g' \
 	-e 's|@loggedevents@|$(loggedevents)|g' \
 	-e 's|@loggercmd@|$(loggercmd)|g' \
 	-e 's|@pagercmd@|$(pagercmd)|g' \
+	-e 's|@domainnamecmd@|$(domainnamecmd)|g' \
+	-e 's|@paginate@|$(setpaginate)|g' \
 	-e 's|@verbosity@|$(verbosity)|g' \
 	-e 's|@color@|$(setcolor)|g' \
 	-e 's|@darkbgcolors@|$(darkbgcolors)|g' \
@@ -442,6 +483,8 @@ sed -e 's|@prefix@|$(prefix)|g' \
 	-e 's|@sourcecache@|$(setsourcecache)|g' \
 	-e 's|@searchmatch@|$(searchmatch)|g' \
 	-e 's|@wa277@|$(setwa277)|g' \
+	-e 's|@pathentryreorder@|$(setpathentryreorder)|g' \
+	-e 's|@initenvvars@|$(initenvvars)|g' \
 	-e 's|@icase@|$(icase)|g' \
 	-e 's|@nearlyforbiddendays@|$(nearlyforbiddendays)|g' \
 	-e 's|@tagabbrev@|$(tagabbrev)|g' \
@@ -478,6 +521,9 @@ sed -e 's|@prefix@|$(prefix)|g' \
 	-e 's|@setmanpath@|$(setsetmanpath)|g' \
 	-e 's|@appendmanpath@|$(setappendmanpath)|g' \
 	-e 's|@usemanpath@|$(setusemanpath)|g' \
+	-e 's|@setpythonpath@|$(setsetpythonpath)|g' \
+	-e 's|@appendpythonpath@|$(setappendpythonpath)|g' \
+	-e 's|@pythondir@|$(pythondir)|g' \
 	-e 's|@notusemanpath@|$(setnotusemanpath)|g' \
 	-e 's|@shellcompsource@|$(shellcompsource)|g' \
 	-e 's|@tcllintercmd@|$(tcllintercmd)|g' \
@@ -493,6 +539,15 @@ DIST_WIN_PREFIX := $(DIST_PREFIX)-win
 
 # avoid shared definitions to be rebuilt by make
 Makefile.inc: ;
+
+# refresh files embedding shared definitions when ./configure updates them
+# (tcl scripts and their assemblies follow through their version.inc
+# prerequisite)
+version.inc share/rpm/environment-modules.spec script/add.modules \
+	script/gitlog2changelog.py script/modulecmd \
+	testsuite/example/.modulespath testsuite/example/modulespath-wild \
+	testsuite/example/modulerc testsuite/example/initrc-1 \
+	testsuite/example/initrc: Makefile.inc
 
 version.inc: version.inc.in $(GIT_REFRESH_PREREQ)
 	$(translate-in-script)
@@ -573,20 +628,30 @@ modulecmd.tcl: tcl/cache.tcl tcl/coll.tcl tcl/envmngt.tcl tcl/init.tcl \
 
 # generate an empty changelog file if not working from git repository
 ifeq ($(wildcard .git),.git)
-ChangeLog.gz: script/gitlog2changelog.py
+ChangeLog: script/gitlog2changelog.py
 	$(ECHO_GEN)
 	script/gitlog2changelog.py
-	gzip -f -9 ChangeLog
 else
-ChangeLog.gz:
+ChangeLog:
 	$(ECHO_GEN)
-	echo "Please refer to the NEWS document to learn about main changes" >ChangeLog
-	gzip -f -9 ChangeLog
+	echo "Please refer to the NEWS document to learn about main changes" >$@
 endif
+
+ChangeLog.gz: ChangeLog
+	$(ECHO_GEN)
+	gzip --keep --force -9 $<
 
 README:
 	$(ECHO_GEN)
 	sed -e '181,187d' -e '1,10d' -e 's|\[\(.*\?\)\]\[[0-9]\]|\1|' $@.md > $@
+
+# AGENTS.md (https://agents.md) is the single source of instructions for AI
+# coding assistants working in this repository. Codex, Claude Code and
+# Mistral Vibe read it directly, but Gemini CLI only looks for its own
+# GEMINI.md filename, so generate a stub that just imports AGENTS.md
+GEMINI.md: AGENTS.md
+	$(ECHO_GEN)
+	echo '@AGENTS.md' > $@
 
 script/add.modules: script/add.modules.in
 	$(translate-in-script)
@@ -619,13 +684,13 @@ lib/libtestutil-0getgroups$(SHLIB_SUFFIX):
 lib/libtestutil-dupgetgroups$(SHLIB_SUFFIX):
 	$(MAKE) --no-print-directory -C lib $(@F)
 
-lib/libtestutil-getgrgid$(SHLIB_SUFFIX):
-	$(MAKE) --no-print-directory -C lib $(@F)
-
 lib/libtestutil-time$(SHLIB_SUFFIX):
 	$(MAKE) --no-print-directory -C lib $(@F)
 
 lib/libtestutil-mktime$(SHLIB_SUFFIX):
+	$(MAKE) --no-print-directory -C lib $(@F)
+
+lib/libtestutil-tcl_loadfile$(SHLIB_SUFFIX):
 	$(MAKE) --no-print-directory -C lib $(@F)
 
 # example configs for test rules
@@ -718,8 +783,8 @@ ifneq ($(wildcard $(subst $(space),\$(space),$(DESTDIR)$(etcdir)/siteconfig.tcl)
 endif
 ifeq ($(docinstall),y)
 	$(INSTALL_DIR) '$(DESTDIR)$(docdir)'
-	$(INSTALL_DATA) COPYING.GPLv2 '$(DESTDIR)$(docdir)/'
-	$(INSTALL_DATA) ChangeLog.gz '$(DESTDIR)$(docdir)/'
+	$(INSTALL_DATA) COPYING '$(DESTDIR)$(docdir)/'
+	$(INSTALL_DATA) $(CHANGELOG) '$(DESTDIR)$(docdir)/'
 	$(INSTALL_DATA) README '$(DESTDIR)$(docdir)/'
 endif
 ifeq ($(vimaddons),y)
@@ -796,7 +861,7 @@ ifeq ($(nagelfaraddons),y)
 	-rmdir -p '$(DESTDIR)$(nagelfardatadir)'
 endif
 ifeq ($(docinstall),y)
-	rm -f $(foreach docfile,ChangeLog.gz README COPYING.GPLv2,'$(DESTDIR)$(docdir)/$(docfile)')
+	rm -f $(foreach docfile,$(CHANGELOG) README COPYING,'$(DESTDIR)$(docdir)/$(docfile)')
 ifeq ($(builddoc),n)
 	rmdir '$(DESTDIR)$(docdir)'
 endif
@@ -823,16 +888,17 @@ endif
 
 # include pre-generated documents not to require documentation build
 # tools when installing from dist tarball
-dist-tar: ChangeLog.gz share/rpm/environment-modules.spec pkgdoc
+dist-tar: $(CHANGELOG) share/rpm/environment-modules.spec pkgdoc
 	$(ECHO_GEN2) $(DIST_PREFIX).tar
 	git archive --prefix=$(DIST_PREFIX)/ --worktree-attributes \
 		-o $(DIST_PREFIX).tar HEAD
 	tar -rf $(DIST_PREFIX).tar --transform 's,^,$(DIST_PREFIX)/,' \
-		lib/configure lib/config.h.in $(DIST_AUTORECONF_EXTRA) ChangeLog.gz \
+		lib/configure lib/config.h.in $(DIST_AUTORECONF_EXTRA) $(CHANGELOG) \
 		doc/build/MIGRATING.txt doc/build/changes.txt doc/build/INSTALL.txt \
 		doc/build/INSTALL-win.txt doc/build/NEWS.txt doc/build/CONTRIBUTING.txt \
 		doc/build/module.1.in doc/build/ml.1 doc/build/envml.1 \
-		doc/build/modulefile.5 share/rpm/environment-modules.spec
+		doc/build/modulecmd.1 doc/build/modulefile.5 \
+		share/rpm/environment-modules.spec
 
 dist-gzip: dist-tar
 	$(ECHO_GEN2) $(DIST_PREFIX).tar.gz
@@ -845,7 +911,7 @@ dist-bzip2: dist-tar
 dist: dist-gzip
 
 # dist zip ball for Windows platform with all pre-generated relevant files
-dist-win: modulecmd.tcl ChangeLog.gz README pkgdoc
+dist-win: modulecmd.tcl $(CHANGELOG) README pkgdoc
 	$(ECHO_GEN2) $(DIST_WIN_PREFIX).zip
 	$(INSTALL_DIR) $(DIST_WIN_PREFIX)
 	$(INSTALL_DIR) $(DIST_WIN_PREFIX)/libexec
@@ -855,8 +921,8 @@ dist-win: modulecmd.tcl ChangeLog.gz README pkgdoc
 	$(INSTALL_PROGRAM) script/ml.cmd $(DIST_WIN_PREFIX)/bin/
 	$(INSTALL_PROGRAM) script/envml.cmd $(DIST_WIN_PREFIX)/bin/
 	$(INSTALL_DIR) $(DIST_WIN_PREFIX)/doc
-	$(INSTALL_DATA) COPYING.GPLv2 $(DIST_WIN_PREFIX)/doc/
-	$(INSTALL_DATA) ChangeLog.gz $(DIST_WIN_PREFIX)/doc/
+	$(INSTALL_DATA) COPYING $(DIST_WIN_PREFIX)/doc/
+	$(INSTALL_DATA) $(CHANGELOG) $(DIST_WIN_PREFIX)/doc/
 	$(INSTALL_DATA) README $(DIST_WIN_PREFIX)/doc/
 	$(INSTALL_DATA) doc/build/MIGRATING.txt $(DIST_WIN_PREFIX)/doc/
 	$(INSTALL_DATA) doc/build/INSTALL-win.txt $(DIST_WIN_PREFIX)/doc/
@@ -887,9 +953,10 @@ clean:
 	rm -rf coverage
 # do not clean generated docs if not in git repository
 ifeq ($(wildcard .git),.git)
-	rm -f ChangeLog.gz
+	rm -f ChangeLog*
 endif
 	rm -f README
+	rm -f GEMINI.md
 	rm -f modulecmd.tcl
 	rm -f $(MODULECMDTEST) $(MODULECMDTEST)_i
 	rm -f tcl/cache.tcl
@@ -1014,17 +1081,31 @@ testlint: initdir modulecmd.tcl $(NAGELFAR) script/add.modules script/modulecmd
 	TESTSUITEDIR=`cd testsuite;pwd -P`; export TESTSUITEDIR; \
 	runtest --srcdir $$TESTSUITEDIR --objdir $$OBJDIR $(RUNTESTFLAGS) --tool lint $(RUNTESTFILES)
 
+testcompletion: initdir $(MODULECMD)
+	TCLSH=$(TCLSH); export TCLSH; \
+	MODULECMD=$(MODULECMD); export MODULECMD; \
+	OBJDIR=`pwd -P`; export OBJDIR; \
+	TESTSUITEDIR=`cd testsuite;pwd -P`; export TESTSUITEDIR; \
+	runtest --srcdir $$TESTSUITEDIR --objdir $$OBJDIR $(RUNTESTFLAGS) --tool completion $(RUNTESTFILES)
+
+testcookbook: $(MODULECMD)
+	TCLSH=$(TCLSH); export TCLSH; \
+	MODULECMD=$(MODULECMD); export MODULECMD; \
+	OBJDIR=`pwd -P`; export OBJDIR; \
+	TESTSUITEDIR=`cd testsuite;pwd -P`; export TESTSUITEDIR; \
+	runtest --srcdir $$TESTSUITEDIR --objdir $$OBJDIR $(RUNTESTFLAGS) --tool cookbook $(RUNTESTFILES)
+
 
 # install enhanced diff tool (to review test results)
 icdiff:
-	$(WGET) $(ICDIFF_DLSRC)$@ || true
+	$(CURL) $(ICDIFF_DLSRC)$@
 	echo "$(ICDIFF_CHECKSUM)  $@" | md5sum --status -c - || \
 		md5 -c $(ICDIFF_CHECKSUM) $@
 	chmod +x $@
 
 # install old Tcl interpreter (for code coverage purpose)
 tclsh83:
-	$(WGET) $(TCL_DLSRC)$(TCL_DIST83) || true
+	$(CURL) $(TCL_DLSRC)$(TCL_DIST83)
 	echo "$(TCL_DISTSUM83)  $(TCL_DIST83)" | md5sum --status -c - || \
 		md5 -c $(TCL_DISTSUM83) $@ || (rm -f $(TCL_DIST83) && false)
 	tar xzf $(TCL_DIST83)
@@ -1041,7 +1122,7 @@ spack:
 
 # install Conda (for source-sh test purpose)
 miniconda3:
-	$(WGET) $(MINICONDA_DLSRC)$(MINICONDA_DIST) || true
+	$(CURL) $(MINICONDA_DLSRC)$(MINICONDA_DIST)
 	echo "$(MINICONDA_DISTSUM)  $(MINICONDA_DIST)" | md5sum --status -c - || \
 		md5 -c $(MINICONDA_DISTSUM) $@ || (rm -f $(MINICONDA_DIST) && false)
 	bash $(MINICONDA_DIST) -b -s -p ./miniconda3
@@ -1054,7 +1135,7 @@ OpenFOAM-dev:
 # install code coverage tool
 # download from alt. source if correct tarball not retrieved from primary location
 $(NAGELFAR):
-	$(WGET) $(NAGELFAR_DLSRC1)$(NAGELFAR_DIST) || true
+	$(CURL) $(NAGELFAR_DLSRC1)$(NAGELFAR_DIST)
 	echo "$(NAGELFAR_DISTSUM)  $(NAGELFAR_DIST)" | md5sum --status -c - || \
 		(rm -f $(NAGELFAR_DIST) && false)
 	tar xzf $(NAGELFAR_DIST)
@@ -1101,7 +1182,7 @@ tcl/syntaxdb.tcl: modulecmd.tcl $(NAGELFAR)
 		proc exit {args} {};\
 		source modulecmd.tcl;\
 		defineModStartNbProc 1;\
-		defineGetEqArrayKeyProc 1 1 1;\
+		defineGetEqArrayKeyProc 1;\
 		defineDoesModMatchAtDepthProc 1 1 equal;\
 		defineModVersCmpProc 1 1;\
 		defineModEqStaticProc 1 1 mod;\
@@ -1109,7 +1190,8 @@ tcl/syntaxdb.tcl: modulecmd.tcl $(NAGELFAR)
 		defineParseModuleSpecificationProc 1;\
 		set tcl_interactive 1;\
 		source $(NAGELFAR_RELEASE)/syntaxbuild.tcl;\
-		set ::syntax(appendNoDupToList) {n x*};\
+		set ::syntax(lappendNoDup) {n x*};\
+		set ::syntax(lrem) {n x};\
 		set ::syntax(lprepend) {n x*};\
 		set ::syntax(execute-modulefile) {x x n x x x? x? x?};\
 		set ::syntax(scanExtraMatchSearch) {x x n};\
@@ -1132,13 +1214,13 @@ $(V).SILENT: initdir pkgdoc doc version.inc share/rpm/environment-modules.spec \
 	tcl/cache.tcl_i tcl/coll.tcl_i tcl/envmngt.tcl_i tcl/init.tcl_i tcl/interp.tcl_i \
 	tcl/main.tcl_i tcl/mfcmd.tcl_i tcl/modfind.tcl_i tcl/modeval.tcl_i \
 	tcl/modscan.tcl_i tcl/modspec.tcl_i tcl/report.tcl_i tcl/subcmd.tcl_i \
-	tcl/util.tcl_i ChangeLog.gz README script/add.modules \
-	script/gitlog2changelog.py script/modulecmd \
+	tcl/util.tcl_i ChangeLog ChangeLog.gz README GEMINI.md \
+	script/add.modules script/gitlog2changelog.py script/modulecmd \
 	lib/libtclenvmodules$(SHLIB_SUFFIX) lib/libtestutil-closedir$(SHLIB_SUFFIX) \
 	lib/libtestutil-getpwuid$(SHLIB_SUFFIX) lib/libtestutil-getgroups$(SHLIB_SUFFIX) \
-	lib/libtestutil-0getgroups$(SHLIB_SUFFIX) \
-	lib/libtestutil-dupgetgroups$(SHLIB_SUFFIX) lib/libtestutil-getgrgid$(SHLIB_SUFFIX) \
-	lib/libtestutil-time$(SHLIB_SUFFIX) lib/libtestutil-mktime$(SHLIB_SUFFIX) \
+	lib/libtestutil-0getgroups$(SHLIB_SUFFIX) lib/libtestutil-mktime$(SHLIB_SUFFIX) \
+	lib/libtestutil-dupgetgroups$(SHLIB_SUFFIX) lib/libtestutil-time$(SHLIB_SUFFIX) \
+	lib/libtestutil-tcl_loadfile$(SHLIB_SUFFIX) \
 	testsuite/example/.modulespath testsuite/example/modulespath-wild \
 	testsuite/example/modulerc testsuite/example/initrc-1 testsuite/example/initrc \
 	dist-tar dist-gzip dist-bzip2 dist-win $(MODULECMDTEST) $(MODULECMDTEST)_i

@@ -70,10 +70,10 @@ program and has the shell evaluate the command's output. The first argument to
 The initialization scripts are kept in |file initdir_shell| where
 *<shell>* is the name of the sourcing shell. For example, a C Shell user
 sources the |file initdir_csh| script. The sh, csh, tcsh, bash, ksh,
-zsh, fish and cmd shells are supported by :file:`modulecmd.tcl`. In addition,
-python, perl, ruby, tcl, cmake, r and lisp "shells" are supported which
-writes the environment changes to stdout as python, perl, ruby, tcl, lisp,
-r or cmake code.
+zsh, fish, cmd and pwsh shells are supported by :file:`modulecmd.tcl`. In
+addition, python, perl, ruby, tcl, cmake, r and lisp "shells" are supported
+which writes the environment changes to stdout as python, perl, ruby, tcl,
+lisp, r or cmake code.
 
 Initialization may also be performed by directly calling the
 :subcmd:`autoinit` sub-command of the :file:`modulecmd.tcl` program.
@@ -89,11 +89,19 @@ time if :command:`mogui-cmd` command is found in :envvar:`PATH`.
 changes performed in the GUI is applied onto the shell session that executed
 :command:`mogui`.
 
-.. only:: html
+The installation location of the ``env_modules`` Python module (which is
+defined with the :instopt:`--with-pythondir` installation option) may also
+be added to the :envvar:`PYTHONPATH` environment variable during
+initialization, unless the :instopt:`--enable-set-pythonpath` installation
+option has been disabled.
+
+.. only:: html or latex
 
    .. versionchanged:: 5.5
       Definition of :command:`mogui` alias or function added
 
+   .. versionchanged:: 5.7
+      Update of :envvar:`PYTHONPATH` environment variable added
 
 Examples of initialization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -130,8 +138,17 @@ Python:
 
 .. parsed-literal::
 
-     import os
-     exec(open("\ |initdir|\ /python.py").read(), globals())
+     from env_modules import module
+     module("load", "modulefile", "modulefile", "...")
+
+Alternative initialization for Python if ``env_modules`` script is not part of
+an enabled Python module directory:
+
+.. parsed-literal::
+
+     import sys
+     sys.path.insert(1, "\ |initdir|\ ")
+     from env_modules import module
      module("load", "modulefile", "modulefile", "...")
 
 Ruby:
@@ -191,6 +208,8 @@ set is not checked.
 .. note:: Run-command files are intended to set parameters for modulefiles,
    not to configure the :command:`module` command itself.
 
+.. _Command line switches:
+
 Command line switches
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -209,7 +228,7 @@ switches are accepted:
  :subcmd:`search`, :subcmd:`spider` or :subcmd:`whatis` sub-commands.
  Hard-hidden modules are not affected by this option.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.6
 
@@ -227,7 +246,7 @@ switches are accepted:
  Enable automated module handling mode on sub-commands that load or unload
  modulefiles. See also :envvar:`MODULES_AUTO_HANDLING` section.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -236,7 +255,7 @@ switches are accepted:
  Colorize the output. *WHEN* defaults to ``always`` or can be ``never`` or
  ``auto``. See also :envvar:`MODULES_COLOR` section.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -246,7 +265,7 @@ switches are accepted:
  sub-commands, return modules or collections whose fully qualified name
  contains search query string.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -265,7 +284,7 @@ switches are accepted:
  progress. Multiple :option:`-D` options increase the debug verbosity. The
  maximum is 2.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -281,7 +300,7 @@ switches are accepted:
  Modulefiles` section in the :ref:`modulefile(5)` man page for further details
  on implicit default version).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -294,7 +313,7 @@ switches are accepted:
  command. This option returns ``Modules`` for this implementation. The command
  then terminates without further processing.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -322,9 +341,10 @@ switches are accepted:
  On :subcmd:`clear` sub-command, skip the confirmation dialog and proceed.
 
  On :subcmd:`purge` sub-command also unload `sticky modules`_ and modulefiles
- that are depended by non-unloadable modules.
+ that are depended by non-unloadable modules, except requirements of retained
+ super-sticky modules.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
        :option:`--force`/:option:`-f` support was dropped on version `4.0`
@@ -359,7 +379,7 @@ switches are accepted:
 
  Match module specification arguments in a case insensitive manner.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
        :option:`--icase`/:option:`-i` support was dropped on version `4.0`
@@ -371,7 +391,7 @@ switches are accepted:
 
  Ignore module cache.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
 
@@ -379,7 +399,7 @@ switches are accepted:
 
  Skip evaluation of user-specific module rc file (:file:`$HOME/.modulerc`).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
 
@@ -389,7 +409,7 @@ switches are accepted:
  results the matching modulefiles and directories and recursively the
  modulefiles and directories contained in these matching directories.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -402,7 +422,7 @@ switches are accepted:
  :subcmd:`search`, :subcmd:`spider`, :subcmd:`stashlist` and :subcmd:`whatis`
  output in JSON format.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.5
 
@@ -419,7 +439,7 @@ switches are accepted:
  highest numerically sorted version of each module name (see :ref:`Locating
  Modulefiles` section in the :ref:`modulefile(5)` man page).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -431,7 +451,7 @@ switches are accepted:
  Display :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist`, :subcmd:`spider`
  and :subcmd:`stashlist` output in long format.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.0
        Support for :subcmd:`savelist` sub-command added
@@ -447,7 +467,7 @@ switches are accepted:
  Disable automated module handling mode on sub-commands that load or unload
  modulefiles. See also :envvar:`MODULES_AUTO_HANDLING` section.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -458,26 +478,44 @@ switches are accepted:
  by the search query. Thus modulefiles contained in directories part of the
  result are excluded.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
     .. versionchanged:: 5.6
        Support for :subcmd:`spider` sub-command added
 
-.. option:: --no-pager
+.. option:: --no-modulepath-ignore
 
- Do not pipe message output into a pager.
+ Do not apply :mfcmd:`modulepath-ignore` pattern definitions for current
+ command execution: every element of the modulepath directories is walked
+ through and checked as if no pattern were defined.
 
- .. only:: html
+ Note that a modulepath cache file built with patterns applied does not
+ contain the ignored elements: combine with :option:`--ignore-cache` option
+ to also search elements excluded from cache file.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. option:: --no-pager, -P
+
+ Do not pipe message output into a pager. See also :envvar:`MODULES_PAGINATE`
+ section.
+
+ .. only:: html or latex
 
     .. versionadded:: 4.1
+
+    .. versionchanged:: 5.7
+       Short form option :option:`-P` added
 
 .. option:: --no-redirect
 
  Do not send message output to stdout. Keep it on stderr.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -508,7 +546,7 @@ switches are accepted:
  See also :envvar:`MODULES_AVAIL_OUTPUT`, :envvar:`MODULES_LIST_OUTPUT` and
  :envvar:`MODULES_SPIDER_OUTPUT`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -539,22 +577,25 @@ switches are accepted:
        Elements *provided-alias* and *via* added for :subcmd:`avail` and
        :subcmd:`spider` sub-commands
 
-.. option:: --paginate
+.. option:: --paginate, -p
 
  Pipe all message output into :command:`less` (or if set, to the command
  referred in :envvar:`MODULES_PAGER` variable) if error output stream is a
- terminal. See also :envvar:`MODULES_PAGER` section.
+ terminal. See also :envvar:`MODULES_PAGINATE` section.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
+
+    .. versionchanged:: 5.7
+       Short form option :option:`-p` added
 
 .. option:: --redirect
 
  Send message output to stdout instead of stderr. Only supported on sh, bash,
  ksh, zsh and fish shells.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -563,7 +604,7 @@ switches are accepted:
  Turn off error, warning and informational messages. :command:`module` command
  output result is not affected by silent mode.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
        :option:`--silent`/:option:`-s` support was dropped on version `4.0`
@@ -575,7 +616,7 @@ switches are accepted:
  sub-commands, return modules or collections whose name starts with search
  query string.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -598,7 +639,7 @@ switches are accepted:
  module is already loaded, tags from *LIST* are added to the list of tags
  already applied to this module.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -607,7 +648,7 @@ switches are accepted:
  Display :subcmd:`avail`, :subcmd:`list`, :subcmd:`savelist`, :subcmd:`spider`
  and :subcmd:`stashlist` output in short format.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.0
        Support for :subcmd:`savelist` sub-command added
@@ -625,7 +666,7 @@ switches are accepted:
  :option:`--debug` options, replaces regular debug messages by reports of the
  execution time of every internal procedure calls.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -634,7 +675,7 @@ switches are accepted:
  Trace mode. Report details on module searches, resolutions, selections and
  evaluations in addition to printing verbose messages.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.6
 
@@ -643,7 +684,7 @@ switches are accepted:
  Enable verbose messages during :command:`module` command execution. Multiple
  :option:`-v` options increase the verbosity level. The maximum is 2.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
        :option:`--verbose`/:option:`-v` support was dropped on version `4.0`
@@ -662,7 +703,7 @@ switches are accepted:
  Set the width of the output to *COLS* columns. See also
  :envvar:`MODULES_TERM_WIDTH` section.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -680,7 +721,7 @@ Module Sub-Commands
 
  See :subcmd:`load-any`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -692,7 +733,7 @@ Module Sub-Commands
  sub-command. Only the symbolic version-names and aliases found in the search
  are displayed.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -711,7 +752,7 @@ Module Sub-Commands
  environment *variable*, is not updated unless if the ``--duplicates`` option
  is set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -779,7 +820,7 @@ Module Sub-Commands
  When several *patterns* are provided all modulefiles matching at least one of
  these *patterns* are listed.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.0
        Options :option:`--default`/:option:`-d`,
@@ -828,7 +869,7 @@ Module Sub-Commands
 
  See :ref:`Module cache` section for more details on module cache mechanism.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
 
@@ -840,7 +881,7 @@ Module Sub-Commands
 
  See :ref:`Module cache` section for more details on module cache mechanism.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
 
@@ -851,7 +892,7 @@ Module Sub-Commands
  :option:`--force`) is not passed. Typed confirmation should equal to ``yes``
  or ``y`` in order to proceed.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
        :subcmd:`clear` support was dropped on version `4.0` but reintroduced
@@ -896,7 +937,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_ABORT_ON_ERROR` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.4
 
@@ -911,7 +952,7 @@ Module Sub-Commands
   option from its default value. See :envvar:`MODULES_ADVANCED_VERSION_SPEC`
   description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.4
 
@@ -952,7 +993,7 @@ Module Sub-Commands
   change the value of this configuration option. See
   :envvar:`MODULES_AVAIL_OUTPUT` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -969,7 +1010,7 @@ Module Sub-Commands
   line switches change the value of this configuration option. See
   :envvar:`MODULES_AVAIL_TERSE_OUTPUT` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -982,7 +1023,7 @@ Module Sub-Commands
   :subcmd:`config` sub-command when changing this configuration option from
   its default value.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.3
 
@@ -995,7 +1036,7 @@ Module Sub-Commands
   :subcmd:`config` sub-command when changing this configuration option from
   its default value.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.3
 
@@ -1017,7 +1058,7 @@ Module Sub-Commands
   changing this configuration option from its default value. See
   :envvar:`MODULES_COLLECTION_PIN_TAG` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.1
 
@@ -1070,7 +1111,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_CONFLICT_UNLOAD` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.5
 
@@ -1083,20 +1124,19 @@ Module Sub-Commands
   configuration option from its default value. See :envvar:`MODULECONTACT`
   description for details.
 
- .. mconfig:: extended_default
+ .. mconfig:: domainname
 
-  Allow partial module version specification.
+  Command to fetch domain name.
 
-  Default value is ``1``. It can be changed at installation time with
-  :instopt:`--disable-extended-default<--enable-extended-default>` option. The
-  :envvar:`MODULES_EXTENDED_DEFAULT` environment variable is defined by
+  Default value is ``domainname``. It can be changed at installation time with
+  :instopt:`--with-domainname` and :instopt:`--with-domainname-opts` options.
+  The :envvar:`MODULES_DOMAINNAME` environment variable is defined by
   :subcmd:`config` sub-command when changing this configuration option from
-  its default value. See :envvar:`MODULES_EXTENDED_DEFAULT` description for
-  details.
+  its default value. See :envvar:`MODULES_DOMAINNAME` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
-     .. versionadded:: 4.4
+     .. versionadded:: 5.7
 
  .. mconfig:: editor
 
@@ -1109,9 +1149,24 @@ Module Sub-Commands
   configuration option from its default value. See :envvar:`MODULES_EDITOR`
   description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.8
+
+ .. mconfig:: extended_default
+
+  Allow partial module version specification.
+
+  Default value is ``1``. It can be changed at installation time with
+  :instopt:`--disable-extended-default<--enable-extended-default>` option. The
+  :envvar:`MODULES_EXTENDED_DEFAULT` environment variable is defined by
+  :subcmd:`config` sub-command when changing this configuration option from
+  its default value. See :envvar:`MODULES_EXTENDED_DEFAULT` description for
+  details.
+
+  .. only:: html or latex
+
+     .. versionadded:: 4.4
 
  .. mconfig:: extra_siteconfig
 
@@ -1132,7 +1187,7 @@ Module Sub-Commands
   variable is defined by :subcmd:`config` sub-command when changing this
   configuration option from its default value.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.5
 
@@ -1146,7 +1201,7 @@ Module Sub-Commands
   sub-command when changing this configuration option from its default value.
   See :envvar:`MODULESHOME` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.4
 
@@ -1162,7 +1217,7 @@ Module Sub-Commands
   this configuration option. See :envvar:`MODULES_ICASE` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.4
 
@@ -1175,9 +1230,22 @@ Module Sub-Commands
   option from its default value. The :option:`--ignore-cache` command line
   switch changes the value of this configuration option.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.3
+
+ .. mconfig:: ignore_cache_subcmds
+
+  List of module sub-commands that ignore module cache.
+
+  Default is an empty list. The :envvar:`MODULES_IGNORE_CACHE_SUBCMDS`
+  environment variable is defined by :subcmd:`config` sub-command when
+  changing this configuration option from its default value. See
+  :envvar:`MODULES_IGNORE_CACHE_SUBCMDS` description for details.
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
 
  .. mconfig:: ignore_user_rc
 
@@ -1188,7 +1256,7 @@ Module Sub-Commands
   option from its default value. The :option:`--ignore-user-rc` command line
   switch changes the value of this configuration option.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.3
 
@@ -1222,9 +1290,53 @@ Module Sub-Commands
   option from its default value. See :envvar:`MODULES_IMPLICIT_REQUIREMENT`
   description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
+
+ .. mconfig:: info_extension
+
+  Consider module :mfcmd:`extensions` having a pure informational purpose: no
+  module alias is associated to them.
+
+  Default is ``0``. The :envvar:`MODULES_INFO_EXTENSION` environment variable
+  is defined by :subcmd:`config` sub-command when changing this configuration
+  option from its default value.
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
+
+ .. mconfig:: init_envvars
+
+  Initial values to assign to environment variables right before they are
+  modified for the first time.
+
+  This configuration option is set to an empty value by default. It can be
+  changed at installation time with :instopt:`--with-init-envvars` option. The
+  :envvar:`MODULES_INIT_ENVVARS` environment variable is defined by
+  :subcmd:`config` sub-command when changing this configuration option from
+  its default value. See :envvar:`MODULES_INIT_ENVVARS` description for
+  details
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
+
+ .. mconfig:: linked_envvars
+
+  Define links between environment variables to apply same value modification
+  to each linked variables.
+
+  This configuration option is set to an empty value by default. The
+  :envvar:`MODULES_LINKED_ENVVARS` environment variable is defined by
+  :subcmd:`config` sub-command when changing this configuration option from
+  its default value. See :envvar:`MODULES_LINKED_ENVVARS` description for
+  details
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
 
  .. mconfig:: list_output
 
@@ -1239,7 +1351,7 @@ Module Sub-Commands
   change the value of this configuration option. See
   :envvar:`MODULES_LIST_OUTPUT` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -1256,7 +1368,7 @@ Module Sub-Commands
   change the value of this configuration option. See
   :envvar:`MODULES_LIST_TERSE_OUTPUT` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -1281,7 +1393,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_LOGGED_EVENTS` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.5
 
@@ -1295,7 +1407,7 @@ Module Sub-Commands
   :subcmd:`config` sub-command when changing this configuration option from
   its default value. See :envvar:`MODULES_LOGGER` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.5
 
@@ -1309,7 +1421,7 @@ Module Sub-Commands
   configuration option from its default value. See
   :envvar:`MODULES_MCOOKIE_CHECK` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.1
 
@@ -1326,7 +1438,7 @@ Module Sub-Commands
   option from its default value. See :envvar:`MODULES_MCOOKIE_VERSION_CHECK`
   description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -1340,9 +1452,23 @@ Module Sub-Commands
   changing this configuration option from its default value. See
   :envvar:`MODULES_ML` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.5
+
+ .. mconfig:: modulepath_ignore
+
+  Apply :mfcmd:`modulepath-ignore` pattern definitions when searching for
+  modulefiles. When disabled, every element of the modulepath directories is
+  walked through and checked as if no pattern were defined.
+
+  Default value is ``1``. The :envvar:`MODULES_MODULEPATH_IGNORE` environment
+  variable or the :option:`--no-modulepath-ignore` command line switch
+  supersede this default value.
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
 
  .. mconfig:: nearly_forbidden_days
 
@@ -1356,9 +1482,24 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_NEARLY_FORBIDDEN_DAYS` description
   for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.6
+
+ .. mconfig:: non_exportable_tags
+
+  Prevent export of listed tags to modules once loaded. (colon ``:``
+  separator)
+
+  This configuration option is set to an empty value by default. The
+  :envvar:`MODULES_NON_EXPORTABLE_TAGS` environment variable is defined by
+  :subcmd:`config` sub-command when changing this configuration option from
+  its default value. See :envvar:`MODULES_NON_EXPORTABLE_TAGS` description for
+  details.
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
 
  .. mconfig:: pager
 
@@ -1370,9 +1511,43 @@ Module Sub-Commands
   sub-command when changing this configuration option from its default value.
   See :envvar:`MODULES_PAGER` description for details.
 
+ .. mconfig:: paginate
+
+  Control whether or not the output of module command should be piped into
+  :mconfig:`pager` command.
+
+  Default value is ``1``. It can be changed at installation time with
+  :instopt:`--enable-paginate` option. The :envvar:`MODULES_PAGINATE`
+  environment variable is defined by :subcmd:`config` sub-command when
+  changing this configuration option from its default value. The
+  :option:`--paginate`/:option:`-p` and :option:`--no-pager`/:option:`-P`
+  command line switches change the value of this configuration option. See
+  :envvar:`MODULES_PAGINATE` description for details.
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
+
+ .. mconfig:: path_entry_reorder
+
+  Change order of entry in a path-like environment variable, when 
+  :mfcmd:`prepend-path`, :mfcmd:`append-path` or :subcmd:`use` target a path
+  entry that is already defined in the environment variable.
+
+  Default value is ``0``. It can be changed at installation time with the
+  :instopt:`--enable-path-entry-reorder` option. The
+  :envvar:`MODULES_PATH_ENTRY_REORDER` environment variable is defined by
+  :subcmd:`config` sub-command when changing this configuration option from
+  its default value. See :envvar:`MODULES_PATH_ENTRY_REORDER` description
+  for details.
+
+  .. only:: html or latex
+
+     .. versionadded:: 5.7
+
  .. mconfig:: protected_envvars
 
-  Prevents any modification of listed environment variables (colon `:`
+  Prevents any modification of listed environment variables (colon ``:``
   separator).
 
   This configuration option is unset by default. The
@@ -1381,7 +1556,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_PROTECTED_ENVVARS` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.2
 
@@ -1397,7 +1572,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_QUARANTINE_SUPPORT` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.0
 
@@ -1422,7 +1597,7 @@ Module Sub-Commands
   configuration option. See :envvar:`MODULES_REDIRECT_OUTPUT` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.1
 
@@ -1437,7 +1612,7 @@ Module Sub-Commands
   changing this configuration option from its default value. See
   :envvar:`MODULES_REQUIRE_VIA` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.6
 
@@ -1452,7 +1627,7 @@ Module Sub-Commands
   changing this configuration option from its default value. See
   :envvar:`MODULES_RESET_TARGET_STATE` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.2
 
@@ -1501,7 +1676,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_SHELLS_WITH_KSH_FPATH` description
   for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -1539,7 +1714,7 @@ Module Sub-Commands
   changing this configuration option from its default value. See
   :envvar:`MODULES_SOURCE_CACHE` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.4
 
@@ -1555,7 +1730,7 @@ Module Sub-Commands
   command line switches change the value of this configuration option. See
   :envvar:`MODULES_SPIDER_INDEPTH` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.6
 
@@ -1572,7 +1747,7 @@ Module Sub-Commands
   change the value of this configuration option. See
   :envvar:`MODULES_SPIDER_OUTPUT` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.6
 
@@ -1589,7 +1764,7 @@ Module Sub-Commands
   line switches change the value of this configuration option. See
   :envvar:`MODULES_SPIDER_TERSE_OUTPUT` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.6
 
@@ -1598,6 +1773,9 @@ Module Sub-Commands
   Error behavior when unloading sticky or super-sticky module during a module
   :subcmd:`purge`.
 
+  Also applies to modules whose unload is skipped because they are required,
+  directly or indirectly, by a retained sticky or super-sticky module.
+
   Raise an ``error`` (default) or emit a ``warning`` or be ``silent``. It can
   be changed at installation time with :instopt:`--with-sticky-purge` option.
   The :envvar:`MODULES_STICKY_PURGE` environment variable is defined by
@@ -1605,7 +1783,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_STICKY_PURGE` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.4
 
@@ -1619,7 +1797,7 @@ Module Sub-Commands
   :subcmd:`config` sub-command when changing this configuration option from
   its default value. See :envvar:`MODULES_TAG_ABBREV` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -1634,7 +1812,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_TAG_COLOR_NAME` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -1657,7 +1835,7 @@ Module Sub-Commands
   :subcmd:`config` sub-command when changing this configuration option from
   its default value. See :envvar:`MODULES_TCL_LINTER` description for details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.2
 
@@ -1683,7 +1861,7 @@ Module Sub-Commands
   this configuration option. See :envvar:`MODULES_TERM_WIDTH` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.7
 
@@ -1698,7 +1876,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_UNIQUE_NAME_LOADED` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 5.4
 
@@ -1724,7 +1902,7 @@ Module Sub-Commands
   its default value. See :envvar:`MODULES_VARIANT_SHORTCUT` description for
   details.
 
-  .. only:: html
+  .. only:: html or latex
 
      .. versionadded:: 4.8
 
@@ -1751,7 +1929,7 @@ Module Sub-Commands
   configuration option from its default value. See :envvar:`MODULES_WA_277`
   description for details.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -1759,11 +1937,15 @@ Module Sub-Commands
        *Value* prefixes ``+`` and ``-`` added to append and subtract elements
        to list-value options
 
+.. subcmd:: delete [--auto|--no-auto] [-f] modulefile...
+
+ See :subcmd:`unload`.
+
 .. subcmd:: describe [collection]
 
  See :subcmd:`saveshow`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -1771,7 +1953,7 @@ Module Sub-Commands
 
  See :subcmd:`saverm`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -1799,7 +1981,7 @@ Module Sub-Commands
  modulefile alias. It may also leverage a specific syntax to finely select
  module version (see `Advanced module version specifiers`_ section below).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -1823,7 +2005,7 @@ Module Sub-Commands
  modules. See :mfcmd:`module-info loaded<module-info>` in the
  :ref:`modulefile(5)` man page for further explanation.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1896,7 +2078,7 @@ Module Sub-Commands
  modulefile alias. It may also leverage a specific syntax to finely select
  module version (see `Advanced module version specifiers`_ section below).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1911,7 +2093,7 @@ Module Sub-Commands
  modulefile alias. It may also leverage a specific syntax to finely select
  module version (see `Advanced module version specifiers`_ section below).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1922,7 +2104,7 @@ Module Sub-Commands
  otherwise. See :mfcmd:`is-saved` in the :ref:`modulefile(5)` man page for
  further explanation.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1933,7 +2115,7 @@ Module Sub-Commands
  provided. Returns a false value otherwise. See :mfcmd:`is-used` in the
  :ref:`modulefile(5)` man page for further explanation.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -1960,7 +2142,7 @@ Module Sub-Commands
  checked in these files based on their kind (global/user rc, modulerc,
  modulecache or modulefile).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -1994,7 +2176,7 @@ Module Sub-Commands
  results only if they match it. *pattern* may be a bare variant specification
  without mention of a module name.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.5
        Option :option:`--json`/:option:`-j` added
@@ -2053,7 +2235,7 @@ Module Sub-Commands
  *modulefile* once loaded. If module is already loaded, tags from *taglist*
  are added to the list of tags already applied to this module.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.2
        Options :option:`--auto`, :option:`--no-auto`,
@@ -2091,7 +2273,7 @@ Module Sub-Commands
  *modulefile* once loaded. If module is already loaded, tags from *taglist*
  are added to the list of tags already applied to this module.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -2136,7 +2318,7 @@ Module Sub-Commands
  sub-command is defined in :mconfig:`abort_on_error` configuration option and
  :option:`--force` option is not set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2151,7 +2333,7 @@ Module Sub-Commands
  modulefile alias. It may also leverage a specific syntax to finely select
  module version (see `Advanced module version specifiers`_ section below).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2169,7 +2351,7 @@ Module Sub-Commands
  *pattern* variant specification and extra specifier. *pattern* may be a bare
  variant specification or extra specifier without mention of a module name.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2189,7 +2371,7 @@ Module Sub-Commands
  environment *variable*, is not updated unless if the ``--duplicates`` option
  is set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -2201,9 +2383,15 @@ Module Sub-Commands
 
  Unload all loaded *modulefiles*.
 
+ Sticky and super-sticky modules are kept loaded, along with their required
+ modules, including indirect requirements. Unload attempts for these modules
+ are skipped according to the :mconfig:`sticky_purge` configuration: raise an
+ ``error`` (default), emit a ``warning`` or remain ``silent``.
+
  When the :option:`--force` option is set, also unload `sticky modules`_,
  modulefiles that are depended by non-unloadable modules and modulefiles
- raising an evaluation error.
+ raising an evaluation error. Super-sticky modules and their requirements
+ remain loaded even with :option:`--force`.
 
  If one modulefile unload evaluation raises an error, purge sequence
  continues: unloaded modules prior the evaluation error are kept unloaded and
@@ -2212,13 +2400,16 @@ Module Sub-Commands
  :subcmd:`purge` sub-command is defined in :mconfig:`abort_on_error`
  configuration option and :option:`--force` option is not set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.7
        Option :option:`--force`/:option:`-f` added
 
     .. versionchanged:: 5.4
        Support for :mconfig:`abort_on_error` configuration option added
+
+    .. versionchanged:: 5.7
+       Preserve requirements of retained sticky and super-sticky modules
 
 .. subcmd:: refresh
 
@@ -2242,7 +2433,7 @@ Module Sub-Commands
  environment changes from refreshed modules prior the evaluation error are
  preserved and sequence is resumed with the refresh of remaining modulefiles.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.0
        Sub-command made as an alias of :subcmd:`reload` sub-command
@@ -2272,7 +2463,7 @@ Module Sub-Commands
  already achieved module evaluations are kept and reload sequence is resumed
  with the remaining modulefiles.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2281,6 +2472,10 @@ Module Sub-Commands
 
     .. versionchanged:: 5.4
        Option :option:`--force`/:option:`-f` added
+
+.. subcmd:: remove [--auto|--no-auto] [-f] modulefile...
+
+ See :subcmd:`unload`.
 
 .. subcmd:: remove-path [options] variable value...
 
@@ -2293,7 +2488,7 @@ Module Sub-Commands
  environment *variable*, is ignored and *value* is removed whatever the
  reference counter value set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -2318,7 +2513,7 @@ Module Sub-Commands
  any other value, :subcmd:`reset` performs a :subcmd:`restore` of
  corresponding name collection.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2361,7 +2556,7 @@ Module Sub-Commands
  When the :option:`--force` option is set, unload modulefiles anyway even if
  an evaluation error occurs.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2405,7 +2600,7 @@ Module Sub-Commands
  *modulefiles* have unsatisfied constraint corresponding to the
  :mfcmd:`prereq` and :mfcmd:`conflict` they declare.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2426,7 +2621,7 @@ Module Sub-Commands
  option is set. Stash collections can be listed with :subcmd:`stashlist`
  sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2449,7 +2644,7 @@ Module Sub-Commands
  equivalent to the value of this variable will be appended to the *collection*
  file name.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2466,7 +2661,7 @@ Module Sub-Commands
  If *collection* name is ``__init__``, initial environment content defined in
  :envvar:`__MODULES_LMINIT` environment variable is displayed.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2482,7 +2677,7 @@ Module Sub-Commands
  *string* in a case insensitive manner will be displayed. *string* may contain
  wildcard characters.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
        Prior version `4.0` :mfcmd:`module-whatis` information search was
@@ -2516,7 +2711,12 @@ Module Sub-Commands
  is not sourced but the output resulting from its execution is evaluated to
  determine the environment changes it does.
 
- .. only:: html
+ .. note:: *shell* is run in non-interactive mode without loading any shell
+    configuration or profile. As a result, script does not have access to
+    transient definitions that are only available in interactive sessions or
+    profile files, such as shell aliases, functions, or completion settings.
+
+ .. only:: html or latex
 
     .. versionadded:: 4.6
 
@@ -2558,7 +2758,7 @@ Module Sub-Commands
  evaluation error are preserved and sequence is resumed with the source of
  remaining modulefile in list.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2633,7 +2833,7 @@ Module Sub-Commands
  When several *patterns* are provided all modulefiles matching at least one of
  these *patterns* are listed.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -2653,7 +2853,7 @@ Module Sub-Commands
  When the :option:`--force` option is set, unload modulefiles anyway even if
  an evaluation error occurs.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2666,7 +2866,7 @@ Module Sub-Commands
  no collection target is currently set, remove stash collection files without
  a target suffix.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2676,7 +2876,7 @@ Module Sub-Commands
  no collection target is currently set, list stash collection files without a
  target suffix.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2697,7 +2897,7 @@ Module Sub-Commands
  When the :option:`--force` option is set, unload modulefiles anyway even if
  an evaluation error occurs.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2717,7 +2917,7 @@ Module Sub-Commands
  value of this variable will be appended to the stash collection file name to
  delete.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2734,7 +2934,7 @@ Module Sub-Commands
  value of this variable will be appended to the stash collection file name to
  display.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -2743,7 +2943,7 @@ Module Sub-Commands
  Gets :file:`modulecmd.tcl` states. Reports the currently set value
  of passed state *name* or all existing states if no *name* passed.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -2754,8 +2954,9 @@ Module Sub-Commands
 .. subcmd:: switch [options] [modulefile1] modulefile2
 
  Switch loaded *modulefile1* with *modulefile2*. If *modulefile1* is not
- specified, then it is assumed to be the currently loaded module with the
- same root name as *modulefile2*.
+ specified, it is assumed to be the currently loaded module that shares the
+ same root name as *modulefile2*. The root name is defined as the initial part
+ of a module name, i.e., all characters preceding the first ``/``.
 
  :subcmd:`switch` command accepts the following options:
 
@@ -2789,7 +2990,7 @@ Module Sub-Commands
  sub-command is defined in :mconfig:`abort_on_error` configuration option and
  :option:`--force` option is not set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.2
        Options :option:`--auto`, :option:`--no-auto`,
@@ -2814,7 +3015,7 @@ Module Sub-Commands
  specified order. If one modulefile evaluation raises an error, test sequence
  continues.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -2822,7 +3023,7 @@ Module Sub-Commands
 
  See :subcmd:`try-load`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -2859,7 +3060,7 @@ Module Sub-Commands
  :mconfig:`abort_on_error` configuration option and :option:`--force` option
  is not set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -2889,7 +3090,7 @@ Module Sub-Commands
  :mconfig:`abort_on_error` configuration option and :option:`--force` option
  is not set.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.2
        Options :option:`--auto`, :option:`--no-auto`,
@@ -2916,7 +3117,7 @@ Module Sub-Commands
  If *directory* corresponds to the concatenation of multiple paths separated
  by colon character, each path is treated separately.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 5.0
        *directory* is removed whatever its reference counter value if
@@ -2930,15 +3131,16 @@ Module Sub-Commands
 
  See :subcmd:`reload`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
-.. subcmd:: use [-a|--append] directory...
+.. subcmd:: use [-a|--append|-p|--prepend] directory...
 
  Prepend one or more *directories* to the :envvar:`MODULEPATH` environment
- variable. The ``--append`` flag will append the *directory* to
- :envvar:`MODULEPATH`.
+ variable. The ``--append``/``-a`` flag will append the *directory* to
+ :envvar:`MODULEPATH` instead. The ``--prepend``/``-p`` flag explicitly
+ requests the default prepend behavior.
 
  When *directory* is already defined in :envvar:`MODULEPATH`, it is not added
  again or moved at the end or at the beginning of the environment variable.
@@ -2954,7 +3156,7 @@ Module Sub-Commands
  A *directory* that does not exist yet can be specified as argument and then
  be added to :envvar:`MODULEPATH`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 5.0
        Accept non-existent modulepath
@@ -2980,7 +3182,7 @@ Module Sub-Commands
  *pattern* variant specification and extra specifier. *pattern* may be a bare
  variant specification or extra specifier without mention of a module name.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionchanged:: 4.5
        Option :option:`--json`/:option:`-j` added
@@ -3043,8 +3245,12 @@ Constraints can be expressed to refine the selection of module version to:
 Advanced specification of single version or list of versions may benefit from
 the activation of the extended default mechanism (see
 :envvar:`MODULES_EXTENDED_DEFAULT`) to use an abbreviated notation like ``@1``
-to refer to more precise version numbers like ``1.2.3``. Range of versions on
-its side natively handles abbreviated versions.
+to refer to more precise version numbers like ``1.2.3``. Characters ``.`` and
+``-`` are considered version number separator to determine abbreviated
+versions. Range of versions on its side natively handles abbreviated versions.
+The upper bound may be less precise than the lower bound. An abbreviated
+upper bound includes all versions that extend it, provided they also satisfy
+the lower bound.
 
 In order to be specified in a range of versions or compared to a range of
 versions, the version major element should corresponds to a number. For
@@ -3071,7 +3277,7 @@ This version symbol should be specified using the ``@`` prefix notation (e.g.,
 ``foo@loaded``). An error is returned if no version of designated module is
 currently loaded.
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 4.4
 
@@ -3126,7 +3332,7 @@ part of the name or version of a module. These specific characters are ``+``,
 ``+`` and ``~`` characters if string that follows after does not correspond to
 a valid variant name (e.g., *name+*, *name++*, *name/version+1*).
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 4.8
 
@@ -3212,7 +3418,7 @@ is raised if used on a module specification query in another context. An error
 is also raised if an unknown extra specifier *element* is defined in search
 query.
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 5.3
 
@@ -3321,7 +3527,7 @@ color rendering do not apply on JSON output.
 
 Module tags cannot be used in search query to designate a modulefile.
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 4.7
 
@@ -3352,6 +3558,14 @@ Modules are designated sticky by associating them the ``sticky`` or the
 ``super-sticky`` :ref:`module tag<Module tags>` with the :mfcmd:`module-tag`
 modulefile command.
 
+Starting with version 5.7, :subcmd:`purge` also preserves the direct and
+indirect requirements of retained sticky or super-sticky modules, even if
+these requirements have no sticky tag. The :mconfig:`sticky_purge`
+configuration applies to their skipped unload. With :option:`--force`,
+sticky modules can be unloaded, but super-sticky modules and their
+requirements remain loaded. If several loaded modules satisfy an alternative
+requirement, only the last necessary one is preserved.
+
 When stickiness is defined over the generic module name (and not over a
 specific module version, a version list or a version range), sticky or
 super-sticky module can be swapped by another version of module. For instance
@@ -3365,7 +3579,7 @@ environment, sticky modules are unloaded to ensure :subcmd:`restore` or
 initial state. Super-sticky modules still cannot be unloaded with
 :subcmd:`restore` and :subcmd:`reset` sub-commands.
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 4.7
 
@@ -3456,7 +3670,7 @@ reported under the ``variants`` JSON object as name/value pairs. Values of
 Boolean variant are set as JSON Boolean. Other values are set as JSON strings.
 Variant shortcut and color rendering do not apply on JSON output.
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 4.8
 
@@ -3529,7 +3743,7 @@ modulefile evaluation is required to get tags applying to a modulefile.
 As extra match search implies additional modulefile evaluations, it is advised
 to build and use :ref:`Module cache` to improve search speed.
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 5.3
 
@@ -3780,7 +3994,7 @@ is stash index *0*).
 
     -------------------------------------------------------------------
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 4.0
 
@@ -3810,23 +4024,161 @@ An additional siteconfig script may be specified through the
 exists the extra siteconfig is sourced by :file:`modulecmd.tcl` right after
 main siteconfig script.
 
+.. _Hooks:
+
 Hooks
 """""
 
-Siteconfig relies on the ability of the Tcl language to overwrite previously
-defined variables and procedures. Sites may deploy their own Tcl code in
-siteconfig to adapt :file:`modulecmd.tcl` to their specific needs. The
-``trace`` Tcl command may especially be used to define hooks that are run when
-entering or leaving a given procedure, or when a variable is read or written.
-See :manpage:`trace(n)` man page for detailed information. The following
-example setup a procedure that is executed before each modulefile evaluation:
+The ``add-hook`` command lets siteconfig register a procedure to be called
+on one of the fixed set of hook events listed below, without having to know
+anything about the internal implementation of :file:`modulecmd.tcl`. This is
+the recommended way to run site-specific code before or after a modulefile
+or modulerc evaluation. It is called this way::
+
+    add-hook event procedure
+
+``event`` must be one of the hook events listed below; an unrecognized event
+name is a siteconfig error, raised immediately when ``add-hook`` is called.
+Several procedures may be registered on the same event: they are then all
+called, in their registration order, every time the event occurs.
+
+If ``procedure`` raises an error, this error is reported but does not stop
+the other procedures registered on the same event from being called, and
+does not interrupt the modulefile or modulerc evaluation the event relates
+to.
+
+Unless stated otherwise, hook procedures execute in the context of the main
+Tcl interpreter -- the same one siteconfig itself runs in -- never in the
+modulefile- or modulerc-specific sub-interpreter the event relates to. See
+the second example below for how a hook procedure can still reach that
+sub-interpreter when it needs to run modulefile or modulerc commands.
+
+.. only:: html or latex
+
+   .. versionadded:: 5.7
+
+.. mhook:: before-modulefile-eval modfile modname modnamevr modspec mode\
+   requested
+
+ Called right before a modulefile is evaluated, with the path of the
+ modulefile (``modfile``), the module name and version being evaluated,
+ without its variant specification (``modname``), the module name, version and
+ variant (``modnamevr``), the module specification as it was passed to the
+ internal evaluation call, prior to resolution -- typically what the user
+ typed on the command line (``modspec``), the current evaluation mode
+ (``mode``, see :mfcmd:`module-info`) and whether this modulefile evaluation
+ was directly requested by the user or triggered as a side effect, for
+ instance an automatically-loaded dependency (``requested``, a boolean).
+ The value ``procedure`` returns, if any, is ignored.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. mhook:: after-modulefile-eval modfile modname modnamevr modspec mode\
+   requested status
+
+ Called right after a modulefile has been evaluated, with the same
+ arguments as :mhook:`before-modulefile-eval` plus ``status``: ``0`` if the
+ modulefile evaluated without error, ``1`` otherwise. The value
+ ``procedure`` returns, if any, is ignored.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. mhook:: before-modulerc-eval modfile modname
+
+ Called right before a modulerc or :file:`.version` file is evaluated, with
+ the path of the file (``modfile``) and the modulerc short name (``modname``).
+ Modulerc evaluation is not tied to a single evaluation mode nor to a specific
+ request the way modulefile evaluation is, so neither a ``mode`` nor a
+ ``requested`` argument is provided here. The value ``procedure`` returns, if
+ any, is ignored.
+
+ This event, and :mhook:`after-modulerc-eval`, only apply to a
+ :file:`.modulerc` or :file:`.version` file resolved while looking up a
+ module under a modulepath. The RC files read once at startup
+ (:mconfig:`rcfile` and the other sources listed there) are not modulerc
+ files: they are evaluated through
+ :mhook:`before-modulefile-eval`/:mhook:`after-modulefile-eval` instead, in
+ ``load`` mode, exactly like any file passed to the :subcmd:`source`
+ sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. mhook:: after-modulerc-eval modfile modname status
+
+ Called right after a modulerc or :file:`.version` file has been evaluated,
+ with the same arguments as :mhook:`before-modulerc-eval` plus ``status``:
+ ``0`` if the file evaluated without error, ``1`` otherwise. The value
+ ``procedure`` returns, if any, is ignored.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+The following example uses ``add-hook`` to record every directly-requested
+modulefile load to a site-defined audit file. This is a different need
+than the built-in :mconfig:`logger` integration (see channel argument of
+:mfcmd:`puts`), which only forwards messages a modulefile explicitly sends
+to it:
 
 .. code-block:: tcl
 
-    proc beforeEval {cmdstring code result op} {
-       # code to run right before each modulefile evaluation
+    proc auditRequestedLoad {modfile modname modnamevr modspec mode requested} {
+       if {$requested && $mode eq {load}} {
+          set fd [open /var/log/modules-audit.log a]
+          puts $fd "[clock format [clock seconds]] $modnamevr"
+          close $fd
+       }
     }
-    trace add execution execute-modulefile enter beforeEval
+    add-hook before-modulefile-eval auditRequestedLoad
+
+If a hook procedure running in the context of the main interpreter needs to
+execute modulefile commands (for example, to define environment variables),
+these commands should be run through the current modulefile Tcl interpreter.
+This ensures that the commands behave consistently with the current modulefile
+evaluation mode.
+
+.. code-block:: tcl
+
+    proc hook_procedure {modfile modname modnamevr modspec mode requested} {
+        # get the name of the current modulefile Tcl interpreter
+        set modfile_interp [getCurrentModfileInterpName]
+
+        # execute a modulefile command in the current interpreter context
+        interp eval $modfile_interp setenv MYVAR value
+    }
+    add-hook before-modulefile-eval hook_procedure
+
+Advanced hooks
+""""""""""""""
+
+Siteconfig relies on the ability of the Tcl language to overwrite previously
+defined variables and procedures. For needs ``add-hook`` does not cover --
+for instance rejecting a modulefile evaluation outright, something a hook
+procedure cannot do since its return value is ignored -- sites may still
+deploy their own Tcl code in siteconfig to adapt :file:`modulecmd.tcl` to
+their specific needs. The ``trace`` Tcl command may especially be used to
+define hooks that are run when entering or leaving a given procedure, or
+when a variable is read or written. See :manpage:`trace(n)` man page for
+detailed information. The following example blocks the evaluation of a
+specific modulefile by raising an error from an ``enter`` trace on the
+internal ``execute-modulefile`` procedure, something that cannot be
+expressed through :mhook:`before-modulefile-eval`:
+
+.. code-block:: tcl
+
+    proc blockModule {cmdstring op} {
+       # third word of cmdstring is the resolved module name and version
+       if {[lindex $cmdstring 2] eq {foo/1.0}} {
+          error "foo/1.0 is blocked by site policy"
+       }
+    }
+    trace add execution execute-modulefile enter blockModule
 
 Another possibility is to override the definition of an existing procedure by
 first renaming its original version then creating a new procedure that will add
@@ -3843,6 +4195,10 @@ adds a new query option to the :mfcmd:`module-info` modulefile command:
           default { return [__module-info $what $more] }
        }
     }
+
+These techniques bind to :file:`modulecmd.tcl` internal procedure names and
+call signatures, which may change across versions; prefer ``add-hook``
+when one of its events covers the need.
 
 Siteconfig hook variables
 """""""""""""""""""""""""
@@ -3866,7 +4222,7 @@ meaning. The following variables are recognized:
  ``myvar`` and ``othervar`` variables in the modulefile evaluation context
  with respectively ``1`` and ``some text`` as value.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -3893,7 +4249,7 @@ meaning. The following variables are recognized:
  bind them respectively to the ``mycmd`` and ``anotherproc`` procedures
  defined in siteconfig script.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -3913,7 +4269,7 @@ meaning. The following variables are recognized:
  ``myvar`` and ``othervar`` variables in the modulerc evaluation context with
  respectively ``1`` and ``some text`` as value.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -3941,11 +4297,11 @@ meaning. The following variables are recognized:
  defined in siteconfig script.
 
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
-.. only:: html
+.. only:: html or latex
 
    .. versionadded:: 4.1
 
@@ -4013,7 +4369,7 @@ ENVIRONMENT
  of Modules occur. At the end of the processing of the :subcmd:`autoinit`
  sub-command, :envvar:`__MODULES_AUTOINIT_INPROGRESS` is unset.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.0
 
@@ -4042,7 +4398,7 @@ ENVIRONMENT
  on :subcmd:`list` sub-command to report the symbolic versions associated with
  the loaded modules.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -4062,7 +4418,7 @@ ENVIRONMENT
  in order to keep environment consistent when a conflicting module is asked
  for load afterward.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -4082,7 +4438,7 @@ ENVIRONMENT
  use to distinguish from all tags those that have been specifically set with
  :option:`--tag` option.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -4105,7 +4461,7 @@ ENVIRONMENT
  :subcmd:`saveshow` sub-command when ``__init__`` collection name is specified
  or when no collection name is specified and no *default* collection exists.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -4124,7 +4480,7 @@ ENVIRONMENT
  *modulefiles* in order to keep environment consistent when a pre-required
  module is asked for unload afterward.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -4147,7 +4503,7 @@ ENVIRONMENT
  use to get knowledge of the pre-requirement declared by the loaded
  *modulefiles* in order to keep environment consistent.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -4157,7 +4513,7 @@ ENVIRONMENT
  evaluation. Loaded modules listed in this variable are those defining
  volatile environment changes like shell completion, alias and function.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -4180,7 +4536,7 @@ ENVIRONMENT
  these modulefile commands when modulefile is unloaded to undo the environment
  changes.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.6
 
@@ -4203,7 +4559,7 @@ ENVIRONMENT
  This environment variable is intended for :command:`module` command internal
  use to get knowledge of the stickiness scope when sticky module is changed.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -4222,7 +4578,7 @@ ENVIRONMENT
  to report these tags on :subcmd:`list` sub-command output or to apply
  specific behavior when unloading *modulefile*.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -4242,7 +4598,7 @@ ENVIRONMENT
  in order to keep environment consistent when unloading these modules whereas
  modulefiles from the enabled modulepaths are loaded.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -4266,7 +4622,7 @@ ENVIRONMENT
  specific variant value or just to report these variant values when listing
  loaded modules.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -4286,7 +4642,7 @@ ENVIRONMENT
  :mfcmd:`pushenv` command, this value is associated to an empty module name to
  record it as a pair element in :envvar:`__MODULES_PUSHENV_\<VAR\>`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -4295,7 +4651,7 @@ ENVIRONMENT
  Value of environment variable :envvar:`<VAR>` passed to :file:`modulecmd.tcl`
  in order to restore :envvar:`<VAR>` to this value once started.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -4310,7 +4666,7 @@ ENVIRONMENT
  :command:`module` shell function when they apply the quarantine mechanism.
  (see :envvar:`MODULES_QUARANTINE_SUPPORT`).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.0
 
@@ -4332,7 +4688,7 @@ ENVIRONMENT
  distinguish between an empty path-like variable and a path-like variable
  containing an empty string as single element.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -4367,7 +4723,7 @@ ENVIRONMENT
  :mconfig:`contact` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -4426,7 +4782,7 @@ ENVIRONMENT
  :mconfig:`abort_on_error` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -4440,7 +4796,7 @@ ENVIRONMENT
  :mconfig:`advanced_version_spec` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
 
@@ -4521,7 +4877,9 @@ ENVIRONMENT
    available.
 
  However, reload is always attempted if the modulefile is tagged as
- ``super-sticky`` or ``sticky``, and force mode is not enabled. Dependent
+ ``super-sticky`` or ``sticky``, and force mode is not enabled. *Abort on
+ error* behavior is applied if reload of such module kind fails whatever the
+ value of the :mconfig:`abort_on_error` configuration option. Dependent
  Reload modulefiles whose reload has been skipped are treated as Dependent
  Unload modulefiles.
 
@@ -4533,7 +4891,7 @@ ENVIRONMENT
  :subcmd:`config` sub-command. The :option:`--auto` and :option:`--no-auto`
  command line switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.2
 
@@ -4555,6 +4913,10 @@ ENVIRONMENT
     .. versionchanged:: 5.5
        Reload of all Dependent Reload modules occurs after the main evaluation
 
+    .. versionchanged:: 5.6
+       *Abort on error* behavior is always applied if reload of a Dependent
+       Reload sticky or super-sticky module fails
+
 .. envvar:: MODULES_AVAIL_INDEPTH
 
  If set to ``1``, enable in depth search results for :subcmd:`avail`
@@ -4572,7 +4934,7 @@ ENVIRONMENT
  :option:`--no-indepth` command line switches override this environment
  variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -4617,7 +4979,7 @@ ENVIRONMENT
  the :subcmd:`config` sub-command. The :option:`--output`/:option:`-o` command
  line switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -4647,7 +5009,7 @@ ENVIRONMENT
  the :subcmd:`config` sub-command. The :option:`--output`/:option:`-o`
  command line switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -4662,7 +5024,7 @@ ENVIRONMENT
  Size of the buffer used when reading or writing cache files. Accepted values
  are integers comprised between 4096 and 1000000.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
 
@@ -4676,7 +5038,7 @@ ENVIRONMENT
  comprised between 0 (cache files never expire) and 31536000 (equivalent to
  one year duration).
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
 
@@ -4687,7 +5049,7 @@ ENVIRONMENT
  This environment variable is generated by :command:`module` command and
  should not be modified externally.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -4702,7 +5064,7 @@ ENVIRONMENT
  :mconfig:`collection_pin_version` configuration option. It can be defined
  with the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -4719,7 +5081,7 @@ ENVIRONMENT
  :mconfig:`collection_pin_tag` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -4750,7 +5112,7 @@ ENVIRONMENT
  :mconfig:`collection_target` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.0
 
@@ -4778,7 +5140,7 @@ ENVIRONMENT
  superseded by mode set with :envvar:`MODULES_COLOR` environment variable or
  with :option:`--color` command line switch..
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -4825,7 +5187,7 @@ ENVIRONMENT
  :mconfig:`colors` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -4859,9 +5221,22 @@ ENVIRONMENT
  :mconfig:`conflict_unload` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
+
+.. envvar:: MODULES_DOMAINNAME
+
+ Command to fetch domain name. The value of this variable is composed of a
+ domainname command name or path eventually followed by command-line options.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`domainname` configuration option. It can be defined with the
+ :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. envvar:: MODULES_EDITOR
 
@@ -4876,7 +5251,7 @@ ENVIRONMENT
  :envvar:`EDITOR` environment variables. These environment variables are
  overridden by :envvar:`MODULES_EDITOR`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -4884,9 +5259,9 @@ ENVIRONMENT
 
  If set to ``1``, a specified module version is matched against starting
  portion of existing module versions, where portion is a substring separated
- from the rest of the version string by a ``.`` character. For example
+ from the rest of the version string by ``.`` or ``-`` characters. For example
  specified modules ``mod/1`` and ``mod/1.2`` will match existing modulefile
- ``mod/1.2.3``.
+ ``mod/1.2.3`` and ``mod/2.4`` will match ``mod/2.4-91db5cf2``.
 
  In case multiple modulefiles match the specified module version and a single
  module has to be selected, the explicitly set default version is returned if
@@ -4898,9 +5273,12 @@ ENVIRONMENT
  :mconfig:`extended_default` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
+
+    .. versionchanged:: 5.7
+       Character ``-`` is also considered a version number separator
 
 .. envvar:: MODULES_FAMILY_<NAME>
 
@@ -4915,7 +5293,7 @@ ENVIRONMENT
  This environment variable is generated by :command:`module` command and
  should not be modified externally.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -4929,7 +5307,7 @@ ENVIRONMENT
  :mconfig:`hide_auto_loaded` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -4951,7 +5329,7 @@ ENVIRONMENT
  switches, which correspond to the ``always`` mode, override this environment
  variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.4
 
@@ -4973,9 +5351,33 @@ ENVIRONMENT
  :subcmd:`config` sub-command. The :option:`--ignore-cache` command line
  switch overrides this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
+
+.. envvar:: MODULES_IGNORE_CACHE_SUBCMDS
+
+ A colon separated list of the module sub-commands that ignore module cache.
+ When one of these sub-commands is run, modulepath directories are walked
+ through to search modules instead of relying on their cache file.
+
+ Sub-command name aliases (like ``add`` for :subcmd:`load`) resolve to their
+ target sub-command, which is the name to set in value list. The
+ :command:`ml` command used without a sub-command name translates to the
+ underlying :subcmd:`load` or :subcmd:`unload` sub-commands.
+
+ Ignoring cache may be useful for sub-commands targeting specific modules
+ (like :subcmd:`load`) when cache files are large: walking through modulepath
+ content to find the requested modules may be faster than evaluating the
+ whole cache file.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`ignore_cache_subcmds` configuration option. It can be defined
+ with the :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. envvar:: MODULES_IGNORE_USER_RC
 
@@ -4987,7 +5389,7 @@ ENVIRONMENT
  :subcmd:`config` sub-command. The :option:`--ignore-user-rc` command line
  switch overrides this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.3
 
@@ -5020,7 +5422,7 @@ ENVIRONMENT
  :mconfig:`implicit_default` has been declared locked in
  :mconfig:`locked_configs` configuration option.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5038,9 +5440,72 @@ ENVIRONMENT
  the :subcmd:`config` sub-command. The ``--not-req`` option, applied to a
  :mfcmd:`module` command in a modulefile, overrides this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
+
+.. envvar:: MODULES_INFO_EXTENSION
+
+ Consider (if set to ``1``) that module extensions have a pure informational
+ purpose and no module alias are associated to them. Extensions defined with
+ :mfcmd:`provide` modulefile command are not affected by this mechanism.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`info_extension` configuration option. It can be defined with the
+ :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. envvar:: MODULES_INIT_ENVVARS
+
+ A colon-separated list of environment variable initial definitions. Each
+ definition must use the format ``VARIABLE_NAME=initial_value``. When an
+ environment variable is modified for the first time, the corresponding
+ initial value is assigned before the modification is applied.
+
+ This mechanism applies to all path-like environment variable management
+ modulefile commands and module sub-commands (:mfcmd:`append-path`,
+ :mfcmd:`prepend-path` and :mfcmd:`remove-path`).
+
+ When an entry is removed from an environment variable, the variable is unset
+ if its resulting value matches the configured initial value and no explicit
+ reference counter is associated with it.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`init_envvars` configuration option. It can be defined with the
+ :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. envvar:: MODULES_LINKED_ENVVARS
+
+ A colon-separated list of environment variable link sets. Each link set is a
+ group of environment variable names separated by the ampersand character.
+ When an environment variable modification command is applied to the first
+ variable in a link set, the same command is automatically applied to all
+ other variables in that set.
+
+ This link mechanism applies to all environment variable management modulefile
+ commands and module sub-commands (:mfcmd:`append-path`,
+ :mfcmd:`prepend-path`, :mfcmd:`pushenv`, :mfcmd:`remove-path`,
+ :mfcmd:`setenv` and :mfcmd:`unsetenv`).
+
+ For example, if the configuration option is set to ``FOO&BAR&BAZ:BAR&QUX``, a
+ :mfcmd:`prepend-path` command applied to ``FOO`` will also be applied to
+ ``BAR``, ``BAZ``, and ``QUX``. Linking is not reflexive: a command applied to
+ ``QUX`` is not propagated to any other environment variable in the link set.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`linked_envvars` configuration option. It can be defined with the
+ :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. envvar:: MODULES_LIST_OUTPUT
 
@@ -5069,7 +5534,7 @@ ENVIRONMENT
  :subcmd:`config` sub-command. The :option:`--output`/:option:`-o` command
  line switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -5098,7 +5563,7 @@ ENVIRONMENT
  :subcmd:`config` sub-command. The :option:`--output`/:option:`-o` command
  line switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -5126,7 +5591,7 @@ ENVIRONMENT
  :mconfig:`logged_events` has been declared locked in
  :mconfig:`locked_configs` configuration option.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -5144,7 +5609,7 @@ ENVIRONMENT
  If :envvar:`MODULES_LOGGER` variable is set to an empty string, logger
  will not be launched.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.5
 
@@ -5173,7 +5638,7 @@ ENVIRONMENT
  :mconfig:`mcookie_check` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -5191,7 +5656,7 @@ ENVIRONMENT
  :mconfig:`mcookie_version_check` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -5209,9 +5674,24 @@ ENVIRONMENT
  prior Modules initialization or the :mconfig:`ml` configuration option should
  be set in the :file:`initrc` configuration file.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.5
+
+.. envvar:: MODULES_MODULEPATH_IGNORE
+
+ If set to ``0``, do not apply :mfcmd:`modulepath-ignore` pattern
+ definitions: every element of the modulepath directories is walked through
+ and checked as if no pattern were defined.
+
+ This environment variable supersedes the default value of the
+ :mconfig:`modulepath_ignore` configuration option. Patterns can be skipped
+ for one command execution with the :option:`--no-modulepath-ignore` command
+ line switch.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. envvar:: MODULES_NEARLY_FORBIDDEN_DAYS
 
@@ -5225,32 +5705,94 @@ ENVIRONMENT
  :mconfig:`nearly_forbidden_days` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.6
 
+.. envvar:: MODULES_NON_EXPORTABLE_TAGS
+
+ A colon separated list of tags that should not be exported to the module once
+ it is loaded.
+
+ This environment variable value supersedes the default value set in the
+ :mconfig:`non_exportable_tags` configuration option. It can be defined with
+ the :subcmd:`config` sub-command.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
 .. envvar:: MODULES_PAGER
 
- Text viewer for use to paginate message output if error output stream is
- attached to a terminal. The value of this variable is composed of a pager
- command name or path eventually followed by command-line options.
+ Text viewer for use to paginate message output. The value of this variable is
+ composed of a pager command name or path eventually followed by command-line
+ options. See :envvar:`MODULES_PAGINATE` to learn how pagination is enabled.
 
  This environment variable value supersedes the default value set in the
  :mconfig:`pager` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- If :envvar:`MODULES_PAGER` variable is set to an empty string or to the value
- ``cat``, pager will not be launched.
-
- Pager is never launched if :file:`modulecmd.tcl` program is run for scripting
- language rather shells.
-
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
     .. versionchanged:: 5.5
        No pager when :file:`modulecmd.tcl` is run for scripting languages
+
+.. envvar:: MODULES_PAGINATE
+
+ If set to ``1``, output of module command is piped into defined pager
+ command. See :envvar:`MODULES_PAGER` variable for pager command definition.
+
+ Pagination is automatically disabled in the following situations:
+
+ * :envvar:`MODULES_PAGER` variable is set to an empty string or to the value
+   ``cat``.
+ * :file:`modulecmd.tcl` program is run for scripting language rather shells.
+ * :file:`modulecmd.tcl` error output stream is not attached to a terminal.
+ * :subcmd:`clear` or :subcmd:`edit` sub-commands are run.
+
+ The :envvar:`MODULES_PAGINATE` environment variable value supersedes the
+ default value set in the :mconfig:`paginate` configuration option. It can be
+ defined with the :subcmd:`config` sub-command. The
+ :option:`--paginate`/:option:`-p` and :option:`--no-pager`/:option:`-P`
+ command line switches override this environment variable.
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
+
+.. envvar:: MODULES_PATH_ENTRY_REORDER
+
+ This environment variable changes the behavior of :mfcmd:`prepend-path`,
+ :mfcmd:`append-path` and :mfcmd:`module use<module>` modulefile commands and
+ sub-commands.
+ 
+ If set to ``1``, and one of these commands targets a path entry that already
+ exists in the environment variable, the entry is moved to the beginning or
+ end (depending on the command), unless duplicates are allowed. If set to
+ ``0``, the environment variable is not modified when the entry already
+ exists.
+
+ .. parsed-literal::
+
+     :ps:`$` module config path_entry_reorder 0
+     :ps:`$` module append-path PATHVAR /foo
+     :ps:`$` module append-path PATHVAR /bar
+     :ps:`$` module append-path PATHVAR /foo
+     :ps:`$` echo $PATHVAR
+     /foo:/bar
+     :ps:`$` module config path_entry_reorder 1
+     :ps:`$` module append-path PATHVAR /foo
+     :ps:`$` echo $PATHVAR
+     /bar:/foo
+     :ps:`$` module append-path --duplicates PATHVAR /bar
+     :ps:`$` echo $PATHVAR
+     /bar:/foo:/bar
+
+ .. only:: html or latex
+
+    .. versionadded:: 5.7
 
 .. envvar:: MODULES_PROTECTED_ENVVARS
 
@@ -5266,7 +5808,7 @@ ENVIRONMENT
  :mconfig:`protected_envvars` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -5295,7 +5837,7 @@ ENVIRONMENT
  :mconfig:`quarantine_support` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.0
 
@@ -5310,7 +5852,7 @@ ENVIRONMENT
  :option:`--no-redirect` command line switches override this environment
  variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.1
 
@@ -5328,7 +5870,7 @@ ENVIRONMENT
  :mconfig:`require_via` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -5343,7 +5885,7 @@ ENVIRONMENT
  :mconfig:`reset_target_state` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -5362,13 +5904,25 @@ ENVIRONMENT
  Original values of these environment variables set in quarantine are passed
  to :file:`modulecmd.tcl` via :envvar:`__MODULES_QUAR_\<VAR\>` variables.
 
+ Each variable found in :envvar:`MODULES_RUN_QUARANTINE` is also set in
+ quarantine by :file:`modulecmd.tcl` during the creation of the Tcl
+ sub-interpreters used to evaluate modulercs and modulefiles. Variables are
+ unset or set to the value of their corresponding
+ :envvar:`MODULES_RUNENV_\<VAR\>` variable during this creation step, then
+ their original value is restored. It protects sub-interpreter initialization
+ from side-effect coming from current definition of these variables (e.g., a
+ ``TCL_LIBRARY`` variable pointing at a broken Tcl installation).
+
  This environment variable value supersedes the default value set in the
  :mconfig:`run_quarantine` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
+
+    .. versionchanged:: 5.7
+       Quarantine also applied during Tcl sub-interpreter creation
 
 .. envvar:: MODULES_RUNENV_<VAR>
 
@@ -5376,7 +5930,7 @@ ENVIRONMENT
  :file:`modulecmd.tcl` run-time execution if :envvar:`<VAR>` is referred in
  :envvar:`MODULES_RUN_QUARANTINE`.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -5396,7 +5950,7 @@ ENVIRONMENT
  :option:`--contains` command line switches override this environment
  variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5426,7 +5980,7 @@ ENVIRONMENT
  configuration option should be set to ``1`` in the :file:`initrc`
  configuration file.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5451,7 +6005,7 @@ ENVIRONMENT
  configuration option should be set to the list of these shells in the
  :file:`initrc` configuration file.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -5472,7 +6026,7 @@ ENVIRONMENT
  :mconfig:`silent_shell_debug` configuration option should be set to ``1`` in
  the :file:`initrc` configuration file.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.1
 
@@ -5488,7 +6042,7 @@ ENVIRONMENT
  :mconfig:`extra_siteconfig` has been declared locked in
  :mconfig:`locked_configs` configuration option.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5502,7 +6056,7 @@ ENVIRONMENT
  :mconfig:`source_cache` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -5523,7 +6077,7 @@ ENVIRONMENT
  :option:`--no-indepth` command line switches override this environment
  variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -5567,7 +6121,7 @@ ENVIRONMENT
  the :subcmd:`config` sub-command. The :option:`--output`/:option:`-o` command
  line switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -5588,7 +6142,7 @@ ENVIRONMENT
  the :subcmd:`config` sub-command. The :option:`--output`/:option:`-o`
  command line switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.6
 
@@ -5598,11 +6152,14 @@ ENVIRONMENT
  :subcmd:`purge`, raise an ``error`` or emit a ``warning`` message or be
  ``silent``.
 
+ Also applies to the skipped unload of modules required, directly or
+ indirectly, by a retained sticky or super-sticky module.
+
  This environment variable value supersedes the default value set in the
  :mconfig:`sticky_purge` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -5620,7 +6177,7 @@ ENVIRONMENT
  :mconfig:`tag_abbrev` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -5642,7 +6199,7 @@ ENVIRONMENT
  :mconfig:`tag_color_name` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -5655,7 +6212,7 @@ ENVIRONMENT
  :mconfig:`tcl_linter` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.2
 
@@ -5671,7 +6228,7 @@ ENVIRONMENT
  :mconfig:`term_background` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5687,7 +6244,7 @@ ENVIRONMENT
  :subcmd:`config` sub-command. The :option:`--width`/:option:`-w` command line
  switches override this environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.7
 
@@ -5701,7 +6258,7 @@ ENVIRONMENT
  :mconfig:`unique_name_loaded` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 5.4
 
@@ -5715,7 +6272,7 @@ ENVIRONMENT
  :mconfig:`unload_match_order` configuration option. It can be defined with
  the :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5737,7 +6294,7 @@ ENVIRONMENT
  :mconfig:`variant_shortcut` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.8
 
@@ -5771,7 +6328,7 @@ ENVIRONMENT
  :option:`--debug` and :option:`--trace` command line switches override this
  environment variable.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5801,7 +6358,7 @@ ENVIRONMENT
  prior Modules initialization or the :mconfig:`wa_277` configuration option
  should be set to ``1`` in the :file:`initrc` configuration file.
 
- .. only:: html
+ .. only:: html or latex
 
     .. versionadded:: 4.3
 
@@ -5815,6 +6372,8 @@ ENVIRONMENT
  :mconfig:`home` configuration option. It can be defined with the
  :subcmd:`config` sub-command.
 
+
+.. _module FILES:
 
 FILES
 -----
@@ -5885,8 +6444,12 @@ FILES
 
 |file libexecdir_modulecmd|
 
- The *modulefile* interpreter that gets executed upon each invocation
+ Modules execution engine, interpreting *modulefile* upon each invocation
  of :command:`module`.
+
+|file bindir_modulecmd|
+
+ Generic wrapper command pointing to Modules execution engine.
 
 |file initdir_shell|
 
@@ -5896,5 +6459,4 @@ FILES
 SEE ALSO
 --------
 
-:ref:`ml(1)`, :ref:`modulefile(5)`, :ref:`envml(1)`
-
+:ref:`envml(1)`, :ref:`ml(1)`, :ref:`modulecmd(1)`, :ref:`modulefile(5)`

@@ -29,6 +29,16 @@
 # Tcl>=8.6): use channel pipe instead of saving these outputs in file
 if {[lindex [lsort -dictionary [list 8.6 [info tclversion]]] 1] eq [info tclversion]} {
 
+# catch background errors, like a modulecmd process killed by a signal that
+# makes readpipe raise an uncaught CHILDKILLED error from its event handler.
+# without this catching procedure defined, such an error leaves the endpipe
+# variable unset and the vwait call in modulecmd_xxx_ hangs forever
+proc bgerror {msg} {
+    send_user "ERROR: background error caught: $msg\n"
+    # release ongoing command wait to make related test fail right away
+    set ::endpipe error
+}
+
 proc readpipe {p1 p2 varname {exit_varname {}}} {
     append ::$varname [read $p1]
     if {[eof $p1]} {
@@ -50,7 +60,7 @@ proc readpipe {p1 p2 varname {exit_varname {}}} {
     }
 }
 
-proc modulecmd_xxx_ {command {input noinput}} {
+proc modulecmd_xxx_ {command {input noinput} {launcher {}}} {
 	global MODULECMD
 	global TCLSH
 	global verbose
@@ -68,7 +78,12 @@ proc modulecmd_xxx_ {command {input noinput}} {
 	  unresolved "internal testsuite error: no module command specified"
 	}
 
-    set cmdlist [list $TCLSH $MODULECMD $shell]
+    set cmdlist [list]
+    if {[llength $launcher]} {
+        lappend cmdlist {*}$launcher
+    }
+    lappend cmdlist $TCLSH $MODULECMD $shell
+
     # check if asked not to split passed command line
     if {[string first "NOCMDSPLIT" $command] == 0} {
         lappend cmdlist [string range $command 10 end]
@@ -106,7 +121,7 @@ proc modulecmd_xxx_ {command {input noinput}} {
 
 } else {
 
-proc modulecmd_xxx_ {command {input noinput}} {
+proc modulecmd_xxx_ {command {input noinput} {launcher {}}} {
 	global MODULECMD
 	global TCLSH
 	global verbose
@@ -120,7 +135,12 @@ proc modulecmd_xxx_ {command {input noinput}} {
 	  unresolved "internal testsuite error: no module command specified"
 	}
 
-    set cmdlist [list exec $TCLSH $MODULECMD $shell]
+    set cmdlist [list]
+    if {[llength $launcher]} {
+        lappend cmdlist {*}$launcher
+    }
+    lappend cmdlist $TCLSH $MODULECMD $shell
+
     # check if asked not to split passed command line
     if {[string first "NOCMDSPLIT" $command] == 0} {
         lappend cmdlist [string range $command 10 end]
@@ -281,6 +301,7 @@ proc install_test_xxx_ {command} {
 
    if {$shell eq {ruby}} {
       set comp_error [regsub -all -line {^.* warning: Insecure world writable dir .*(\n|$)} $comp_error {}]
+      set comp_error [regsub -all -line {^`RubyGems' were not loaded\.(\n|$)} $comp_error {}]
    }
 }
 
